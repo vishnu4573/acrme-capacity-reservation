@@ -1,0 +1,16 @@
+# Local config (contains subscription IDs)
+config.yaml
+
+# Generated run artefacts
+reports/*.html
+reports/*.md
+reports/*.json
+reports/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/

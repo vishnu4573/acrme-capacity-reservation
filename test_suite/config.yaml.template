@@ -1,0 +1,58 @@
+# ============================================================================
+# ACRME POC Test Suite — Configuration Template
+# ----------------------------------------------------------------------------
+# Copy this file to `config.yaml` and fill in every value before running the
+# suite. All fields below are REQUIRED unless explicitly noted as optional.
+#
+#   cp config.yaml.template config.yaml
+#   $EDITOR config.yaml
+#
+# HARD CONSTRAINT: regions.primary, regions.dr and regions.nonprod MUST be
+# three distinct Azure regions. The config loader (and pre-flight PF-09/PF-10)
+# will refuse to run if any two are identical.
+# ============================================================================
+
+provider:
+  subscription_id: ""      # Provider (capacity owner) subscription GUID
+  resource_group: ""       # Provider resource group that holds the CRGs
+  tenant_id: ""            # Azure AD tenant GUID
+
+consumer:
+  subscription_id: ""      # Consumer subscription GUID (shares provider CRG)
+  resource_group: ""       # Consumer resource group for consumer VMs
+
+regions:
+  primary: ""              # e.g. westeurope  (production region)
+  dr: ""                   # e.g. northeurope (must differ from primary)
+  nonprod: ""              # e.g. uksouth     (must differ from primary and dr)
+
+vm:
+  sku: ""                  # e.g. Standard_D4s_v3
+  sku_family: ""           # e.g. standardDSv3Family
+  vcpus_per_instance: 4    # vCPUs per instance of the chosen SKU (used for floor maths)
+
+crg:
+  name: ""                 # Primary CRG name (will be prefixed acrme-poc- if not already)
+  reservation_name: ""     # Primary capacity reservation name
+  quantity: 2              # Reserved instance count in the primary CRG
+  dr_crg_name: ""          # DR CRG name
+  dr_reservation_name: ""  # DR capacity reservation name
+  dr_quantity: 2           # Reserved instance count in the DR CRG
+  dr_floor_percentage: 40  # DR floor protection percentage (engine-enforced, see POC-13)
+
+quota_group:
+  name: ""                 # Quota group name. Leave BLANK if quota groups not required.
+
+aks:
+  resource_group: ""       # AKS resource group. Leave BLANK to skip AKS tests.
+  cluster_name: ""         # Existing AKS cluster name
+  nodepool_name: ""        # Node pool name to create/associate (e.g. acrmepoc)
+
+# Phase gate governs which tests are eligible to run:
+#   phase1     — read/lightweight validation, no destructive DR/quota-group tests
+#   phase2     — DR failover, quota group membership, engine-dependent tests
+#   production — full suite including 100-consumer limit and throttle tests
+phase_gate: "phase1"       # phase1 | phase2 | production
+
+dry_run: false             # If true, commands are printed but NOT executed
+timeout_seconds: 300       # Per-test / per-command timeout in seconds

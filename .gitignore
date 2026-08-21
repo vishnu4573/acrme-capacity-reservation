@@ -1,0 +1,18 @@
+# Local runtime config (never commit secrets / subscription IDs)
+test_suite/config.yaml
+
+# Generated reports
+test_suite/reports/*.html
+test_suite/reports/*.md
+test_suite/reports/*.json
+test_suite/reports/*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.abacus*
