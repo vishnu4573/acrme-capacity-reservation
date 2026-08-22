@@ -43,6 +43,7 @@ acrme-capacity-reservation/
 | Artifact | Description |
 |---|---|
 | **Executive Design Document** | Architecture narrative for the ACRME Capacity Reservation initiative — WAF pillars, ADR decisions, DR model, quota governance, and implementation roadmap. |
+| **Executive Presentation** | 14-slide leadership deck (`.pptx` + `.pdf`, `docs/presentation/`) distilling the Executive Design Document — the position in one slide, capacity model, automation safety tiers, placement & cross-geo DR, honest what's-working / what's-still-validated split, risks, and the three decisions leadership must make. Each slide is traceable to its source document section. |
 | **POC Workbook v2** | Test workbook covering all 8 POC groups and 35 test cases, with pass/fail criteria, evidence tables, risk ratings, and phase-gate checklists. |
 | **Production Readiness Review & Architecture** | The finalized architecture and production-readiness review that the executive document and workbook are derived from. |
 | **Architecture Diagrams Deck** | Presentation / infographic deck (`.pptx` + `.pdf`) covering the six core architecture views, each with an infographic key-facts slide plus the full diagram. |
