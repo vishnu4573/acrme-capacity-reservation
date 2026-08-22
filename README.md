@@ -35,6 +35,7 @@ acrme-capacity-reservation/
 | **POC Workbook v2** | Test workbook covering all 8 POC groups and 35 test cases, with pass/fail criteria, evidence tables, risk ratings, and phase-gate checklists. |
 | **Production Readiness Review & Architecture** | The finalized architecture and production-readiness review that the executive document and workbook are derived from. |
 | **Architecture Diagrams Deck** | Presentation / infographic deck (`.pptx` + `.pdf`) covering the six core architecture views, each with an infographic key-facts slide plus the full diagram. |
+| **UML Class Diagrams Summary** | Design-first UML class diagrams (4 diagram sets) for domain model, operation tracking, service layer, and state machines — with explicit gap analysis. |
 
 Each document is provided in editable (`.docx` / `.md` / `.pptx`) and print-ready (`.pdf`) form.
 
@@ -51,6 +52,27 @@ and vector (`.svg`, infinitely zoomable) form:
 | 4 | Steady-State Capacity Lifecycle | Auto-increase triggers, debounce, Phase A/B |
 | 5 | Emergency Capacity Transfer | Three-tier crisis response (DR_EVENT_ACTIVE) |
 | 6 | VM Disassociation Sequence | Tier-3 execution: Path B default, Path A fallback |
+
+#### UML Class Diagrams (`docs/diagrams/uml_*.md`)
+
+**Design-first tool (70% complete)** — identifies gaps and unresolved design questions:
+
+| # | Diagram | Coverage | Status |
+|---|---|---|---|
+| 1 | Core Domain Model | CRG, Assignment, Policy, QuotaGroup, Snapshot, Increase, Transfer entities | Entity outlines complete; property types & Cosmos schemas TBD |
+| 2 | Operation Tracking Model | Saga pattern, OperationRecord, compensation chains, VM_ImpactRecord, audit | Saga defined; compensation lambda structure TBD |
+| 3 | Service Layer Model | PlacementEngine, Reconciliation, Transfer, Quota, Sharing, Zone services | Service boundaries clear; FastAPI contracts & DTOs TBD |
+| 4 | State Machines | engine_mode, IncreaseRequest lifecycle, Transfer workflow (Tier 1/2/3) | High-level states defined; transition guards TBD (G-15/B-3 blocker) |
+
+**Purpose:** Visual design tool that explicitly surfaces the 30% of design work still required. Each diagram includes a "Known Gaps" section calling out unresolved questions for focused design sessions.
+
+**Key blockers identified:**
+- **G-14:** Consumer credential model for Tier 3 VM disassociation
+- **G-15/B-3:** Engine mode state machine (transition guards, concurrency, recovery)
+- **Entity schemas:** Cosmos DB partition keys, indexes, TTL for all entities
+- **Service contracts:** FastAPI DTOs, RBAC, endpoints for all services
+
+See [`docs/acrme_uml_class_diagrams_summary.md`](docs/acrme_uml_class_diagrams_summary.md) for full analysis and next steps.
 
 ---
 
