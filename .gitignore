@@ -19,6 +19,7 @@ venv/
 
 # Auto-generated preview/conversion files
 *.pptx_preview/
+*.docx_preview/
 
 # Auto-converted diagram PDFs/DOCX (keep source .md only for diagrams)
 docs/diagrams/uml_*.pdf

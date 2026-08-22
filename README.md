@@ -51,6 +51,16 @@ acrme-capacity-reservation/
 
 Each document is provided in editable (`.docx` / `.md` / `.pptx`) and print-ready (`.pdf`) form.
 
+#### Product backlog (`docs/backlog/`)
+
+The full Agile delivery backlog — **19 Epics → 66 Stories → 175 Tasks (426 story points)** — derived directly from the Production Readiness Review. Epics, Stories (each with acceptance criteria), and Tasks are generated from a single Python data module so the Markdown and the Jira-import CSV never drift. See [`docs/backlog/`](docs/backlog/).
+
+| Backlog file | Description |
+|---|---|
+| [`acrme_epics_stories_tasks.md`](docs/backlog/acrme_epics_stories_tasks.md) | Human-readable backlog (also `.docx` / `.pdf`) — epic index, per-epic story tables, and per-story detail with acceptance criteria and task checklists. |
+| [`acrme_backlog_jira_import.csv`](docs/backlog/acrme_backlog_jira_import.csv) | Jira-importable issue list (Epics, Stories, Sub-tasks) with Issue ID / Parent ID / Epic Link linking columns. |
+| [`backlog_data.py`](docs/backlog/backlog_data.py) | Single source of truth; `generate_markdown.py` and `generate_csv.py` render the outputs from it. |
+
 #### Research documents (`docs/research/`)
 
 The source research documents that the Production Readiness Review reconciles are published under [`docs/research/`](docs/research/). They are the raw design and test inputs; the PRR is the authoritative, finalized synthesis derived from them.
