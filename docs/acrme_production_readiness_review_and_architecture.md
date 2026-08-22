@@ -803,84 +803,300 @@ Engineering constraint: Do not assume `groupType` semantics are stable across Az
 
 ## 27. Region Selection Architecture
 
-### Prod region input modes (geography vs. region)
+### Terminology note
 
-The Prod region is the anchor of every placement: NonProd and DR are selected sequentially *from* the fixed Prod region (Section 4, "Sequential placement"). A customer may supply the Prod anchor in one of two ways, and the engine treats each as a distinct entry mode. [Undocumented — architectural judgement]
+Throughout this section and Section 28, **CVAL (Customer Validation)** is the customer-facing term for the Non-Production environment. In scoring formulas and snapshot fields (Sections 28–29) the identifier `NonProd` is retained for engineering consistency; CVAL and NonProd are interchangeable and refer to the same environment class. [Undocumented — architectural judgement]
 
-**Scenario 1 — Customer chooses an Azure geography (not a region).** The engine derives the Prod region itself, using the **same capacity-weighted scoring model** that already selects NonProd and DR (`PS_Prod`, Section 28), but restricted to the set of **approved production regions within the chosen geography**. The derivation adds one candidate-set filter (geography containment) ahead of the existing scorer; it introduces no new formula. Once the engine has derived the Prod region, that region becomes the fixed anchor and the **existing** sequential NonProd → DR selection runs unchanged. [Undocumented — architectural judgement]
+---
 
-**Scenario 2 — Customer provides a specific Azure region.** No change from the design described elsewhere in this document. The supplied region is validated against the hard constraints (Section 27, "Hard constraints") and, if eligible, becomes the Prod anchor directly. `PS_Prod` is used only for post-selection validation, exactly as today. Sequential NonProd → DR selection proceeds unchanged. [Derived]
+### Region Classification Model
 
-The two modes converge at the same point — a fixed, validated Prod region — after which the downstream design is identical. Scenario 1 adds a single pre-step (geography → weighted Prod region); Scenario 2 skips that pre-step. [Undocumented — architectural judgement]
+All regions are assigned one of three classification tiers. Classification is a governance decision, not a live Azure capability query; it is stored in `PlacementPolicy` (config-as-code, versioned and auditable) and flows through the same policy-versioning and replay path as the scoring weights. [Undocumented — architectural judgement]
+
+#### Standard Capacity Regions
+
+Standard Capacity Regions are eligible for dynamic selection, automated placement, capacity scoring, and all environment assignments (Prod, CVAL, DR). These are the only regions that enter the scoring pipeline. [Undocumented — architectural judgement]
+
+| Geography | Standard Capacity Regions |
+|---|---|
+| North America | West US 3, Central US, Canada Central |
+| Europe | Sweden Central, Belgium Central |
+| Middle East | Saudi Arabia, UAE North |
+| Asia Pacific | Japan East, Southeast Asia, Australia East |
+
+#### Restricted Capacity Regions
+
+The following five regions are under current Azure physical capacity constraints and are designated **exception-only** deployment targets. They must not enter the automated placement, scoring, ranking, or recommendation pipeline for any environment type. [Undocumented — architectural judgement]
+
+| Region | Geography | Classification reason |
+|---|---|---|
+| East US 2 | North America | Azure physical capacity constraint |
+| North Europe | Europe | Azure physical capacity constraint |
+| West Europe | Europe | Azure physical capacity constraint |
+| East Asia | Asia Pacific | Azure physical capacity constraint |
+| Australia Southeast | Asia Pacific | Azure physical capacity constraint |
+
+Restricted regions are excluded before capacity scoring, candidate ranking, recommendation generation, deployment placement evaluation, and Prod/CVAL/DR region assignment. Exclusion is applied as a **pre-filter ahead of all hard constraints** — these regions never reach the scoring pipeline. [Undocumented — architectural judgement]
+
+#### Cross-Geo Extension Regions
+
+Cross-Geo Extension regions serve DR placement for geographies that cannot satisfy the three-region minimum within their own geography boundary. [Undocumented — architectural judgement]
+
+| Extension path | Source geography | DR target |
+|---|---|---|
+| Belgium Central → Saudi Arabia | Middle East | Europe DR coverage for Saudi Arabia Prod/CVAL |
+| Belgium Central → UAE North | Middle East | Europe DR coverage for UAE North Prod/CVAL |
+
+Cross-Geo Extension is currently approved only for Middle East DR. Belgium Central is a Standard Capacity Region and participates normally in Europe in-geo scoring; its Cross-Geo Extension role is additive and is invoked only when the DR selection algorithm cannot satisfy the three-region minimum in-geo for Middle East. Additional extension paths require a `PlacementPolicy` update, governance approval, and Decision Log entry before activation. [Undocumented — architectural judgement]
+
+---
+
+### Region Distribution Model by Geography
+
+| Operational group | Regions |
+|---|---|
+| North America | West US 3, Central US, Canada Central, East US 2 † |
+| Europe | Sweden Central, Belgium Central, North Europe †, West Europe † |
+| Middle East | Saudi Arabia, UAE North |
+| Asia Pacific | Japan East, Southeast Asia, Australia East, Australia Southeast †, East Asia † |
+| Cross-Geo Extension | Belgium Central → Saudi Arabia, Belgium Central → UAE North |
+
+† Restricted Capacity Region — excluded from all automated placement; eligible only under the Scenario 2 exception path (Production workload, explicit customer request, exception approval). [Undocumented — architectural judgement]
+
+---
+
+### Region Eligibility Decision Tree
+
+The engine applies a mandatory two-stage filter before any region reaches the scoring pipeline:
+
+**Stage 1 — Classification filter (enforced first, before all other checks)**
+
+```
+for each candidate region R:
+  if region_class(R) == RESTRICTED:
+    if input_mode == Scenario_2 and env_type == Prod:
+      route to Exception Deployment Workflow
+    else:
+      REJECT with RESTRICTED_REGION_ERROR
+  if Scenario_1 and R ∉ standard_regions(requested_geography):
+    EXCLUDE
+  pass to Stage 2
+```
+
+**Stage 2 — Hard constraints filter (HC-1 through HC-10)**
+
+Surviving Standard Capacity Region candidates are evaluated against HC-1 through HC-10 (capacity floor, quota floor, zone availability, separation class, snapshot freshness, geography containment, DR coverage floor, NonProd/DR floor integrity, Middle East cross-geo requirement, cross-geo extension path approval). Regions failing any hard constraint are excluded from scoring; the remainder enter the scoring pipeline. [Derived]
 
 ```mermaid
 flowchart TD
-    Input[Placement Request] --> Mode{Prod input mode}
-    Mode -- Geography --> GeoFilter[Filter to approved Prod regions in geography]
-    GeoFilter --> GeoConstraints[Apply hard constraints to candidates]
-    GeoConstraints --> GeoEligible{Eligible Prod candidates exist}
-    GeoEligible -- No --> GeoReject[Reject: no eligible Prod region in geography]
-    GeoEligible -- Yes --> GeoScore[Score candidates with PS_Prod]
-    GeoScore --> GeoPick[argmax PS_Prod = derived Prod region]
-    GeoPick --> Anchor[Fixed Prod anchor]
-    Mode -- Region --> Validate[Validate supplied region]
-    Validate --> RegionOk{Region eligible}
-    RegionOk -- No --> RegionReject[Reject or request alternative]
-    RegionOk -- Yes --> Anchor
-    Anchor --> Sequential[Existing sequential NonProd then DR selection]
+    Candidate[Region Candidate] --> ClassCheck{Stage 1: Classification}
+    ClassCheck -- Standard --> HCFilter[Stage 2: Apply HC-1 to HC-10]
+    ClassCheck -- Restricted --> EnvCheck{Scenario 2 + Prod + Exception}
+    EnvCheck -- All conditions met --> ExceptionFlow[Exception Deployment Workflow]
+    EnvCheck -- Any condition fails --> Reject1[Reject: restricted region not eligible]
+    HCFilter --> HCPass{All HCs pass}
+    HCPass -- No --> Reject2[Exclude from scoring]
+    HCPass -- Yes --> Scoring[Enter scoring pipeline]
 ```
 
-#### Approved production regions by geography
+---
 
-Scenario 1 draws candidates from a governed, version-controlled allow-list — an approved-region set is a governance decision, not a live Azure capability query, so a region existing in Azure does not make it eligible for production. [Undocumented — architectural judgement] The engine never crosses the geography boundary the customer selected. [Derived]
+### Prod region input modes
 
-| Geography | Approved production regions |
-|---|---|
-| North America | West US 3, Central US, East US 2, Canada Central |
-| Europe | North Europe, West Europe, Belgium Central, Sweden Central |
-| Middle East | Saudi Arabia Central, UAE North |
-| Asia Pacific | East Asia, Southeast Asia, Japan East, Australia East, Australia Southeast |
+The Prod region is the anchor of every placement: CVAL and DR are selected sequentially from the fixed Prod anchor. A customer may supply the Prod anchor in one of two ways. [Undocumented — architectural judgement]
 
-The allow-list is stored in `PlacementPolicy` (config-as-code, versioned and auditable) so that changes flow through the same policy-versioning and replay path as the scoring weights. [Undocumented — architectural judgement]
+**Scenario 1 — Customer chooses an Azure geography (not a region).** The engine derives the Prod region using `PS_Prod` (Section 28), restricted to the **Standard Capacity Regions** within the chosen geography. Restricted Capacity Regions are excluded before the candidate set is formed — they never reach the scorer. Once the Prod anchor is derived, sequential CVAL → DR selection runs on the same Standard Capacity Region pool with the Middle East special handling applied where required. [Undocumented — architectural judgement]
+
+**Scenario 2 — Customer provides a specific Azure region.** If the supplied region is a Standard Capacity Region it is validated against HC-1 through HC-10 and, if eligible, becomes the Prod anchor directly; `PS_Prod` is used only for post-selection validation. If the supplied region is a Restricted Capacity Region the request is routed to the Exception Deployment Workflow (see below). [Derived]
+
+The two modes converge at the same point — a fixed, validated Prod anchor — after which the downstream design is identical for Standard placements. [Undocumented — architectural judgement]
+
+```mermaid
+flowchart TD
+    Input[Placement Request] --> ClassFilter[Stage 1 Classification Filter]
+    ClassFilter --> Mode{Prod input mode}
+    Mode -- Geography Scenario 1 --> GeoStd[Standard Capacity Regions in geography]
+    GeoStd --> GeoHC[Apply HC-1 to HC-10]
+    GeoHC --> GeoEligible{Eligible candidates exist}
+    GeoEligible -- No --> GeoReject[Reject: geography exhausted]
+    GeoEligible -- Yes --> GeoScore[Score candidates with PS_Prod]
+    GeoScore --> GeoPick[argmax PS_Prod = derived Prod anchor]
+    GeoPick --> Anchor[Fixed Prod Anchor]
+    Mode -- Region Scenario 2 --> S2Class{Standard or Restricted}
+    S2Class -- Standard --> S2HC[Apply HC-1 to HC-10]
+    S2HC --> S2Ok{HC passes}
+    S2Ok -- No --> S2Reject[Reject or request alternative]
+    S2Ok -- Yes --> Anchor
+    S2Class -- Restricted --> ExceptionWf[Exception Deployment Workflow]
+    ExceptionWf --> ExApproved{Exception approved}
+    ExApproved -- Yes --> Anchor
+    ExApproved -- No --> ExReject[Reject]
+    Anchor --> SeqSelect[Sequential CVAL then DR selection]
+```
 
 #### Scenario 1 derivation — semantics
 
-- **Candidate set:** the approved regions for the chosen geography, minus any region excluded by the hard constraints (capacity floor, quota floor, zone availability, separation class, snapshot freshness). [Derived]
-- **Scoring:** each surviving candidate is scored with `PS_Prod` from the same versioned regional snapshot used for NonProd/DR, so the Prod anchor is chosen on live capacity, quota headroom, distribution fairness, DR-coverage readiness, and zone diversity — identical signals to the rest of the model. [Derived]
-- **Selection:** `argmax(PS_Prod)` over the eligible candidates; ties broken deterministically by the approved-list order (the first-listed region acts as the deterministic cold-start default when no snapshot exists yet or all scores tie). [Undocumented — architectural judgement]
-- **Determinism and audit:** the derivation is deterministic given a snapshot; the derived Prod region, every candidate score, and the policy version are written to the operation record alongside the subsequent NonProd/DR scores, so the full three-environment decision is replayable. [Undocumented — architectural judgement]
-- **Exhaustion:** if no approved region in the geography is eligible, the request is rejected with a geography-scoped exhaustion error rather than silently falling back to a region outside the geography. [Derived]
+- **Candidate set:** Standard Capacity Regions within the chosen geography, minus any region excluded by HC-1 through HC-10. [Derived]
+- **Scoring:** each surviving candidate is scored with `PS_Prod` from the same versioned regional snapshot used for CVAL/DR, so the Prod anchor is chosen on live capacity, quota headroom, distribution fairness, DR-coverage readiness, and zone diversity — identical signals to the rest of the model. [Derived]
+- **Selection:** `argmax(PS_Prod)` over the eligible candidates; ties broken deterministically by the Standard Capacity Region list order for the geography (first-listed region acts as the deterministic cold-start default when no snapshot exists or all scores tie). [Undocumented — architectural judgement]
+- **Determinism and audit:** derivation is deterministic given a snapshot; the derived Prod region, every candidate score, and the policy version are written to the `OperationRecord` alongside the subsequent CVAL/DR scores so the full three-environment decision is replayable. [Undocumented — architectural judgement]
+- **Exhaustion:** if no Standard Capacity Region in the geography is eligible the request is rejected with a geography-scoped exhaustion error; the engine never silently falls back to a region outside the geography or to a Restricted Capacity Region. [Derived]
+
+#### Automated placement flow
 
 ```mermaid
 flowchart TD
     Request[Placement Request] --> Load[Load Versioned Snapshots]
-    Load --> Fresh{Snapshots Fresh}
+    Load --> Fresh{Snapshots fresh}
     Fresh -- No --> Refresh[Targeted ARM Refresh]
-    Fresh -- Yes --> Constraints[Apply Hard Constraints]
-    Refresh --> Constraints
-    Constraints --> Eligible{Eligible Regions Exist}
+    Fresh -- Yes --> Stage1[Stage 1 Classification Filter]
+    Refresh --> Stage1
+    Stage1 --> Stage2[Stage 2 Hard Constraint Filter HC-1 to HC-10]
+    Stage2 --> Eligible{Eligible Standard regions exist}
     Eligible -- No --> Exhausted[Queue or Reject]
-    Eligible -- Yes --> Score[Compute Environment Scores]
-    Score --> Compare[Compare Sequential and Shadow Joint Result]
-    Compare --> Hold[Create Atomic Capacity Hold]
-    Hold --> Commit{Conditional Commit Succeeds}
-    Commit -- No --> Retry[Refresh and Reevaluate]
-    Commit -- Yes --> Assignment[Persist Assignment]
-    Assignment --> Reconcile[Confirm Azure and Engine State]
+    Eligible -- Yes --> Score[Compute env-type scores PS_Prod PS_CVAL PS_DR]
+    Score --> Compare[Compare sequential and shadow joint result]
+    Compare --> Hold[Create atomic capacity hold]
+    Hold --> Commit{Conditional commit succeeds}
+    Commit -- No --> Retry[Refresh and re-evaluate]
+    Commit -- Yes --> Assignment[Persist assignment]
+    Assignment --> Reconcile[Confirm Azure and engine state]
 ```
 
-### Hard constraints
+---
 
-- In Scenario 1 (geography input), the derived Prod region must be a member of the approved production-region set for the customer's chosen geography; the engine never selects a Prod region outside that geography. [Undocumented — architectural judgement]
-- Prod and DR must not share a region. [Derived]
-- NonProd and Prod must not share a region. [Derived]
-- NonProd and DR may share a region only under the approved policy. [Derived]
-- Capacity, quota, zone, SKU, sharing, and DR-floor checks must pass. [Derived]
-- Region separation class must be approved. [Derived]
-- Snapshot age must be within the policy limit or refreshed. [Undocumented — architectural judgement]
-- A capacity hold must be acquired before assignment. [Undocumented — architectural judgement]
+### Middle East Special Handling
+
+Middle East is a **special-case geography**: only two Standard Capacity Regions exist in-geo (Saudi Arabia, UAE North). The three-region minimum required for Prod + CVAL + DR cannot be satisfied within the geography boundary alone. The engine resolves this via the approved Cross-Geo Extension Group. [Undocumented — architectural judgement]
+
+#### Required placement for Middle East three-region deployments
+
+| Environment | Region | Selection rule |
+|---|---|---|
+| Production | Saudi Arabia **or** UAE North | `argmax(PS_Prod)` over the two in-geo Standard regions |
+| CVAL | Alternate in-geo Middle East region | The in-geo Standard region not selected for Prod (deterministic, no scoring needed) |
+| DR | Belgium Central | Cross-Geo Extension — mandatory; the only approved extension path for Middle East DR |
+
+Both in-geo regions are Standard Capacity Regions and are scored normally via `PS_Prod`. The weighted model selects one for Prod; the other is assigned CVAL deterministically (only one remaining in-geo candidate exists). [Undocumented — architectural judgement]
+
+#### Middle East placement flow
+
+```mermaid
+flowchart TD
+    ME[Middle East Placement Request] --> ScoreBoth[Score Saudi Arabia and UAE North with PS_Prod]
+    ScoreBoth --> ProdPick[argmax PS_Prod = Prod region]
+    ProdPick --> CVALPick[Alternate in-geo region = CVAL region]
+    CVALPick --> DRRequired{DR region required}
+    DRRequired -- Yes --> CrossGeo[Cross-Geo Extension: Belgium Central]
+    CrossGeo --> DRValidate[Validate Belgium Central HC-1 to HC-10 + DR coverage floor]
+    DRValidate --> DRValid{Belgium Central eligible}
+    DRValid -- No --> DRAlert[Ops alert: Cross-Geo Extension path degraded — block placement]
+    DRValid -- Yes --> DRAssign[DR = Belgium Central]
+    DRRequired -- No --> Complete[Assignment complete]
+    DRAssign --> Complete
+```
+
+#### Cross-Geo Extension constraints
+
+- Belgium Central must pass HC-1 through HC-10 including DR coverage floor (HC-6) before being assigned as Middle East DR. If it fails the placement is rejected with an ops alert — the engine does not silently select any alternative outside the approved extension paths. [Undocumented — architectural judgement]
+- Belgium Central's Cross-Geo Extension role for Middle East DR is additive; it does not remove Belgium Central from the Europe Standard Capacity Region pool for in-geo Europe placements. [Undocumented — architectural judgement]
+- DR failover from Belgium Central back to Middle East uses the standard DR Activation Architecture (Section 31) with the additional obligation to verify Belgium Central CRG sharing eligibility across subscription boundaries and the zone-alignment requirement (FC-06). [Derived]
+- The extension paths Belgium Central → Saudi Arabia and Belgium Central → UAE North are the only currently approved Cross-Geo Extension paths. Any additional paths require a `PlacementPolicy` update, governance approval, and Decision Log entry before the engine will use them. [Undocumented — architectural judgement]
+
+---
+
+### Exception-Based Placement Workflow (Scenario 2 — Restricted region)
+
+When a customer explicitly requests a Restricted Capacity Region all four exception conditions (EC-1 through EC-4) must be satisfied before the engine proceeds. [Undocumented — architectural judgement]
+
+| Condition | Check |
+|---|---|
+| EC-1 Explicit request | Customer explicitly named the restricted region; the engine did not recommend or suggest it |
+| EC-2 Production only | Workload type is Production; CVAL and DR must not use Restricted Capacity Regions under any condition |
+| EC-3 Exception approval | Named exception approval record exists for this customer–region pair |
+| EC-4 Scenario 2 input | Input mode is Scenario 2 (customer-supplied region); restricted regions cannot be derived by the engine |
+
+If all four conditions are met the engine assigns the restricted region as the **Exception Prod Anchor** and marks the placement record as an **Exception Deployment**. CVAL and DR are then selected from Standard Capacity Regions only, using the normal scoring model. [Undocumented — architectural judgement]
+
+```mermaid
+flowchart TD
+    ExReq[Restricted Region Requested] --> EC1{EC-1 Explicit customer request}
+    EC1 -- No --> R1[Reject: restricted region not eligible for automated placement]
+    EC1 -- Yes --> EC2{EC-2 Production workload}
+    EC2 -- No --> R2[Reject: restricted regions not eligible for CVAL or DR]
+    EC2 -- Yes --> EC3{EC-3 Exception approval record exists}
+    EC3 -- No --> R3[Reject: exception approval required before proceeding]
+    EC3 -- Yes --> EC4{EC-4 Scenario 2 input mode}
+    EC4 -- No --> R4[Reject: restricted region cannot be engine-derived]
+    EC4 -- Yes --> Warn[Emit capacity-constraint warning to caller]
+    Warn --> ExAnchor[Assign as Exception Prod Anchor]
+    ExAnchor --> Mark[Mark as Exception Deployment in OperationRecord]
+    Mark --> StdCVAL[Select CVAL from Standard Capacity Regions — normal scoring]
+    StdCVAL --> StdDR[Select DR from Standard Capacity Regions — normal scoring]
+    StdDR --> Audit[Persist exception approval ID in OperationRecord]
+```
+
+The engine must emit a capacity-constraint warning to the caller on exception approval. The restriction status and exception approval ID are mandatory fields in the `OperationRecord`; the commit is blocked if either is absent. [Undocumented — architectural judgement]
+
+---
+
+### Validation Rule Framework
+
+| Rule | Scope | Check | Failure action |
+|---|---|---|---|
+| VR-1 | All paths | Region exists in classification list (Standard, Restricted, or Cross-Geo Extension) | Reject if unknown |
+| VR-2 | Automated placement | Region classification is Standard | Exclude before scoring if Restricted |
+| VR-3 | Scenario 2 Restricted | EC-1 through EC-4 all satisfied | Reject at first failing condition |
+| VR-4 | Scenario 1 | Derived Prod region is within Standard Capacity Regions for chosen geography | Geography-scoped exhaustion error |
+| VR-5 | All paths | Standard region passes HC-1 through HC-10 | Exclude from scoring; exhaustion error if all excluded |
+| VR-6 | Middle East | DR region is Belgium Central via approved Cross-Geo Extension path | Block placement with ops alert if Belgium Central fails HC-1–HC-10 |
+| VR-7 | Exception deployment | Exception approval ID persisted in `OperationRecord` before commit | Block commit if absent |
+| VR-8 | Exception deployment | Capacity-constraint warning emitted to caller | Block commit if warning suppressed |
+| VR-9 | All paths | Snapshot age within policy limit before scoring begins | Trigger targeted ARM refresh |
+| VR-10 | All paths | Capacity hold acquired before assignment commit | Block commit if hold absent |
+| VR-11 | Recommendation API | Restricted Capacity Regions absent from all recommendation outputs | Post-scoring filter as defence-in-depth even though pre-scoring exclusion already applies |
+
+---
+
+### Governance and compliance controls
+
+- The region classification list (Standard / Restricted / Cross-Geo Extension) is version-controlled in `PlacementPolicy`; changes require a policy version increment, a Decision Log entry, and replay of the prior 30 days of placements against the new classification before activation. [Undocumented — architectural judgement]
+- Exception deployment approval records are explicit engine artefacts; the engine validates the record exists before proceeding and persists its ID in the `OperationRecord`. Approval records must be revocable; a revoked approval blocks future exception deployments for the same customer–region pair without requiring a code change. [Undocumented — architectural judgement]
+- The engine must never recommend, auto-select, or surface a Restricted Capacity Region in any recommendation API response. Recommendation outputs must be filtered post-scoring as a defence-in-depth measure (VR-11) even though restricted regions are excluded pre-scoring by Stage 1. [Undocumented — architectural judgement]
+- Cross-Geo Extension paths are explicitly enumerated in `PlacementPolicy`; the engine rejects any DR assignment to a region not on the approved extension list even if that region is a Standard Capacity Region in another geography. [Undocumented — architectural judgement]
+- Every region classification change is written to the audit trail with the approver identity, timestamp, previous classification, new classification, and affected geography. [Undocumented — architectural judgement]
+- The Middle East Cross-Geo Extension dependency on Belgium Central must be included in Belgium Central's regional capacity planning targets; the capacity reservation quantities for Belgium Central must account for potential Middle East DR demand in addition to in-geo Europe demand. [Undocumented — architectural judgement]
+
+---
+
+### Hard constraints (HC-1 through HC-10)
+
+HC-1 through HC-8 are defined in `multi_region_placement_design.md`. HC-9 and HC-10 are added by this section.
+
+**HC-9  STANDARD_REGION_ONLY:** Automated placement, scoring, recommendation, and all environment assignments (Prod, CVAL, DR) must use Standard Capacity Regions only. Restricted Capacity Regions are excluded before the scoring pipeline runs; their exclusion is enforced at Stage 1 of the eligibility decision tree, not as a scoring penalty. Exception deployments proceed via the Scenario 2 exception path only. [Undocumented — architectural judgement]
+
+**HC-10  CROSS_GEO_EXTENSION_PATH_APPROVED:** Any DR assignment to a region outside the customer's chosen geography must match an explicitly enumerated Cross-Geo Extension path in the active `PlacementPolicy`. DR assignments to Standard Capacity Regions in a different geography are rejected if no approved extension path exists for the source geography. [Undocumented — architectural judgement]
+
+The following hard constraint list applies to all placement paths:
+
+- Restricted Capacity Regions excluded before scoring pipeline (HC-9). [Undocumented — architectural judgement]
+- In Scenario 1, derived Prod region must be within the Standard Capacity Regions for the customer's chosen geography (HC-8 geography containment). [Undocumented — architectural judgement]
+- Prod and DR must not share a region (HC-1). [Derived]
+- CVAL and Prod must not share a region (HC-1). [Derived]
+- CVAL and DR may share a region only under the approved policy (HC-1 update per D8). [Derived]
+- For Middle East three-region placements, DR must be Belgium Central via the approved Cross-Geo Extension path (HC-10). [Undocumented — architectural judgement]
+- CVAL and DR may not use Restricted Capacity Regions under any condition, including exception deployments (HC-9). [Undocumented — architectural judgement]
+- Capacity floor, quota floor, zone availability, SKU, sharing, and DR-floor integrity checks must pass (HC-2 through HC-7). [Derived]
+- Region separation class must be approved (HC-4). [Derived]
+- Cross-Geo Extension DR path must be explicitly approved in active `PlacementPolicy` (HC-10). [Undocumented — architectural judgement]
+- Snapshot age must be within the policy limit or refreshed before scoring. [Undocumented — architectural judgement]
+- A capacity hold must be acquired before assignment commit. [Undocumented — architectural judgement]
 
 ## 28. Placement Scoring and Forecasting
+
+The scoring formulas (`PS_Prod`, `PS_NonProd`, `PS_DR`) operate exclusively on **Standard Capacity Regions** that have passed the Stage 1 classification filter and Stage 2 hard constraint filter described in Section 27. Restricted Capacity Regions are excluded before the scoring pipeline is entered and are never assigned a score. [Undocumented — architectural judgement]
+
+`PS_NonProd` is the engineering identifier for the CVAL (Customer Validation) environment scorer. Throughout this section, `PS_NonProd` and `PS_CVAL` are interchangeable. [Undocumented — architectural judgement]
 
 ```mermaid
 flowchart LR
@@ -908,7 +1124,7 @@ Each raw ratio must be clamped:
 
 [Undocumented — architectural judgement]
 
-The NonProd formula should not duplicate the same signal under alpha and delta. [Undocumented — architectural judgement] For pilot implementation:
+The NonProd (CVAL) formula should not duplicate the same signal under alpha and delta. [Undocumented — architectural judgement] For pilot implementation:
 
 `PS_NonProd = 0.35 Capacity + 0.25 Quota + 0.25 Distribution + 0.05 DR_Overflow_Integrity + 0.10 Zones`
 
