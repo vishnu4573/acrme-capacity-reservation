@@ -803,6 +803,54 @@ Engineering constraint: Do not assume `groupType` semantics are stable across Az
 
 ## 27. Region Selection Architecture
 
+### Prod region input modes (geography vs. region)
+
+The Prod region is the anchor of every placement: NonProd and DR are selected sequentially *from* the fixed Prod region (Section 4, "Sequential placement"). A customer may supply the Prod anchor in one of two ways, and the engine treats each as a distinct entry mode. [Undocumented — architectural judgement]
+
+**Scenario 1 — Customer chooses an Azure geography (not a region).** The engine derives the Prod region itself, using the **same capacity-weighted scoring model** that already selects NonProd and DR (`PS_Prod`, Section 28), but restricted to the set of **approved production regions within the chosen geography**. The derivation adds one candidate-set filter (geography containment) ahead of the existing scorer; it introduces no new formula. Once the engine has derived the Prod region, that region becomes the fixed anchor and the **existing** sequential NonProd → DR selection runs unchanged. [Undocumented — architectural judgement]
+
+**Scenario 2 — Customer provides a specific Azure region.** No change from the design described elsewhere in this document. The supplied region is validated against the hard constraints (Section 27, "Hard constraints") and, if eligible, becomes the Prod anchor directly. `PS_Prod` is used only for post-selection validation, exactly as today. Sequential NonProd → DR selection proceeds unchanged. [Derived]
+
+The two modes converge at the same point — a fixed, validated Prod region — after which the downstream design is identical. Scenario 1 adds a single pre-step (geography → weighted Prod region); Scenario 2 skips that pre-step. [Undocumented — architectural judgement]
+
+```mermaid
+flowchart TD
+    Input[Placement Request] --> Mode{Prod input mode}
+    Mode -- Geography --> GeoFilter[Filter to approved Prod regions in geography]
+    GeoFilter --> GeoConstraints[Apply hard constraints to candidates]
+    GeoConstraints --> GeoEligible{Eligible Prod candidates exist}
+    GeoEligible -- No --> GeoReject[Reject: no eligible Prod region in geography]
+    GeoEligible -- Yes --> GeoScore[Score candidates with PS_Prod]
+    GeoScore --> GeoPick[argmax PS_Prod = derived Prod region]
+    GeoPick --> Anchor[Fixed Prod anchor]
+    Mode -- Region --> Validate[Validate supplied region]
+    Validate --> RegionOk{Region eligible}
+    RegionOk -- No --> RegionReject[Reject or request alternative]
+    RegionOk -- Yes --> Anchor
+    Anchor --> Sequential[Existing sequential NonProd then DR selection]
+```
+
+#### Approved production regions by geography
+
+Scenario 1 draws candidates from a governed, version-controlled allow-list — an approved-region set is a governance decision, not a live Azure capability query, so a region existing in Azure does not make it eligible for production. [Undocumented — architectural judgement] The engine never crosses the geography boundary the customer selected. [Derived]
+
+| Geography | Approved production regions |
+|---|---|
+| North America | West US 3, Central US, East US 2, Canada Central |
+| Europe | North Europe, West Europe, Belgium Central, Sweden Central |
+| Middle East | Saudi Arabia Central, UAE North |
+| Asia Pacific | East Asia, Southeast Asia, Japan East, Australia East, Australia Southeast |
+
+The allow-list is stored in `PlacementPolicy` (config-as-code, versioned and auditable) so that changes flow through the same policy-versioning and replay path as the scoring weights. [Undocumented — architectural judgement]
+
+#### Scenario 1 derivation — semantics
+
+- **Candidate set:** the approved regions for the chosen geography, minus any region excluded by the hard constraints (capacity floor, quota floor, zone availability, separation class, snapshot freshness). [Derived]
+- **Scoring:** each surviving candidate is scored with `PS_Prod` from the same versioned regional snapshot used for NonProd/DR, so the Prod anchor is chosen on live capacity, quota headroom, distribution fairness, DR-coverage readiness, and zone diversity — identical signals to the rest of the model. [Derived]
+- **Selection:** `argmax(PS_Prod)` over the eligible candidates; ties broken deterministically by the approved-list order (the first-listed region acts as the deterministic cold-start default when no snapshot exists yet or all scores tie). [Undocumented — architectural judgement]
+- **Determinism and audit:** the derivation is deterministic given a snapshot; the derived Prod region, every candidate score, and the policy version are written to the operation record alongside the subsequent NonProd/DR scores, so the full three-environment decision is replayable. [Undocumented — architectural judgement]
+- **Exhaustion:** if no approved region in the geography is eligible, the request is rejected with a geography-scoped exhaustion error rather than silently falling back to a region outside the geography. [Derived]
+
 ```mermaid
 flowchart TD
     Request[Placement Request] --> Load[Load Versioned Snapshots]
@@ -823,6 +871,7 @@ flowchart TD
 
 ### Hard constraints
 
+- In Scenario 1 (geography input), the derived Prod region must be a member of the approved production-region set for the customer's chosen geography; the engine never selects a Prod region outside that geography. [Undocumented — architectural judgement]
 - Prod and DR must not share a region. [Derived]
 - NonProd and Prod must not share a region. [Derived]
 - NonProd and DR may share a region only under the approved policy. [Derived]
@@ -1071,7 +1120,7 @@ All state-changing endpoints return an operation resource rather than implying s
 - `/zones/resolve`
 - `/quota`
 - `/placement/evaluate`
-- `/placement/select-regions`
+- `/placement/select-regions` — accepts **either** a specific Prod region (Scenario 2) **or** an Azure geography (Scenario 1); when a geography is supplied the engine derives the Prod region via `PS_Prod` over the geography's approved regions before running sequential NonProd/DR selection (Section 27). [Undocumented — architectural judgement]
 - `/capacity/increase-requests`
 - `/capacity/emergency-transfer`
 - `/dr/incidents`
