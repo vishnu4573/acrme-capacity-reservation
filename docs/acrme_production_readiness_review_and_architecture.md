@@ -844,8 +844,8 @@ Cross-Geo Extension regions serve DR placement for geographies that cannot satis
 
 | Extension path | Source geography | DR target |
 |---|---|---|
-| Belgium Central → Saudi Arabia | Middle East | Europe DR coverage for Saudi Arabia Prod/CVAL |
-| Belgium Central → UAE North | Middle East | Europe DR coverage for UAE North Prod/CVAL |
+| Saudi Arabia → Belgium Central | Middle East | Europe DR coverage for Saudi Arabia Prod/CVAL |
+| UAE North → Belgium Central | Middle East | Europe DR coverage for UAE North Prod/CVAL |
 
 Cross-Geo Extension is currently approved only for Middle East DR. Belgium Central is a Standard Capacity Region and participates normally in Europe in-geo scoring; its Cross-Geo Extension role is additive and is invoked only when the DR selection algorithm cannot satisfy the three-region minimum in-geo for Middle East. Additional extension paths require a `PlacementPolicy` update, governance approval, and Decision Log entry before activation. [Undocumented — architectural judgement]
 
@@ -859,7 +859,7 @@ Cross-Geo Extension is currently approved only for Middle East DR. Belgium Centr
 | Europe | Sweden Central, Belgium Central, North Europe †, West Europe † |
 | Middle East | Saudi Arabia, UAE North |
 | Asia Pacific | Japan East, Southeast Asia, Australia East, Australia Southeast †, East Asia † |
-| Cross-Geo Extension | Belgium Central → Saudi Arabia, Belgium Central → UAE North |
+| Cross-Geo Extension | Saudi Arabia → Belgium Central, UAE North → Belgium Central |
 
 † Restricted Capacity Region — excluded from all automated placement; eligible only under the Scenario 2 exception path (Production workload, explicit customer request, exception approval). [Undocumented — architectural judgement]
 
@@ -1001,7 +1001,7 @@ flowchart TD
 - Belgium Central must pass HC-1 through HC-10 including DR coverage floor (HC-6) before being assigned as Middle East DR. If it fails the placement is rejected with an ops alert — the engine does not silently select any alternative outside the approved extension paths. [Undocumented — architectural judgement]
 - Belgium Central's Cross-Geo Extension role for Middle East DR is additive; it does not remove Belgium Central from the Europe Standard Capacity Region pool for in-geo Europe placements. [Undocumented — architectural judgement]
 - DR failover from Belgium Central back to Middle East uses the standard DR Activation Architecture (Section 31) with the additional obligation to verify Belgium Central CRG sharing eligibility across subscription boundaries and the zone-alignment requirement (FC-06). [Derived]
-- The extension paths Belgium Central → Saudi Arabia and Belgium Central → UAE North are the only currently approved Cross-Geo Extension paths. Any additional paths require a `PlacementPolicy` update, governance approval, and Decision Log entry before the engine will use them. [Undocumented — architectural judgement]
+- The extension paths Saudi Arabia → Belgium Central and UAE North → Belgium Central are the only currently approved Cross-Geo Extension paths. Any additional paths require a `PlacementPolicy` update, governance approval, and Decision Log entry before the engine will use them. [Undocumented — architectural judgement]
 
 ---
 
