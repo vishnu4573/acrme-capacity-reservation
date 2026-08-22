@@ -17,6 +17,12 @@ acrme-capacity-reservation/
 │   ├── acrme_poc_workbook_v2.docx / .pdf
 │   ├── acrme_production_readiness_review_and_architecture.md / .docx / .pdf
 │   ├── acrme_security_and_rbac_guide.md / .docx / .pdf
+│   ├── research/                      # Source research documents (inputs to the PRR)
+│   │   ├── azure_cr_management_engine_design.md
+│   │   ├── multi_region_placement_design.md
+│   │   ├── design_change_summary.md
+│   │   ├── acrme_requirements_traceability_review.md
+│   │   └── azure_cr_poc_test_workbook.md
 │   └── rbac/                          # Custom role JSONs + deploy scripts
 │       ├── custom_roles/*.json        # 5 least-privilege custom roles
 │       ├── deploy_custom_roles.sh
@@ -44,6 +50,18 @@ acrme-capacity-reservation/
 | **Security & RBAC Guide** | Complete authorization model: every engine operation mapped to exact Azure permissions, 5 least-privilege custom roles (JSON), deploy scripts, separation-of-duties, and the G-14 (Tier 3) consent/revocation model. |
 
 Each document is provided in editable (`.docx` / `.md` / `.pptx`) and print-ready (`.pdf`) form.
+
+#### Research documents (`docs/research/`)
+
+The source research documents that the Production Readiness Review reconciles are published under [`docs/research/`](docs/research/). They are the raw design and test inputs; the PRR is the authoritative, finalized synthesis derived from them.
+
+| Research document | Description |
+|---|---|
+| [Azure CR Management Engine Design](docs/research/azure_cr_management_engine_design.md) | Original engine design — microservice architecture, CR lifecycle, sharing, quota, placement, DR, forecasting, and the initial backlog. |
+| [Multi-Region Placement Design](docs/research/multi_region_placement_design.md) | Final placement design — three-CRG model, quota groups, sequential Prod→NonProd→DR selection, and the `PS_Prod`/`PS_NonProd`/`PS_DR` scoring formulas (HC-1 through HC-8). |
+| [Design Change Summary](docs/research/design_change_summary.md) | Consolidated record of design decisions (D1–D9) and the changes they introduced across the architecture. |
+| [Requirements Traceability Review](docs/research/acrme_requirements_traceability_review.md) | Coverage analysis mapping functional/non-functional requirements to design elements, with gap identification. |
+| [Azure CR POC Test Workbook](docs/research/azure_cr_poc_test_workbook.md) | Full POC test workbook (POC groups and test cases) with pass/fail criteria and evidence tables. |
 
 #### Architecture diagrams (`docs/diagrams/`)
 
