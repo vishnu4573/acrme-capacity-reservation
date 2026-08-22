@@ -34,8 +34,23 @@ acrme-capacity-reservation/
 | **Executive Design Document** | Architecture narrative for the ACRME Capacity Reservation initiative — WAF pillars, ADR decisions, DR model, quota governance, and implementation roadmap. |
 | **POC Workbook v2** | Test workbook covering all 8 POC groups and 35 test cases, with pass/fail criteria, evidence tables, risk ratings, and phase-gate checklists. |
 | **Production Readiness Review & Architecture** | The finalized architecture and production-readiness review that the executive document and workbook are derived from. |
+| **Architecture Diagrams Deck** | Presentation / infographic deck (`.pptx` + `.pdf`) covering the six core architecture views, each with an infographic key-facts slide plus the full diagram. |
 
-Each document is provided in editable (`.docx` / `.md`) and print-ready (`.pdf`) form.
+Each document is provided in editable (`.docx` / `.md` / `.pptx`) and print-ready (`.pdf`) form.
+
+#### Architecture diagrams (`docs/diagrams/`)
+
+Full-resolution source images for each of the six core views, in both raster (`.png`)
+and vector (`.svg`, infinitely zoomable) form:
+
+| # | View | Purpose |
+|---|---|---|
+| 1 | System Architecture Overview | Control plane across Prod / NonProd / DR regions |
+| 2 | Quota Group Architecture | Two quota groups per region; Tier-3 quota-neutrality |
+| 3 | Placement Engine Flow | 7 hard-constraint filters + weighted scoring |
+| 4 | Steady-State Capacity Lifecycle | Auto-increase triggers, debounce, Phase A/B |
+| 5 | Emergency Capacity Transfer | Three-tier crisis response (DR_EVENT_ACTIVE) |
+| 6 | VM Disassociation Sequence | Tier-3 execution: Path B default, Path A fallback |
 
 ---
 
