@@ -1,0 +1,26 @@
+{
+  "Name": "ACRME Quota Operator",
+  "IsCustom": true,
+  "Description": "Query quota/usage and submit approved quota increase requests for approved scopes. No CR or VM mutation. Backs the ACRME Quota UAMI. Support ticket creation is included because non-adjustable quota changes require a support request.",
+  "Actions": [
+    "Microsoft.Quota/quotas/read",
+    "Microsoft.Quota/quotas/write",
+    "Microsoft.Quota/quotaRequests/read",
+    "Microsoft.Quota/usages/read",
+    "Microsoft.Quota/register/action",
+    "Microsoft.Capacity/resourceProviders/locations/serviceLimits/read",
+    "Microsoft.Capacity/resourceProviders/locations/serviceLimits/write",
+    "Microsoft.Capacity/resourceProviders/locations/serviceLimitsRequests/read",
+    "Microsoft.Capacity/register/action",
+    "Microsoft.Compute/locations/usages/read",
+    "Microsoft.Support/register/action",
+    "Microsoft.Support/supportTickets/read",
+    "Microsoft.Support/supportTickets/write"
+  ],
+  "NotActions": [],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/<PROVIDER_SUBSCRIPTION_ID>"
+  ]
+}

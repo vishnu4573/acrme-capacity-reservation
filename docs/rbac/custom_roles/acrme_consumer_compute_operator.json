@@ -1,0 +1,24 @@
+{
+  "Name": "ACRME Consumer Compute Operator",
+  "IsCustom": true,
+  "Description": "G-14 CLOSURE ROLE (Tier 3). Customer-consented, resource-group-scoped rights to change VM-to-CRG association and, only as Path A fallback, deallocate/start a VM in an EXPLICIT consumer resource group. Deliberately narrow: no VM create/delete, no subscription-wide compute mutation, no networking or disk changes. This role is DISABLED by default and only assigned per incident with a recorded consent artifact and a tested revocation procedure. Until security approves this role, Tier 3 remains blocked.",
+  "Actions": [
+    "Microsoft.Compute/virtualMachines/read",
+    "Microsoft.Compute/virtualMachines/write",
+    "Microsoft.Compute/virtualMachines/deallocate/action",
+    "Microsoft.Compute/virtualMachines/start/action",
+    "Microsoft.Compute/capacityReservationGroups/read",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/read",
+    "Microsoft.Resources/subscriptions/resourceGroups/read"
+  ],
+  "NotActions": [
+    "Microsoft.Compute/virtualMachines/delete",
+    "Microsoft.Compute/virtualMachineScaleSets/write",
+    "Microsoft.Compute/virtualMachineScaleSets/delete"
+  ],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/<CONSUMER_SUBSCRIPTION_ID>/resourceGroups/<CONSUMER_VM_RG>"
+  ]
+}

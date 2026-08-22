@@ -1,0 +1,33 @@
+{
+  "Name": "ACRME Reader",
+  "IsCustom": true,
+  "Description": "Read-only discovery and state inspection for the ACRME control plane. Reads CRGs, capacity reservations, quota, SKUs, zone/location metadata, and VM-to-CRG association state. No writes, no role assignments. Backs the ACRME Reader UAMI.",
+  "Actions": [
+    "Microsoft.Compute/capacityReservationGroups/read",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/read",
+    "Microsoft.Compute/virtualMachines/read",
+    "Microsoft.Compute/virtualMachineScaleSets/read",
+    "Microsoft.Compute/locations/capacityReservationGroups/read",
+    "Microsoft.Compute/skus/read",
+    "Microsoft.Compute/locations/vmSizes/read",
+    "Microsoft.Compute/locations/usages/read",
+    "Microsoft.Quota/quotas/read",
+    "Microsoft.Quota/usages/read",
+    "Microsoft.Quota/quotaRequests/read",
+    "Microsoft.Capacity/resourceProviders/locations/serviceLimits/read",
+    "Microsoft.Capacity/resourceProviders/locations/serviceLimitsRequests/read",
+    "Microsoft.Resources/subscriptions/read",
+    "Microsoft.Resources/subscriptions/resourceGroups/read",
+    "Microsoft.Resources/subscriptions/locations/read",
+    "Microsoft.ResourceGraph/resources/read",
+    "Microsoft.Authorization/roleAssignments/read",
+    "Microsoft.Authorization/roleDefinitions/read"
+  ],
+  "NotActions": [],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/<PROVIDER_SUBSCRIPTION_ID>",
+    "/subscriptions/<CONSUMER_SUBSCRIPTION_ID>"
+  ]
+}

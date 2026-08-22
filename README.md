@@ -15,7 +15,12 @@ acrme-capacity-reservation/
 ├── docs/                              # Production-ready design artifacts
 │   ├── acrme_executive_design_document.docx / .pdf
 │   ├── acrme_poc_workbook_v2.docx / .pdf
-│   └── acrme_production_readiness_review_and_architecture.md / .docx / .pdf
+│   ├── acrme_production_readiness_review_and_architecture.md / .docx / .pdf
+│   ├── acrme_security_and_rbac_guide.md / .docx / .pdf
+│   └── rbac/                          # Custom role JSONs + deploy scripts
+│       ├── custom_roles/*.json        # 5 least-privilege custom roles
+│       ├── deploy_custom_roles.sh
+│       └── deploy_role_assignments.sh
 └── test_suite/                       # Runnable Python test automation suite
     ├── README.md                     # Full suite usage guide
     ├── requirements.txt
@@ -36,6 +41,7 @@ acrme-capacity-reservation/
 | **Production Readiness Review & Architecture** | The finalized architecture and production-readiness review that the executive document and workbook are derived from. |
 | **Architecture Diagrams Deck** | Presentation / infographic deck (`.pptx` + `.pdf`) covering the six core architecture views, each with an infographic key-facts slide plus the full diagram. |
 | **UML Class Diagrams Summary** | Design-first UML class diagrams (4 diagram sets) for domain model, operation tracking, service layer, and state machines — with explicit gap analysis. |
+| **Security & RBAC Guide** | Complete authorization model: every engine operation mapped to exact Azure permissions, 5 least-privilege custom roles (JSON), deploy scripts, separation-of-duties, and the G-14 (Tier 3) consent/revocation model. |
 
 Each document is provided in editable (`.docx` / `.md` / `.pptx`) and print-ready (`.pdf`) form.
 

@@ -1,0 +1,26 @@
+{
+  "Name": "ACRME Sharing Operator",
+  "IsCustom": true,
+  "Description": "Manage CRG sharing profile (add/remove consumer subscriptions) and execute the governed onboarding role-assignment workflow, scoped to approved CRGs and onboarding scopes. Cannot mutate CRs, cannot mutate consumer VMs, cannot activate DR. Backs the ACRME Sharing UAMI. The roleAssignments write permission is included ONLY to grant consumer deploy rights during onboarding and MUST be constrained by a conditional assignment (see guide Section 7).",
+  "Actions": [
+    "Microsoft.Compute/capacityReservationGroups/read",
+    "Microsoft.Compute/capacityReservationGroups/write",
+    "Microsoft.Compute/capacityReservationGroups/share/action",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/read",
+    "Microsoft.Resources/subscriptions/read",
+    "Microsoft.Resources/subscriptions/resourceGroups/read",
+    "Microsoft.Authorization/roleAssignments/read",
+    "Microsoft.Authorization/roleAssignments/write",
+    "Microsoft.Authorization/roleAssignments/delete",
+    "Microsoft.Authorization/roleDefinitions/read"
+  ],
+  "NotActions": [
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/write",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/delete"
+  ],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/<PROVIDER_SUBSCRIPTION_ID>/resourceGroups/<PROVIDER_CRG_RG>"
+  ]
+}

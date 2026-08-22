@@ -1,0 +1,28 @@
+{
+  "Name": "ACRME Capacity Operator",
+  "IsCustom": true,
+  "Description": "Create and update Capacity Reservation Groups and Capacity Reservations (quantity increase/decrease) in APPROVED provider resource groups only. No sharing profile changes, no role assignments, no consumer VM mutation. Backs the ACRME Capacity UAMI. Assign at resource-group scope, never subscription-wide.",
+  "Actions": [
+    "Microsoft.Compute/capacityReservationGroups/read",
+    "Microsoft.Compute/capacityReservationGroups/write",
+    "Microsoft.Compute/capacityReservationGroups/delete",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/read",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/write",
+    "Microsoft.Compute/capacityReservationGroups/capacityReservations/delete",
+    "Microsoft.Compute/skus/read",
+    "Microsoft.Compute/locations/vmSizes/read",
+    "Microsoft.Compute/locations/usages/read",
+    "Microsoft.Resources/subscriptions/resourceGroups/read",
+    "Microsoft.Resources/deployments/read",
+    "Microsoft.Resources/deployments/write",
+    "Microsoft.Resources/deployments/operations/read"
+  ],
+  "NotActions": [
+    "Microsoft.Compute/capacityReservationGroups/share/action"
+  ],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/<PROVIDER_SUBSCRIPTION_ID>/resourceGroups/<PROVIDER_CRG_RG>"
+  ]
+}
