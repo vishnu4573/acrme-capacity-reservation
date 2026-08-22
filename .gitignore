@@ -16,3 +16,10 @@ venv/
 # OS / editor
 .DS_Store
 .abacus*
+
+# Auto-generated preview/conversion files
+*.pptx_preview/
+
+# Auto-converted diagram PDFs/DOCX (keep source .md only for diagrams)
+docs/diagrams/uml_*.pdf
+docs/diagrams/uml_*.docx
