@@ -2,10 +2,10 @@
 
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** August 2026  
 **Status:** Accepted  
-**Change note (v1.1):** Aligned each ADR with the Production-Readiness Review & Architecture (§26–§32) — added the normative region-classification model, Scenario 1/2 input modes, EC-1..EC-4 exception workflow, VR-1..VR-11, capacity-hold concurrency and corrected scoring (ADR-001); group accounting formulas, dual-validation detector and `groupType` FC-11 preview status (ADR-002); the full five-state engine state machine, `EngineModeState` entity and DR-activation semantics (ADR-003); and the 10-step steady-state lifecycle with auto-decrease exclusion (ADR-004).
+**Change note (v1.2):** Made this a self-contained, reference-free document — removed external document and section citations so it can be read without any companion document — and added rendered architecture diagrams (placement pipeline, input modes, quota-group model, engine state machine, emergency-transfer tiers, capacity-increase lifecycle). **(v1.1):** Added the region-classification model, Scenario 1/2 input modes, the exception workflow, the validation-rule framework, capacity-hold concurrency and corrected scoring (ADR-001); group accounting formulas, the dual-validation detector and `groupType` preview status (ADR-002); the five-state engine state machine, the `EngineModeState` entity and DR-activation semantics (ADR-003); and the 10-step steady-state lifecycle with the auto-decrease exclusion (ADR-004).
 
 ---
 
@@ -22,7 +22,7 @@ This document records the four foundational ACRME architecture decisions:
 | **ADR-003** | Capacity Management during Disaster Recovery (DR) | Accepted | — |
 | **ADR-004** | Forecast and Increase of Capacity and Quota | Accepted | — |
 
-**Evidence tags** used throughout: `[Documented]` (Azure platform docs), `[Decided]` (Decision Log D1–D11), `[Derived]` (logical consequence), `[Assumed]` (architectural judgement pending validation).
+**Evidence tags** used throughout: `[Documented]` (traceable to Azure platform behaviour or documentation), `[Decided]` (an explicit ACRME design choice recorded in this ADR set), `[Derived]` (a logical consequence of a documented constraint or decision), `[Assumed]` (architectural judgement pending proof-of-concept validation).
 
 ---
 
@@ -31,8 +31,7 @@ This document records the four foundational ACRME architecture decisions:
 **Status:** Accepted  
 **Date:** August 2026  
 **Deciders:** Principal Cloud Architect, Platform Engineering, DR Owner  
-**Related decisions:** D1, D4, D5, D8, D9; HC-1..HC-10; VR-1..VR-11  
-**Source:** `multi_region_placement_design.md` §27–28; `acrme_production_readiness_review_and_architecture.md` §27
+**Related constraints:** HC-1..HC-10 (hard constraints); VR-1..VR-11 (validation rules)  
 
 ### Context
 
@@ -50,27 +49,29 @@ Forces at play:
 Adopt a **staged, constraint-then-score placement pipeline** driven by environment-type-specific scoring formulas:
 
 1. **Stage 1 — Eligibility pre-filtering.** Reduce all Azure regions to Standard Capacity Regions within the customer's geography.
-   - **HC-9 STANDARD_REGION_ONLY** excludes Restricted regions before scoring. `[Decided — D9]`
+   - **HC-9 STANDARD_REGION_ONLY** excludes Restricted regions before scoring. `[Decided]`
    - **HC-8 GEOGRAPHY_CONTAINMENT** confines the Prod anchor to the customer's chosen geography. `[Derived]`
 
-2. **Stage 2 — Hard-constraint gate.** Each surviving region must pass **HC-1..HC-7 and HC-10** (region separation, capacity floor, quota floor, DR separation class, zone availability, DR coverage floor, DR floor integrity, cross-geo extension approval). Any failure excludes the region from scoring entirely — hard constraints are binary gates, never scored penalties. `[Decided — D4]`
+2. **Stage 2 — Hard-constraint gate.** Each surviving region must pass **HC-1..HC-7 and HC-10** (region separation, capacity floor, quota floor, DR separation class, zone availability, DR coverage floor, DR floor integrity, cross-geo extension approval). Any failure excludes the region from scoring entirely — hard constraints are binary gates, never scored penalties. `[Decided]`
 
-3. **Stage 3 — Environment-type-specific scoring.** Rank survivors using three formulas sharing default weights (α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10) but with env-type-specific semantics for α (capacity signal) and δ (DR readiness): `[Decided — D9]`
+3. **Stage 3 — Environment-type-specific scoring.** Rank survivors using three formulas sharing default weights (α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10) but with env-type-specific semantics for α (capacity signal) and δ (DR readiness): `[Decided]`
    - **Prod:** `Prod_region = argmax(PS_Prod(r))` over eligible Standard regions in-geo.
    - **NonProd/CVAL:** `argmax(PS_NonProd(r))` over survivors, excluding the Prod region.
-   - **DR:** `argmax(PS_DR(r))` over survivors, excluding the Prod region (but **may** share with NonProd per D8).
+   - **DR:** `argmax(PS_DR(r))` over survivors, excluding the Prod region (but **may** share with NonProd).
 
-4. **Selection order is sequential — Prod → NonProd → DR** — not joint optimization. With 3–4 regions the greedy sequential result equals the joint-optimal result in nearly all practical cases, while remaining transparent and auditable. `[Decided — D1]`
+4. **Selection order is sequential — Prod → NonProd → DR** — not joint optimization. With 3–4 regions the greedy sequential result equals the joint-optimal result in nearly all practical cases, while remaining transparent and auditable. `[Decided]`
 
-5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Belgium Central** via the only approved Cross-Geo Extension paths (Saudi Arabia → Belgium Central, UAE North → Belgium Central). Belgium Central must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided — D8; Documented — §27]`
+5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Belgium Central** via the only approved Cross-Geo Extension paths (Saudi Arabia → Belgium Central, UAE North → Belgium Central). Belgium Central must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided]`
 
-6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided — D5]`
+6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided]`
 
 7. **Operating mode.** In Phase 1 the engine runs region selection in **recommendation/shadow mode** — it produces and logs the ranked recommendation but does not autonomously place. Autonomous placement is gated on POC validation of the scoring formulas.
 
+![**Figure 1.** ACRME staged placement pipeline — Stage 1 eligibility pre-filter, Stage 2 hard-constraint gate, Stage 3 environment-type-specific scoring, then sequential Prod → NonProd → DR selection.](adr/diagrams/adr001_pipeline.png){ width=80% }
+
 #### Region Classification Model (normative)
 
-Every Azure region carries exactly one classification tier, stored in `PlacementPolicy` as config-as-code (versioned, auditable, replayable) — classification is a **governance decision, not a live capability query**. `[Documented — §27]`
+Every Azure region carries exactly one classification tier, stored in `PlacementPolicy` as config-as-code (versioned, auditable, replayable) — classification is a **governance decision, not a live capability query**. `[Documented]`
 
 | Tier | Eligibility | Regions |
 |---|---|---|
@@ -82,14 +83,16 @@ Restricted regions are excluded by a **pre-filter ahead of all hard constraints*
 
 #### Prod Region Input Modes
 
-The Prod region is the anchor; CVAL and DR are selected sequentially from it. The customer supplies the anchor one of two ways, and both converge on a single validated Prod anchor: `[Documented — §27]`
+The Prod region is the anchor; CVAL and DR are selected sequentially from it. The customer supplies the anchor one of two ways, and both converge on a single validated Prod anchor: `[Documented]`
 
 - **Scenario 1 — geography supplied.** The engine derives Prod via `argmax(PS_Prod)` over Standard Capacity Regions **in that geography only**. Ties break deterministically by the Standard-region list order for the geography; the first-listed region is the deterministic cold-start default when no snapshot exists. Geography exhaustion → reject (never silently cross-geo or use a Restricted region).
 - **Scenario 2 — specific region supplied.** If Standard, validate against HC-1..HC-10 and adopt as the anchor (`PS_Prod` used only for post-selection validation). If Restricted, route to the Exception Deployment Workflow.
 
+![**Figure 2.** Prod region input modes — geography-supplied (Scenario 1) versus specific-region (Scenario 2), including the restricted-region Exception Deployment Workflow.](adr/diagrams/adr001_input_modes.png){ width=72% }
+
 #### Exception Deployment Workflow (Scenario 2 — Restricted region)
 
-A Restricted region is used only if **all four** conditions hold; failure rejects at the first failing gate: `[Documented — §27]`
+A Restricted region is used only if **all four** conditions hold; failure rejects at the first failing gate: `[Documented]`
 
 | # | Condition | Check |
 |---|---|---|
@@ -118,18 +121,18 @@ On success the region becomes the **Exception Prod Anchor**, the placement is ma
 
 #### Capacity Holds & Concurrency
 
-Before returning a committed assignment the engine creates a **capacity hold** keyed by region, SKU, zone, environment, and policy version, using **optimistic concurrency**; the hold expires if Azure provisioning does not begin. This closes the concurrent-placement race (B-7). `[Documented — §29]`
+Before returning a committed assignment the engine creates a **capacity hold** keyed by region, SKU, zone, environment, and policy version, using **optimistic concurrency**; the hold expires if Azure provisioning does not begin. This closes the concurrent-placement race. `[Documented]`
 
 #### Corrected Scoring Model (pilot)
 
 - Default weights retained for pilot comparison: `α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10`; every component is clamped `Clamp(x) = max(0, min(1, x))`. `[Assumed]`
-- To avoid double-counting the same signal under α and δ, the CVAL/NonProd formula is proposed as `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones`. `[Undocumented — §28]`
-- Distribution uses **demand units, not customer count**: `Distribution = 1 − Region_Assigned_Demand / Total_Assigned_Demand`. `[Undocumented — §28]`
+- To avoid double-counting the same signal under α and δ, the CVAL/NonProd formula is proposed as `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones`. `[Assumed]`
+- Distribution uses **demand units, not customer count**: `Distribution = 1 − Region_Assigned_Demand / Total_Assigned_Demand`. `[Assumed]`
 - Revised weights are proposed, not empirically validated — advisory until pilot measurement.
 
 #### Governance & Compliance Controls
 
-- The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented — §27]`
+- The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented]`
 - Exception approval records are revocable engine artefacts; a revoked approval blocks future exception deployments for the customer–region pair with no code change.
 - Every classification change is audited with approver identity, timestamp, previous/new classification, and affected geography.
 - Belgium Central's regional capacity-planning targets must include potential Middle East DR demand on top of in-geo Europe demand.
@@ -143,22 +146,22 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 - Env-type-specific formulas let Prod optimise for capacity/isolation while DR optimises for overflow readiness.
 
 **Negative / trade-offs:**
-- Three formulas plus 16 per-CRG-type `RegionalSnapshot` fields increase implementation and snapshot-maintenance cost (backlog E07-S16, E03-S10).
-- Sequential selection is greedy; if the region count ever exceeds 6, joint optimization should be revisited (D1 review trigger).
+- Three formulas plus 16 per-CRG-type `RegionalSnapshot` fields increase implementation and snapshot-maintenance cost.
+- Sequential selection is greedy; if the region count ever exceeds 6, joint optimization should be revisited.
 - Cross-geo extension paths are a manual governance artefact — adding a path requires a PlacementPolicy update, governance approval, and a Decision Log entry.
-- Worked scoring examples remain a known gap (G-7) until per-CRG-type inputs are finalised.
+- Worked scoring examples remain a known gap until per-CRG-type inputs are finalised.
 
 **Neutral:**
-- CRG_Score (RCW) is demoted from a primary scoring input to a monitoring-only signal (D9).
+- CRG_Score (Regional Capacity Weight) is demoted from a primary scoring input to a monitoring-only signal.
 
 ### Alternatives Considered
 
 | Alternative | Why Rejected |
 |---|---|
-| **Joint optimization** (select all three regions simultaneously) | Higher combinatorial complexity; opaque and harder to audit; identical result to sequential for 3–4 regions. `[D1]` |
-| **Single generic PS(r, env_type) formula** | α and δ have fundamentally different meanings per env type; a single formula needs so many branches it becomes three formulas anyway. `[D9]` |
-| **Geographic distance as a scored soft objective** | Operators already choose geographically independent region sets at design time; HC-4 as a hard constraint is sufficient and simpler. `[D4]` |
-| **Silent fallback region for failed Middle East DR** | Violates governance and residency guarantees; the engine must fail loudly and require an approved extension path. `[§27]` |
+| **Joint optimization** (select all three regions simultaneously) | Higher combinatorial complexity; opaque and harder to audit; identical result to sequential for 3–4 regions. `[Decided]` |
+| **Single generic PS(r, env_type) formula** | α and δ have fundamentally different meanings per env type; a single formula needs so many branches it becomes three formulas anyway. `[Decided]` |
+| **Geographic distance as a scored soft objective** | Operators already choose geographically independent region sets at design time; HC-4 as a hard constraint is sufficient and simpler. `[Decided]` |
+| **Silent fallback region for failed Middle East DR** | Violates governance and residency guarantees; the engine must fail loudly and require an approved extension path. `[Documented]` |
 
 ---
 
@@ -167,15 +170,14 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 **Status:** Accepted  
 **Date:** August 2026  
 **Deciders:** Principal Cloud Architect, Platform Engineering, FinOps  
-**Related decisions:** D6, D7, D9; HC-2, HC-3, HC-7  
-**Source:** `multi_region_placement_design.md` §Quota Groups; `design_change_summary.md` QG-1..QG-12
+**Related constraints:** HC-2, HC-3, HC-7 (hard constraints)  
 
 ### Context
 
 Each customer needs three CRGs per region (Prod, NonProd, DR). Azure tracks compute quota per subscription per region per SKU family; quota exhaustion silently blocks CR creation and VM deployment. The engine must:
 
 - Prevent a NonProd surge from consuming quota that Prod CR creation needs (isolation).
-- Make emergency capacity transfer (ADR-003) **quota-neutral** where possible — i.e. reshuffle capacity without waiting hours for an Azure quota-increase approval during a crisis.
+- Make emergency capacity transfer (see ADR-003) **quota-neutral** where possible — i.e. reshuffle capacity without waiting hours for an Azure quota-increase approval during a crisis.
 - Provide clean per-environment cost attribution for chargeback.
 - Enforce a protected DR reservation that NonProd growth can never erode.
 
@@ -185,33 +187,35 @@ Azure **Quota Groups** (Preview) allow multiple subscriptions/CRGs to share a gr
 
 Adopt a **Two-Quota-Group-per-region model with an engine-enforced DR floor**:
 
-1. **Two groups per region:** one **Prod-only** group and one **shared NonProd+DR** group. `[Decided — D6]`
+1. **Two groups per region:** one **Prod-only** group and one **shared NonProd+DR** group. `[Decided]`
    ```
    Prod_Group_Limit(R)        = base_subscription_quota_limit × (1 + emergency_transfer_headroom_vcpu / base_limit)
    NonProd_DR_Group_Limit(R)  = base_subscription_quota_limit × (1 + emergency_transfer_headroom_vcpu / base_limit)
    ```
 
-2. **Engine-enforced DR floor** inside the NonProd+DR group (Azure has no native sub-reservation): `[Decided — D7]`
+2. **Engine-enforced DR floor** inside the NonProd+DR group (Azure has no native sub-reservation): `[Decided]`
    ```
    DR_Floor_vCPU(R)               = potential_dr_demand(R) × vCPU_per_instance × dr_ratio_max
    Effective_NonProd_Ceiling(R)   = NonProd_DR_Group_Limit(R) − DR_Floor_vCPU(R)
    ```
-   The floor is always sized at **`dr_ratio_max` (0.40)** — the upper bound of the DR ratio range — so it never needs to grow if the operating ratio is later raised (0.30 → 0.40). Only actual Prod demand growth expands the floor. `[Decided — D7]`
+   The floor is always sized at **`dr_ratio_max` (0.40)** — the upper bound of the DR ratio range — so it never needs to grow if the operating ratio is later raised (0.30 → 0.40). Only actual Prod demand growth expands the floor. `[Decided]`
 
 3. **Hard-constraint enforcement at placement:**
    - **HC-2 CAPACITY_FLOOR** — CR headroom ≥ `2 × requested_vm_count × SKU_vCPU`.
-   - **HC-3 QUOTA_FLOOR** — env-type-aware group headroom check (Prod group / effective NonProd ceiling / DR headroom). Reads from the `QuotaGroup` entity, not legacy per-subscription `QuotaRecord`. `[Decided — D9]`
-   - **HC-7 DR_FLOOR_INTEGRITY** — rejects NonProd placement that would push `nonprod_quota_used` above the effective ceiling, evaluated **after** HC-3. `[Decided — D7]`
+   - **HC-3 QUOTA_FLOOR** — env-type-aware group headroom check (Prod group / effective NonProd ceiling / DR headroom). Reads from the `QuotaGroup` entity, not legacy per-subscription `QuotaRecord`. `[Decided]`
+   - **HC-7 DR_FLOOR_INTEGRITY** — rejects NonProd placement that would push `nonprod_quota_used` above the effective ceiling, evaluated **after** HC-3. `[Decided]`
 
-4. **Legacy per-subscription quota tracking is retained for monitoring/audit only** and superseded for all placement and scoring checks by group-level fields. `[Decided — D6]`
+4. **Legacy per-subscription quota tracking is retained for monitoring/audit only** and superseded for all placement and scoring checks by group-level fields. `[Decided]`
 
 5. **Continuous protection:** the reconciliation loop watches for floor violations and emits `DRFloorViolationDetected`; NonProd CRG scale operations that approach the ceiling are operator-gated.
 
-**Worked POC topology (GP-06):** Prod group 128 vCPU; NonProd+DR group 80 vCPU; DR floor 32 vCPU → effective NonProd ceiling 48 vCPU.
+**Worked topology example:** Prod group 128 vCPU; NonProd+DR group 80 vCPU; DR floor 32 vCPU → effective NonProd ceiling 48 vCPU.
+
+![**Figure 3.** Two-quota-group-per-region model — an isolated Prod-only group and a shared NonProd+DR group with the engine-enforced DR floor and the effective NonProd ceiling.](adr/diagrams/adr002_quota_groups.png){ width=85% }
 
 #### Group Accounting Formulas (normative)
 
-All four are **engine accounting controls** — they do not create a native Azure sub-reservation: `[Documented — §26]`
+All four are **engine accounting controls** — they do not create a native Azure sub-reservation: `[Documented]`
 ```
 DR_Floor_vCPU             = Potential_DR_Demand × vCPU_Per_Instance × DR_Ratio_Max
 Effective_NonProd_Ceiling = NonProd_DR_Group_Limit − DR_Floor_vCPU
@@ -221,14 +225,14 @@ Group_Headroom            = Group_Limit − Group_Used
 
 #### Exact Enforcement Controls
 
-- Every **NonProd** increase performs a group check **and** a subscription check. `[Documented — §26]`
+- Every **NonProd** increase performs a group check **and** a subscription check. `[Documented]`
 - Every **DR** increase performs a group check, subscription check, SKU check, capacity check, **and** active-incident check.
 - A **separate detector** recalculates the DR floor from authoritative assignment/allocation data. Any disagreement between the command-time and detector calculations **disables automatic NonProd expansion** (fail-safe) and raises `DRFloorViolationDetected`.
 - Group propagation is **polled** — no fixed propagation SLA is assumed.
 
-#### `groupType` Preview Dependency (FC-11)
+#### `groupType` Preview Dependency
 
-The Quota-Group `groupType` property (`AllocationGroup` = advisory vs `EnforcedGroup` = enforced) is **preview-only** in the Azure Quota REST API and is not GA. `[Documented — Azure Quota REST API reference]` The engine's accounting controls are deliberately **engine-level and do not depend on `groupType` enforcement**. If `EnforcedGroup` is ever relied upon to drop the engine's own subscription-level check, that dependency must pass the preview-acceptance gate (POC-30) and a Decision Log entry first. Engineering constraint: pin the exact preview API version in all quota-group calls and add version-drift detection to the platform health check.
+The Quota-Group `groupType` property (`AllocationGroup` = advisory vs `EnforcedGroup` = enforced) is **preview-only** in the Azure Quota REST API and is not GA. `[Documented]` The engine's accounting controls are deliberately **engine-level and do not depend on `groupType` enforcement**. If `EnforcedGroup` is ever relied upon to drop the engine's own subscription-level check, that dependency must pass a preview-acceptance proof-of-concept and a recorded decision first. Engineering constraint: pin the exact preview API version in all quota-group calls and add version-drift detection to the platform health check.
 
 ### Consequences
 
@@ -239,19 +243,19 @@ The Quota-Group `groupType` property (`AllocationGroup` = advisory vs `EnforcedG
 - The DR floor guarantees a protected reservation NonProd can never erode.
 
 **Negative / trade-offs:**
-- The DR floor is a **soft ceiling the engine must maintain continuously** — Azure won't enforce it. A bug could allow NonProd to breach the floor; mitigated by `DRFloorViolationDetected` alerting and operator gates. `[D6]`
-- Sizing the floor at `dr_ratio_max` over-reserves quota slightly at lower operating ratios — a deliberate reliability-over-cost trade, reviewed quarterly. `[D7]`
+- The DR floor is a **soft ceiling the engine must maintain continuously** — Azure won't enforce it. A bug could allow NonProd to breach the floor; mitigated by `DRFloorViolationDetected` alerting and operator gates. `[Decided]`
+- Sizing the floor at `dr_ratio_max` over-reserves quota slightly at lower operating ratios — a deliberate reliability-over-cost trade, reviewed quarterly. `[Decided]`
 - `Quota_Score` and HC-3 must be environment-type-aware (three code paths).
-- **Hard dependency on Azure Quota Groups GA** — Blocker B-1 (POC-30); if `groupQuotas` returns 404 in the target tenant/region, escalate to Azure Support.
+- **Hard dependency on Azure Quota Groups GA** — validated by proof-of-concept before rollout; if `groupQuotas` returns 404 in the target tenant/region, escalate to Azure Support.
 
 ### Alternatives Considered
 
 | Alternative | Why Rejected |
 |---|---|
-| **Single shared quota pool** (all three CRGs) | Breaks Prod isolation — a NonProd surge can consume Prod's quota. `[D6]` |
-| **Three separate groups** (one per CRG) | Maximum isolation but makes Tier 3 transfer non-atomic — releasing NonProd quota lands in the wrong group, forcing an Azure quota request mid-crisis (hours of RTO impact). `[D6]` |
-| **Per-subscription quota only** (legacy) | Cannot make emergency transfer quota-neutral without risky cross-subscription coordination. `[D6]` |
-| **DR floor sized at current ratio** | Undersizes the floor if the ratio is later increased, blocking DR expansion. `[D7]` |
+| **Single shared quota pool** (all three CRGs) | Breaks Prod isolation — a NonProd surge can consume Prod's quota. `[Decided]` |
+| **Three separate groups** (one per CRG) | Maximum isolation but makes Tier 3 transfer non-atomic — releasing NonProd quota lands in the wrong group, forcing an Azure quota request mid-crisis (hours of RTO impact). `[Decided]` |
+| **Per-subscription quota only** (legacy) | Cannot make emergency transfer quota-neutral without risky cross-subscription coordination. `[Decided]` |
+| **DR floor sized at current ratio** | Undersizes the floor if the ratio is later increased, blocking DR expansion. `[Decided]` |
 
 ---
 
@@ -260,8 +264,7 @@ The Quota-Group `groupType` property (`AllocationGroup` = advisory vs `EnforcedG
 **Status:** Accepted  
 **Date:** August 2026  
 **Deciders:** Principal Cloud Architect, DR Owner, Platform Engineering, Security  
-**Related decisions:** D8, D10, D11; HC-1, HC-4, HC-6; G-14, G-15  
-**Source:** `multi_region_placement_design.md` §Emergency Capacity Transfer; `acrme_production_readiness_review_and_architecture.md` §29
+**Related constraints:** HC-1, HC-4, HC-6 (hard constraints)  
 
 ### Context
 
@@ -275,20 +278,20 @@ Two capabilities are needed:
 
 Adopt **NonProd/DR co-location with a coverage floor**, a **formal two-mode engine state**, and a **three-tier emergency transfer model**:
 
-1. **NonProd and DR may share a region (HC-1 constraint removed).** This lets the NonProd CRG's `effective_free` (after `dr_overflow_reserve`) count as DR overflow headroom. `[Decided — D8]`
+1. **NonProd and DR may share a region (HC-1 constraint removed).** This lets the NonProd CRG's `effective_free` (after `dr_overflow_reserve`) count as DR overflow headroom. `[Decided]`
    - **HC-6 DR_COVERAGE_FLOOR** guarantees the combined pool can absorb demand before DR placement is accepted:
      ```
      dr_crg_free_slots(R) + nonprod_crg_effective_free(R) ≥ prod_vm_count × dr_ratio_max
      ```
    - **HC-4 DR_SEPARATION_CLASS** still guarantees Prod and DR sit in non-correlated failure domains (HIGH separation for non-paired regions).
 
-2. **Two separate operating systems gated by `engine_mode`:** `[Decided — D10]`
-   - **`STEADY_STATE`** — organic growth via the reconciliation loop and `CapacityIncreaseRequest` (ADR-004). Emergency Transfer is **rejected** in this mode.
-   - **`DR_EVENT_ACTIVE`** — crisis operations only. The auto-increase trigger is **suppressed** in this mode. Mode transitions are operator-gated with dual approval (state machine `EngineModeState`, PRR §29), never automatic. `[Decided — D10]`
+2. **Two separate operating systems gated by `engine_mode`:** `[Decided]`
+   - **`STEADY_STATE`** — organic growth via the reconciliation loop and `CapacityIncreaseRequest` (see ADR-004). Emergency Transfer is **rejected** in this mode.
+   - **`DR_EVENT_ACTIVE`** — crisis operations only. The auto-increase trigger is **suppressed** in this mode. Mode transitions are operator-gated with dual approval (state machine `EngineModeState`), never automatic. `[Decided]`
 
-3. **Three-tier Emergency Capacity Transfer escalation:** `[Decided — D11]`
+3. **Three-tier Emergency Capacity Transfer escalation:** `[Decided]`
    - **Tier 1 — DirectExpansion (automated):** expand DR CR quantity using free headroom in the DR group. No approval beyond DR-event declaration.
-   - **Tier 2 — QuotaNeutralTransfer (policy-gated):** reduce a NonProd CR (releasing quota to the shared NonProd+DR group pool) and expand the DR CR from that same pool. Net group headroom change ≈ 0 — **quota-neutral, no VM execution-state change** (only NonProd SLA is removed). This is possible *only* because of the two-group model (ADR-002).
+   - **Tier 2 — QuotaNeutralTransfer (policy-gated):** reduce a NonProd CR (releasing quota to the shared NonProd+DR group pool) and expand the DR CR from that same pool. Net group headroom change ≈ 0 — **quota-neutral, no VM execution-state change** (only NonProd SLA is removed). This is possible *only* because of the two-group model (see ADR-002).
    - **Tier 3 — DestructiveTransfer (dual approval + elevated RBAC):** the only tier that modifies VM-to-CRG associations. The operator supplies an explicit `vm_disassociation_list` (no automated VM selection in Phase 1); executed via 6-step Path B with Path A fallback per VM. VMSS entries are rejected in Phase 1.
 
 4. **Quota-neutral math (Tier 2):**
@@ -298,13 +301,15 @@ Adopt **NonProd/DR co-location with a coverage floor**, a **formal two-mode engi
    ⇒ net group headroom change ≈ 0  (ARM operations only; no Azure quota approval)
    ```
 
-5. **DR reserve sizing** is `30–40%` of Prod (`dr_ratio_min=0.30`, `dr_ratio_max=0.40`, `dr_ratio_target=0.35`); the protected floor uses `dr_ratio_max` (ADR-002/D7).
+5. **DR reserve sizing** is `30–40%` of Prod (`dr_ratio_min=0.30`, `dr_ratio_max=0.40`, `dr_ratio_target=0.35`); the protected floor uses `dr_ratio_max` (see ADR-002).
 
-6. **Phase-1 safety posture:** Tier 2 is approval-gated; **Tier 3 is blocked** pending the G-14 consumer-credential model and G-15 engine-mode state machine. No invented SLA — propagation/approval times are measured and reported as unknown until observed.
+6. **Phase-1 safety posture:** Tier 2 is approval-gated; **Tier 3 is blocked** pending the consumer-credential model and the engine-mode state machine. No invented SLA — propagation/approval times are measured and reported as unknown until observed.
+
+![**Figure 4.** Three-tier Emergency Capacity Transfer escalation — Tier 1 automated, Tier 2 quota-neutral, Tier 3 destructive (blocked in Phase 1).](adr/diagrams/adr003_transfer_tiers.png){ width=33% }
 
 #### Full Engine State Machine (normative)
 
-`engine_mode` is not a two-value flag but a **five-state machine** persisted in Cosmos DB with conditional writes, transition guards, and recovery tests — a production blocker until implemented (G-15): `[Documented — §29]`
+`engine_mode` is not a two-value flag but a **five-state machine** persisted in Cosmos DB with conditional writes, transition guards, and recovery tests — a production blocker until implemented: `[Documented]`
 
 | State | Meaning | Permitted transitions |
 |---|---|---|
@@ -316,13 +321,15 @@ Adopt **NonProd/DR co-location with a coverage floor**, a **formal two-mode engi
 
 All transitions are **operator-gated with dual approval** — never automatic.
 
+![**Figure 5.** Five-state engine mode machine — every transition is operator-gated with dual approval.](adr/diagrams/adr003_state_machine.png){ width=98% }
+
 #### `EngineModeState` Entity
 
-Must carry: environment/control-plane scope · current mode · state version · incident ID · requested-by · approved-by · transition timestamp · transition reason · active operation IDs · lease owner + expiry · recovery checkpoint. `[Documented — §29]`
+Must carry: environment/control-plane scope · current mode · state version · incident ID · requested-by · approved-by · transition timestamp · transition reason · active operation IDs · lease owner + expiry · recovery checkpoint. `[Documented]`
 
 #### DR Activation Semantics
 
-Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which separately-governed emergency operations may be evaluated — it does **not** automatically authorize Tier 2 or Tier 3. Each tier is independently gated. The DR orchestrator validates group+subscription quota and CR/sharing state before starting any approved failover deployment, and records active-or-incident-hold state back to the state service. `[Documented — §31]`
+Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which separately-governed emergency operations may be evaluated — it does **not** automatically authorize Tier 2 or Tier 3. Each tier is independently gated. The DR orchestrator validates group and subscription quota and CR/sharing state before starting any approved failover deployment, and records active-or-incident-hold state back to the state service. `[Documented]`
 
 ### Consequences
 
@@ -335,7 +342,7 @@ Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which sepa
 **Negative / trade-offs:**
 - Co-location adds risk that NonProd over-consumption erodes DR overflow; mitigated by HC-6, `dr_overflow_reserve`, and floor alerting.
 - `engine_mode` must be a formal Cosmos DB state propagated to every reconciliation cycle, with operator-gated, dual-approval transitions.
-- **Tier 3 is blocked** until G-14 (Managed Identity vs cross-tenant SP credential model) and G-15 (state machine) are resolved — a known Phase-1 limitation.
+- **Tier 3 is blocked** until the consumer-credential model (Managed Identity vs cross-tenant service-principal) and the engine-mode state machine are resolved — a known Phase-1 limitation.
 - Tier 3 requires a rare, audited break-glass role (`ACRME.SuperAdmin`) for single-approver override.
 - Requires per-CRG-type `RegionalSnapshot` fields to evaluate HC-6.
 
@@ -343,12 +350,12 @@ Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which sepa
 
 | Alternative | Why Rejected |
 |---|---|
-| **Keep DR_region ≠ NonProd_region** | Prevents using NonProd as DR overflow — the whole point of co-location. `[D8]` |
-| **Remove separation with no compensating HC** | Risks NonProd over-consumption leaving no DR headroom. `[D8]` |
-| **Unified capacity engine with mode flags** | Mode flags create complex conditionals and risk triggering VM disassociation during routine reconciliation. `[D10]` |
-| **Emergency transfer as an extension of auto-increase** | Conflates policy-driven growth with operator-gated crisis response; could run destructive ops without a DR declaration. `[D10]` |
-| **Two tiers only (automated + destructive)** | Loses the quota-neutral Tier 2 — the critical low-risk intermediate that avoids Tier 3 in most crises. `[D11]` |
-| **Four tiers (separate VMSS tier)** | VMSS disassociation deferred as a Phase-1 limitation rather than a distinct tier. `[D11]` |
+| **Keep DR_region ≠ NonProd_region** | Prevents using NonProd as DR overflow — the whole point of co-location. `[Decided]` |
+| **Remove separation with no compensating HC** | Risks NonProd over-consumption leaving no DR headroom. `[Decided]` |
+| **Unified capacity engine with mode flags** | Mode flags create complex conditionals and risk triggering VM disassociation during routine reconciliation. `[Decided]` |
+| **Emergency transfer as an extension of auto-increase** | Conflates policy-driven growth with operator-gated crisis response; could run destructive ops without a DR declaration. `[Decided]` |
+| **Two tiers only (automated + destructive)** | Loses the quota-neutral Tier 2 — the critical low-risk intermediate that avoids Tier 3 in most crises. `[Decided]` |
+| **Four tiers (separate VMSS tier)** | VMSS disassociation deferred as a Phase-1 limitation rather than a distinct tier. `[Decided]` |
 
 ---
 
@@ -357,38 +364,37 @@ Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which sepa
 **Status:** Accepted  
 **Date:** August 2026  
 **Deciders:** Principal Cloud Architect, Platform Engineering, FinOps, Capacity Planning  
-**Related decisions:** D10; FR-7, FR-4.4; G-24  
-**Source:** `azure_cr_management_engine_design.md` FR-7; `acrme_production_readiness_review_and_architecture.md` §Forecast/§30
+**Related constraints:** HC-3 (applied at increase-execution time)  
 
 ### Context
 
-Reserved capacity must grow ahead of demand — but Azure quota increases take time to approve, and over-reservation wastes money. The engine needs to forecast demand, recommend right-sized capacity, and drive quota/CR increases with enough lead time, **without** ever autonomously performing material or destructive changes in Phase 1. This growth path must be architecturally distinct from crisis operations (ADR-003).
+Reserved capacity must grow ahead of demand — but Azure quota increases take time to approve, and over-reservation wastes money. The engine needs to forecast demand, recommend right-sized capacity, and drive quota/CR increases with enough lead time, **without** ever autonomously performing material or destructive changes in Phase 1. This growth path must be architecturally distinct from crisis operations (see ADR-003).
 
 ### Decision
 
 Adopt **forecast-driven, approval-gated capacity growth** operating exclusively in `STEADY_STATE`:
 
-1. **Forecasting** analyses historical CR allocation and projects demand over a configurable window (default 30/60/90 days), exposing raw time series and derived recommendations via API. `[Documented — FR-7.1/7.6]`
+1. **Forecasting** analyses historical CR allocation and projects demand over a configurable window (default 30/60/90 days), exposing raw time series and derived recommendations via API. `[Documented]`
 
-2. **Capacity sizing formula:** `[Documented — FR-7.3]`
+2. **Capacity sizing formula:** `[Documented]`
    ```
    Forecast_Quantity = ceil(Forecast_Peak × (1 + Growth_Buffer) + DR_Buffer)
    ```
    Increase when forecast demand exceeds current reserved quantity within the window; right-size down when demand is consistently below current, honouring a configurable buffer.
 
-3. **Lead-time alerting:** when forecast demand approaches a quota limit (default **80%**), emit `ForecastApproachingQuotaLimit` with a **14-day lead time** — enough for quota-increase processing. `[Documented — FR-7.4]`
+3. **Lead-time alerting:** when forecast demand approaches a quota limit (default **80%**), emit `ForecastApproachingQuotaLimit` with a **14-day lead time** — enough for quota-increase processing. `[Documented]`
 
-4. **Auto-increase is approval-gated in Phase 1.** The trigger uses utilisation thresholds with **debounce/cooldown** to avoid thrashing; a `CapacityIncreaseRequest` entity carries the full lifecycle (create → approve → execute → retry → cancel), and Phase 1 requires **operator approval** before execution. `[Decided — D10; Derived — §30, G-24]`
+4. **Auto-increase is approval-gated in Phase 1.** The trigger uses utilisation thresholds with **debounce/cooldown** to avoid thrashing; a `CapacityIncreaseRequest` entity carries the full lifecycle (create → approve → execute → retry → cancel), and Phase 1 requires **operator approval** before execution. `[Decided]`
 
-5. **Quota increases** are initiated via the Azure Support REST API (`Microsoft.Capacity/.../serviceLimits`) — at group level where Quota Groups apply (ADR-002) — subject to the same operator-approval gate. `[Documented — FR-4.4]`
+5. **Quota increases** are initiated via the Azure Support REST API (`Microsoft.Capacity/.../serviceLimits`) — at group level where Quota Groups apply (see ADR-002) — subject to the same operator-approval gate. `[Documented]`
 
-6. **Mode isolation.** Auto-increase runs **only** in `STEADY_STATE` and is **suppressed during `DR_EVENT_ACTIVE`**, keeping organic growth strictly separate from crisis transfer (ADR-003). `[Decided — D10]`
+6. **Mode isolation.** Auto-increase runs **only** in `STEADY_STATE` and is **suppressed during `DR_EVENT_ACTIVE`**, keeping organic growth strictly separate from crisis transfer (see ADR-003). `[Decided]`
 
-7. **Non-destructive guarantee.** Increases only ever raise CR quantity or request more quota; guarded reduction (right-sizing) never drops a CR below its allocated count (platform floor, FR-1.6) and is itself approval-gated.
+7. **Non-destructive guarantee.** Increases only ever raise CR quantity or request more quota; guarded reduction (right-sizing) never drops a CR below its allocated count (the platform floor) and is itself approval-gated.
 
 #### Steady-State Capacity Lifecycle (normative 10-step policy)
 
-The steady-state increase runs strictly separate from DR crisis operations and follows a fixed sequence, with **no assumed quota-propagation SLA**: `[Documented — §30]`
+The steady-state increase runs strictly separate from DR crisis operations and follows a fixed sequence, with **no assumed quota-propagation SLA**: `[Documented]`
 
 1. Detect threshold crossing.
 2. Re-read current CR, quota, sharing, and assignment state.
@@ -401,13 +407,15 @@ The steady-state increase runs strictly separate from DR crisis operations and f
 9. Confirm the actual quantity.
 10. Refresh the snapshot and close the request.
 
+![**Figure 6.** Ten-step steady-state capacity-increase lifecycle, running only in STEADY_STATE behind an operator-approval gate.](adr/diagrams/adr004_lifecycle.png){ width=25% }
+
 #### Auto-Decrease Exclusion
 
-Auto-decrease is **excluded from Phase 1**: it can remove future capacity and interact with running VMs. Right-sizing down remains operator-driven and guarded by the platform floor (never below allocated count). `[Documented — §30]`
+Auto-decrease is **excluded from Phase 1**: it can remove future capacity and interact with running VMs. Right-sizing down remains operator-driven and guarded by the platform floor (never below allocated count). `[Documented]`
 
 #### Forecast Advisory Posture
 
-Forecast recommendations stay **advisory until model accuracy and false-positive rates are measured**; the horizon is 30/60/90 days and `Growth_Buffer`/`DR_Buffer` are policy percentages, not fixed constants. `[Documented — §28]`
+Forecast recommendations stay **advisory until model accuracy and false-positive rates are measured**; the horizon is 30/60/90 days and `Growth_Buffer`/`DR_Buffer` are policy percentages, not fixed constants. `[Documented]`
 
 ### Consequences
 
@@ -418,31 +426,32 @@ Forecast recommendations stay **advisory until model accuracy and false-positive
 - Right-sizing recovers cost from over-reserved CRs without risking allocated VMs.
 
 **Negative / trade-offs:**
-- Approval-gated in Phase 1 means growth is not instantaneous — acceptable because Emergency Transfer (ADR-003) covers crisis speed.
-- Forecast accuracy depends on history; workload-tagged per-workload forecasts (FR-7.5) are only partially covered (gap G-16).
+- Approval-gated in Phase 1 means growth is not instantaneous — acceptable because Emergency Transfer (see ADR-003) covers crisis speed.
+- Forecast accuracy depends on history; workload-tagged per-workload forecasts are only partially covered.
 - Threshold, buffer, and cooldown values are empirical and require tuning during the pilot; SLA/propagation times are measured, not invented.
-- `CapacityIncreaseRequest` lifecycle (entity, approval, retry, cancellation) is still a backlog item (G-24) requiring an end-to-end approved-increase test.
+- the `CapacityIncreaseRequest` lifecycle (entity, approval, retry, cancellation) is still a backlog item requiring an end-to-end approved-increase test.
 
 ### Alternatives Considered
 
 | Alternative | Why Rejected |
 |---|---|
-| **Fully autonomous auto-increase** | Removes human control over material cost/quota changes; unacceptable in Phase 1. `[§30]` |
-| **Auto-increase escalating into emergency tiers** | Conflates growth with crisis response; could run emergency ops without a DR declaration. `[D10]` |
-| **Fixed-timer cooldown** | Less adaptive than recovering the budget incrementally using observed success rates. `[PRR §—]` |
-| **No lead-time alerting (react on exhaustion)** | Quota approvals take too long; reacting at exhaustion guarantees deployment failures. `[FR-7.4]` |
-| **Sizing without a DR buffer** | Under-reserves relative to DR obligations; the formula includes an explicit `DR_Buffer` term. `[FR-7.3]` |
+| **Fully autonomous auto-increase** | Removes human control over material cost/quota changes; unacceptable in Phase 1. `[Documented]` |
+| **Auto-increase escalating into emergency tiers** | Conflates growth with crisis response; could run emergency ops without a DR declaration. `[Decided]` |
+| **Fixed-timer cooldown** | Less adaptive than recovering the budget incrementally using observed success rates. `[Assumed]` |
+| **No lead-time alerting (react on exhaustion)** | Quota approvals take too long; reacting at exhaustion guarantees deployment failures. `[Documented]` |
+| **Sizing without a DR buffer** | Under-reserves relative to DR obligations; the formula includes an explicit `DR_Buffer` term. `[Documented]` |
 
 ---
 
-## Appendix A — Decision Log Cross-Reference
+## Appendix A — ADR Summary
 
-| ADR | Primary Decisions | Hard Constraints | Key Gaps/Blockers |
-|---|---|---|---|
-| ADR-001 Region Selection | D1, D4, D5, D8, D9 | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | G-7 (worked examples) |
-| ADR-002 Quota & Capacity | D6, D7, D9 | HC-2, HC-3, HC-7 | B-1 (Quota Groups GA, POC-30) |
-| ADR-003 Capacity during DR | D8, D10, D11 | HC-1, HC-4, HC-6 | G-14 (credential), G-15 (engine mode), B-2 (POC-31) |
-| ADR-004 Forecast & Increase | D10 | — (uses HC-3 at execution) | G-16 (workload tags), G-24 (increase entity) |
+| ADR | Hard Constraints Applied | Key Open Items |
+|---|---|---|
+| ADR-001 Region Selection | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | Worked scoring examples pending final per-CRG-type inputs |
+| ADR-002 Quota & Capacity | HC-2, HC-3, HC-7 | Azure Quota Groups GA validated by proof-of-concept before rollout |
+| ADR-003 Capacity during DR | HC-1, HC-4, HC-6 | Consumer-credential model and engine-mode state machine; quota-release latency measured |
+| ADR-004 Forecast & Increase | HC-3 (at execution) | Workload-tagged forecasts; `CapacityIncreaseRequest` lifecycle end-to-end test |
+
 
 ## Appendix B — Status Legend
 
@@ -457,12 +466,12 @@ Forecast recommendations stay **advisory until model accuracy and false-positive
 
 | Tag | Meaning |
 |---|---|
-| `[Documented]` | Traceable to Azure platform documentation or a formal FR/NFR |
-| `[Decided]` | Explicit design choice in the Decision Log (D1–D11) |
-| `[Derived]` | Logical consequence of a documented constraint or decision |
-| `[Assumed]` | Architectural judgement pending POC validation |
+| `[Documented]` | Traceable to Azure platform behaviour or documentation |
+| `[Decided]` | An explicit ACRME design choice recorded in this ADR set |
+| `[Derived]` | A logical consequence of a documented constraint or decision |
+| `[Assumed]` | Architectural judgement pending proof-of-concept validation |
 
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After POC-30 (Quota Groups GA) and POC-31 (quota release latency), and on resolution of G-14 / G-15.
+**Next Review:** After proof-of-concept validation of Azure Quota Groups GA and quota-release latency, and on resolution of the consumer-credential model and engine-mode state-machine items.

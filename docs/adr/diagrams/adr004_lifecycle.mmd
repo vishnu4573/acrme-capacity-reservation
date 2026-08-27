@@ -1,0 +1,10 @@
+flowchart TD
+    S1[1. Detect threshold crossing] --> S2[2. Re-read CR, quota,<br/>sharing, assignment state]
+    S2 --> S3[3. Create CapacityIncreaseRequest]
+    S3 --> S4[4. Calculate target quantity<br/>Forecast_Quantity formula]
+    S4 --> S5[5. Require operator approval<br/>Phase 1]
+    S5 --> S6[6. Submit quota action<br/>only if validated as required]
+    S6 --> S7[7. Wait for confirmed quota state<br/>no assumed propagation SLA]
+    S7 --> S8[8. Update CR quantity]
+    S8 --> S9[9. Confirm actual quantity]
+    S9 --> S10[10. Refresh snapshot<br/>and close request]

@@ -1,0 +1,20 @@
+stateDiagram-v2
+    [*] --> STEADY_STATE
+    STEADY_STATE --> DR_DECLARATION_PENDING: DR requested
+    DR_DECLARATION_PENDING --> DR_EVENT_ACTIVE: dual approval + validation
+    DR_DECLARATION_PENDING --> STEADY_STATE: rejected / expired
+    DR_EVENT_ACTIVE --> FAILBACK_PENDING: failback requested
+    DR_EVENT_ACTIVE --> INCIDENT_HOLD: conflict / critical failure
+    FAILBACK_PENDING --> STEADY_STATE: failback completed
+    FAILBACK_PENDING --> DR_EVENT_ACTIVE: validation failed
+    FAILBACK_PENDING --> INCIDENT_HOLD: conflict / critical failure
+    INCIDENT_HOLD --> DR_EVENT_ACTIVE: recovery approval
+    INCIDENT_HOLD --> FAILBACK_PENDING: recovery approval
+    note right of STEADY_STATE
+      Organic growth only.
+      Emergency Transfer rejected.
+    end note
+    note right of DR_EVENT_ACTIVE
+      Crisis operations only.
+      Auto-increase suppressed.
+    end note

@@ -1,0 +1,15 @@
+flowchart TD
+    subgraph REGION[Per-Region Quota Model]
+      direction TB
+      subgraph PG[Prod-only Quota Group]
+        P1[Prod CRG quota<br/>isolated from NonProd surge]
+      end
+      subgraph NG["Shared NonProd + DR Quota Group"]
+        direction TB
+        CEIL[Effective NonProd Ceiling<br/>= Group Limit − DR Floor]
+        FLOOR["DR Floor vCPU<br/>= Potential_DR_Demand<br/>× vCPU_Per_Instance × dr_ratio_max 0.40<br/>engine-enforced, protected"]
+        CEIL --- FLOOR
+      end
+    end
+    NOTE["Tier 2 Emergency Transfer is quota-neutral:<br/>NonProd reduction releases quota to the SAME pool<br/>that DR expansion consumes → net change ≈ 0"]
+    NG -.-> NOTE

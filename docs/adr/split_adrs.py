@@ -42,24 +42,24 @@ status_legend = """## Appendix — Status Legend
 | **Proposed** | Under discussion; not yet ratified |
 | **Accepted** | Ratified and in force |
 | **Deprecated** | No longer recommended but not yet replaced |
-| **Superseded** | Replaced by a later ADR (referenced explicitly) |
+| **Superseded** | Replaced by a later ADR |
 
 ## Appendix — Evidence Tag Taxonomy
 
 | Tag | Meaning |
 |---|---|
-| `[Documented]` | Traceable to Azure platform documentation or a formal FR/NFR |
-| `[Decided]` | Explicit design choice in the Decision Log (D1–D11) |
-| `[Derived]` | Logical consequence of a documented constraint or decision |
-| `[Assumed]` | Architectural judgement pending POC validation |
+| `[Documented]` | Traceable to Azure platform behaviour or documentation |
+| `[Decided]` | An explicit ACRME design choice recorded in this ADR set |
+| `[Derived]` | A logical consequence of a documented constraint or decision |
+| `[Assumed]` | Architectural judgement pending proof-of-concept validation |
 """
 
-# Per-ADR Decision Log cross-reference rows (from combined Appendix A).
+# Per-ADR summary rows (self-contained; no external tracking codes).
 decision_log = {
-    "ADR-001": "| ADR-001 Region Selection | D1, D4, D5, D8, D9 | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | G-7 (worked examples) |",
-    "ADR-002": "| ADR-002 Quota & Capacity | D6, D7, D9 | HC-2, HC-3, HC-7 | B-1 (Quota Groups GA, POC-30) |",
-    "ADR-003": "| ADR-003 Capacity during DR | D8, D10, D11 | HC-1, HC-4, HC-6 | G-14 (credential), G-15 (engine mode), B-2 (POC-31) |",
-    "ADR-004": "| ADR-004 Forecast & Increase | D10 | — (uses HC-3 at execution) | G-16 (workload tags), G-24 (increase entity) |",
+    "ADR-001": "| ADR-001 Region Selection | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | Worked scoring examples pending final per-CRG-type inputs |",
+    "ADR-002": "| ADR-002 Quota & Capacity | HC-2, HC-3, HC-7 | Azure Quota Groups GA validated by proof-of-concept before rollout |",
+    "ADR-003": "| ADR-003 Capacity during DR | HC-1, HC-4, HC-6 | Consumer-credential model and engine-mode state machine; quota-release latency measured |",
+    "ADR-004": "| ADR-004 Forecast & Increase | HC-3 (at execution) | Workload-tagged forecasts; `CapacityIncreaseRequest` lifecycle end-to-end test |",
 }
 
 titles = {a: headings[a][1] for a in order}
@@ -81,6 +81,18 @@ for adr in order:
     body = "\n".join(body_lines)
     # Promote the ADR heading to H1.
     body = re.sub(r"^## (ADR-00\d — .+)$", r"# \1", body, count=1, flags=re.M)
+    # Diagram images live in docs/adr/diagrams/; rewrite the docs-relative path
+    # (adr/diagrams/...) used by the consolidated doc to the adr-local path.
+    body = body.replace("](adr/diagrams/", "](diagrams/")
+    # Renumber figures per-document, starting at 1, so each standalone ADR is
+    # self-contained (the consolidated doc numbers figures 1..6 across all ADRs).
+    _fig_counter = [0]
+
+    def _renumber_fig(m):
+        _fig_counter[0] += 1
+        return f"**Figure {_fig_counter[0]}.**"
+
+    body = re.sub(r"\*\*Figure \d+\.\*\*", _renumber_fig, body)
 
     # Related-ADRs list (all others).
     related = "\n".join(
@@ -90,12 +102,12 @@ for adr in order:
 
     header = f"""**Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** August 2026  
 **Status:** Accepted  
-**Part of:** ACRME Architecture Decision Records — this is one of four standalone ADRs split from the consolidated ADR set.
+**Part of:** ACRME Architecture Decision Records — one of four standalone, self-contained records.
 
-> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
+> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. This record is self-contained: it can be read without any companion document. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
 
 ---
 
@@ -105,10 +117,10 @@ for adr in order:
 
 ---
 
-## Appendix — Decision Log Cross-Reference
+## Appendix — ADR Summary
 
-| ADR | Primary Decisions | Hard Constraints | Key Gaps/Blockers |
-|---|---|---|---|
+| ADR | Hard Constraints Applied | Key Open Items |
+|---|---|---|
 {decision_log[adr]}
 
 {status_legend}
@@ -119,7 +131,7 @@ for adr in order:
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After POC-30 (Quota Groups GA) and POC-31 (quota release latency), and on resolution of G-14 / G-15.
+**Next Review:** After proof-of-concept validation of Azure Quota Groups GA and quota-release latency, and on resolution of the consumer-credential model and engine-mode state-machine items.
 """
 
     out_path = OUT / f"{slug[adr]}.md"
