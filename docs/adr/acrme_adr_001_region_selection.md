@@ -1,11 +1,11 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.1  
+**Version:** 1.2  
 **Date:** August 2026  
 **Status:** Accepted  
-**Part of:** ACRME Architecture Decision Records — this is one of four standalone ADRs split from the consolidated ADR set.
+**Part of:** ACRME Architecture Decision Records — one of four standalone, self-contained records.
 
-> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
+> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. This record is self-contained: it can be read without any companion document. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
 
 ---
 
@@ -14,8 +14,7 @@
 **Status:** Accepted  
 **Date:** August 2026  
 **Deciders:** Principal Cloud Architect, Platform Engineering, DR Owner  
-**Related decisions:** D1, D4, D5, D8, D9; HC-1..HC-10; VR-1..VR-11  
-**Source:** `multi_region_placement_design.md` §27–28; `acrme_production_readiness_review_and_architecture.md` §27
+**Related constraints:** HC-1..HC-10 (hard constraints); VR-1..VR-11 (validation rules)  
 
 ### Context
 
@@ -33,10 +32,10 @@ Forces at play:
 Adopt a **staged, constraint-then-score placement pipeline** driven by environment-type-specific scoring formulas:
 
 1. **Stage 1 — Eligibility pre-filtering.** Reduce all Azure regions to Standard Capacity Regions within the customer's geography.
-   - **HC-9 STANDARD_REGION_ONLY** excludes Restricted regions before scoring. `[Decided — D9]`
+   - **HC-9 STANDARD_REGION_ONLY** excludes Restricted regions before scoring. `[Decided]`
    - **HC-8 GEOGRAPHY_CONTAINMENT** confines the Prod anchor to the customer's chosen geography. `[Derived]`
 
-2. **Stage 2 — Hard-constraint gate.** Each surviving region must pass **HC-1..HC-7 and HC-10** (region separation, capacity floor, quota floor, DR separation class, zone availability, DR coverage floor, DR floor integrity, cross-geo extension approval). Any failure excludes the region from scoring entirely — hard constraints are binary gates, never scored penalties. `[Decided — D4]`
+2. **Stage 2 — Hard-constraint gate.** Each surviving region must pass **HC-1..HC-7 and HC-10** (region separation, capacity floor, quota floor, DR separation class, zone availability, DR coverage floor, DR floor integrity, cross-geo extension approval). Any failure excludes the region from scoring entirely — hard constraints are binary gates, never scored penalties. `[Decided]`
 
 3. **Stage 3 — Environment-type-specific scoring.** Rank survivors using three formulas sharing default weights (α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10) but with env-type-specific semantics for α (capacity signal) and δ (DR readiness): `[Decided — D9]`
    ```
@@ -50,19 +49,21 @@ Adopt a **staged, constraint-then-score placement pipeline** driven by environme
    ```
    - **Prod:** `Prod_region = argmax(PS_Prod(r))` over eligible Standard regions in-geo.
    - **NonProd/CVAL:** `argmax(PS_NonProd(r))` over survivors, excluding the Prod region.
-   - **DR:** `argmax(PS_DR(r))` over survivors, excluding the Prod region (but **may** share with NonProd per D8).
+   - **DR:** `argmax(PS_DR(r))` over survivors, excluding the Prod region (but **may** share with NonProd).
 
-4. **Selection order is sequential — Prod → NonProd → DR** — not joint optimization. With 3–4 regions the greedy sequential result equals the joint-optimal result in nearly all practical cases, while remaining transparent and auditable. `[Decided — D1]`
+4. **Selection order is sequential — Prod → NonProd → DR** — not joint optimization. With 3–4 regions the greedy sequential result equals the joint-optimal result in nearly all practical cases, while remaining transparent and auditable. `[Decided]`
 
-5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Belgium Central** via the only approved Cross-Geo Extension paths (Saudi Arabia → Belgium Central, UAE North → Belgium Central). Belgium Central must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided — D8; Documented — §27]`
+5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Belgium Central** via the only approved Cross-Geo Extension paths (Saudi Arabia → Belgium Central, UAE North → Belgium Central). Belgium Central must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided]`
 
-6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided — D5]`
+6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided]`
 
 7. **Operating mode.** In Phase 1 the engine runs region selection in **recommendation/shadow mode** — it produces and logs the ranked recommendation but does not autonomously place. Autonomous placement is gated on POC validation of the scoring formulas.
 
+![**Figure 1.** ACRME staged placement pipeline — Stage 1 eligibility pre-filter, Stage 2 hard-constraint gate, Stage 3 environment-type-specific scoring, then sequential Prod → NonProd → DR selection.](diagrams/adr001_pipeline.png){ width=80% }
+
 #### Region Classification Model (normative)
 
-Every Azure region carries exactly one classification tier, stored in `PlacementPolicy` as config-as-code (versioned, auditable, replayable) — classification is a **governance decision, not a live capability query**. `[Documented — §27]`
+Every Azure region carries exactly one classification tier, stored in `PlacementPolicy` as config-as-code (versioned, auditable, replayable) — classification is a **governance decision, not a live capability query**. `[Documented]`
 
 | Tier | Eligibility | Regions |
 |---|---|---|
@@ -74,14 +75,16 @@ Restricted regions are excluded by a **pre-filter ahead of all hard constraints*
 
 #### Prod Region Input Modes
 
-The Prod region is the anchor; CVAL and DR are selected sequentially from it. The customer supplies the anchor one of two ways, and both converge on a single validated Prod anchor: `[Documented — §27]`
+The Prod region is the anchor; CVAL and DR are selected sequentially from it. The customer supplies the anchor one of two ways, and both converge on a single validated Prod anchor: `[Documented]`
 
 - **Scenario 1 — geography supplied.** The engine derives Prod via `argmax(PS_Prod)` over Standard Capacity Regions **in that geography only**. Ties break deterministically by the Standard-region list order for the geography; the first-listed region is the deterministic cold-start default when no snapshot exists. Geography exhaustion → reject (never silently cross-geo or use a Restricted region).
 - **Scenario 2 — specific region supplied.** If Standard, validate against HC-1..HC-10 and adopt as the anchor (`PS_Prod` used only for post-selection validation). If Restricted, route to the Exception Deployment Workflow.
 
+![**Figure 2.** Prod region input modes — geography-supplied (Scenario 1) versus specific-region (Scenario 2), including the restricted-region Exception Deployment Workflow.](diagrams/adr001_input_modes.png){ width=72% }
+
 #### Exception Deployment Workflow (Scenario 2 — Restricted region)
 
-A Restricted region is used only if **all four** conditions hold; failure rejects at the first failing gate: `[Documented — §27]`
+A Restricted region is used only if **all four** conditions hold; failure rejects at the first failing gate: `[Documented]`
 
 | # | Condition | Check |
 |---|---|---|
@@ -110,18 +113,18 @@ On success the region becomes the **Exception Prod Anchor**, the placement is ma
 
 #### Capacity Holds & Concurrency
 
-Before returning a committed assignment the engine creates a **capacity hold** keyed by region, SKU, zone, environment, and policy version, using **optimistic concurrency**; the hold expires if Azure provisioning does not begin. This closes the concurrent-placement race (B-7). `[Documented — §29]`
+Before returning a committed assignment the engine creates a **capacity hold** keyed by region, SKU, zone, environment, and policy version, using **optimistic concurrency**; the hold expires if Azure provisioning does not begin. This closes the concurrent-placement race. `[Documented]`
 
 #### Corrected Scoring Model (pilot)
 
 - Default weights retained for pilot comparison: `α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10`; every component is clamped `Clamp(x) = max(0, min(1, x))`. `[Assumed]`
-- To avoid double-counting the same signal under α and δ, the CVAL/NonProd formula is proposed as `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones`. `[Undocumented — §28]`
-- Distribution uses **demand units, not customer count**: `Distribution = 1 − Region_Assigned_Demand / Total_Assigned_Demand`. `[Undocumented — §28]`
+- To avoid double-counting the same signal under α and δ, the CVAL/NonProd formula is proposed as `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones`. `[Assumed]`
+- Distribution uses **demand units, not customer count**: `Distribution = 1 − Region_Assigned_Demand / Total_Assigned_Demand`. `[Assumed]`
 - Revised weights are proposed, not empirically validated — advisory until pilot measurement.
 
 #### Governance & Compliance Controls
 
-- The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented — §27]`
+- The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented]`
 - Exception approval records are revocable engine artefacts; a revoked approval blocks future exception deployments for the customer–region pair with no code change.
 - Every classification change is audited with approver identity, timestamp, previous/new classification, and affected geography.
 - Belgium Central's regional capacity-planning targets must include potential Middle East DR demand on top of in-geo Europe demand.
@@ -135,32 +138,32 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 - Env-type-specific formulas let Prod optimise for capacity/isolation while DR optimises for overflow readiness.
 
 **Negative / trade-offs:**
-- Three formulas plus 16 per-CRG-type `RegionalSnapshot` fields increase implementation and snapshot-maintenance cost (backlog E07-S16, E03-S10).
-- Sequential selection is greedy; if the region count ever exceeds 6, joint optimization should be revisited (D1 review trigger).
+- Three formulas plus 16 per-CRG-type `RegionalSnapshot` fields increase implementation and snapshot-maintenance cost.
+- Sequential selection is greedy; if the region count ever exceeds 6, joint optimization should be revisited.
 - Cross-geo extension paths are a manual governance artefact — adding a path requires a PlacementPolicy update, governance approval, and a Decision Log entry.
-- Worked scoring examples remain a known gap (G-7) until per-CRG-type inputs are finalised.
+- Worked scoring examples remain a known gap until per-CRG-type inputs are finalised.
 
 **Neutral:**
-- CRG_Score (RCW) is demoted from a primary scoring input to a monitoring-only signal (D9).
+- CRG_Score (Regional Capacity Weight) is demoted from a primary scoring input to a monitoring-only signal.
 
 ### Alternatives Considered
 
 | Alternative | Why Rejected |
 |---|---|
-| **Joint optimization** (select all three regions simultaneously) | Higher combinatorial complexity; opaque and harder to audit; identical result to sequential for 3–4 regions. `[D1]` |
-| **Single generic PS(r, env_type) formula** | α and δ have fundamentally different meanings per env type; a single formula needs so many branches it becomes three formulas anyway. `[D9]` |
-| **Geographic distance as a scored soft objective** | Operators already choose geographically independent region sets at design time; HC-4 as a hard constraint is sufficient and simpler. `[D4]` |
-| **Silent fallback region for failed Middle East DR** | Violates governance and residency guarantees; the engine must fail loudly and require an approved extension path. `[§27]` |
+| **Joint optimization** (select all three regions simultaneously) | Higher combinatorial complexity; opaque and harder to audit; identical result to sequential for 3–4 regions. `[Decided]` |
+| **Single generic PS(r, env_type) formula** | α and δ have fundamentally different meanings per env type; a single formula needs so many branches it becomes three formulas anyway. `[Decided]` |
+| **Geographic distance as a scored soft objective** | Operators already choose geographically independent region sets at design time; HC-4 as a hard constraint is sufficient and simpler. `[Decided]` |
+| **Silent fallback region for failed Middle East DR** | Violates governance and residency guarantees; the engine must fail loudly and require an approved extension path. `[Documented]` |
 
 ---
 
 ---
 
-## Appendix — Decision Log Cross-Reference
+## Appendix — ADR Summary
 
-| ADR | Primary Decisions | Hard Constraints | Key Gaps/Blockers |
-|---|---|---|---|
-| ADR-001 Region Selection | D1, D4, D5, D8, D9 | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | G-7 (worked examples) |
+| ADR | Hard Constraints Applied | Key Open Items |
+|---|---|---|
+| ADR-001 Region Selection | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | Worked scoring examples pending final per-CRG-type inputs |
 
 ## Appendix — Status Legend
 
@@ -169,16 +172,16 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 | **Proposed** | Under discussion; not yet ratified |
 | **Accepted** | Ratified and in force |
 | **Deprecated** | No longer recommended but not yet replaced |
-| **Superseded** | Replaced by a later ADR (referenced explicitly) |
+| **Superseded** | Replaced by a later ADR |
 
 ## Appendix — Evidence Tag Taxonomy
 
 | Tag | Meaning |
 |---|---|
-| `[Documented]` | Traceable to Azure platform documentation or a formal FR/NFR |
-| `[Decided]` | Explicit design choice in the Decision Log (D1–D11) |
-| `[Derived]` | Logical consequence of a documented constraint or decision |
-| `[Assumed]` | Architectural judgement pending POC validation |
+| `[Documented]` | Traceable to Azure platform behaviour or documentation |
+| `[Decided]` | An explicit ACRME design choice recorded in this ADR set |
+| `[Derived]` | A logical consequence of a documented constraint or decision |
+| `[Assumed]` | Architectural judgement pending proof-of-concept validation |
 
 ## Related ADRs
 
@@ -189,5 +192,5 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After POC-30 (Quota Groups GA) and POC-31 (quota release latency), and on resolution of G-14 / G-15.
+**Next Review:** After proof-of-concept validation of Azure Quota Groups GA and quota-release latency, and on resolution of the consumer-credential model and engine-mode state-machine items.
 

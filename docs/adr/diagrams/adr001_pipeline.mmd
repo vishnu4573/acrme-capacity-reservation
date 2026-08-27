@@ -1,0 +1,21 @@
+flowchart TD
+    A[Customer request:<br/>geography or specific region] --> S1
+    subgraph S1[Stage 1 — Eligibility Pre-Filter]
+      F1[Reduce all Azure regions to<br/>Standard Capacity Regions in geography]
+      F1 --> HC9[HC-9 STANDARD_REGION_ONLY<br/>exclude Restricted regions]
+      HC9 --> HC8[HC-8 GEOGRAPHY_CONTAINMENT<br/>confine Prod anchor to geography]
+    end
+    S1 --> S2
+    subgraph S2[Stage 2 — Hard-Constraint Gate]
+      G[HC-1..HC-7 and HC-10<br/>binary pass/fail gates]
+      G --> GX{Region passes<br/>all gates?}
+      GX -->|No| EX[Excluded from scoring]
+      GX -->|Yes| KEEP[Survivor set]
+    end
+    S2 --> S3
+    subgraph S3[Stage 3 — Env-Type-Specific Scoring]
+      P[Prod = argmax PS_Prod]
+      P --> N[NonProd = argmax PS_NonProd<br/>excludes Prod region]
+      N --> D[DR = argmax PS_DR<br/>excludes Prod, may share NonProd]
+    end
+    S3 --> OUT[Ranked recommendation +<br/>sub-scores logged to OperationRecord]

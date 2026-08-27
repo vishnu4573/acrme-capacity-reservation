@@ -1,0 +1,12 @@
+flowchart TD
+    DECL[DR event declared<br/>engine_mode = DR_EVENT_ACTIVE] --> T1
+    T1["Tier 1 — DirectExpansion (automated)<br/>Expand DR CR from free DR-group headroom<br/>No approval beyond DR declaration"]
+    T1 --> Q1{Sufficient<br/>capacity?}
+    Q1 -->|Yes| DONE[DR capacity restored]
+    Q1 -->|No| T2
+    T2["Tier 2 — QuotaNeutralTransfer (policy-gated)<br/>Reduce NonProd CR → release quota to shared pool<br/>Expand DR CR from same pool → net ≈ 0<br/>No VM execution-state change"]
+    T2 --> Q2{Sufficient<br/>capacity?}
+    Q2 -->|Yes| DONE
+    Q2 -->|No| T3
+    T3["Tier 3 — DestructiveTransfer (dual approval + elevated RBAC)<br/>Modifies VM-to-CRG associations<br/>Operator supplies vm_disassociation_list<br/>BLOCKED in Phase 1"]
+    T3 --> DONE
