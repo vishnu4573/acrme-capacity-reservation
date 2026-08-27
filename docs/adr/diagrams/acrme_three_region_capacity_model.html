@@ -1,0 +1,462 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ACRME Three-Region Capacity Distribution Model</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1800px;
+      height: 960px;
+      background: #F4F6F9;
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    .hdr {
+      background: #0078D4;
+      color: #fff;
+      text-align: center;
+      padding: 13px 32px 11px;
+      border-bottom: 4px solid #005FA3;
+      flex-shrink: 0;
+    }
+    .hdr h1 { font-size: 21px; font-weight: 700; letter-spacing: .4px; }
+    .hdr p  { font-size: 12.5px; opacity: .88; margin-top: 3px; }
+
+    /* ── CANVAS ── */
+    #canvas {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── PANELS ── */
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 12px 0;
+      min-width: 0;
+    }
+    .panel-title {
+      font-size: 12px; font-weight: 700;
+      letter-spacing: .7px; text-transform: uppercase;
+      padding: 4px 0 6px; text-align: center; flex-shrink: 0;
+    }
+    .ss-title { color: #107C41; }
+    .dr-title { color: #D13438; }
+
+    /* ── REGIONS ROW ── */
+    .regions {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── REGION COLUMN ── */
+    .rcol {
+      flex: 1;
+      background: #fff;
+      border: 1.5px solid #D9DCE3;
+      border-radius: 6px;
+      padding: 7px 6px 5px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+    .rcol.fail {
+      justify-content: flex-start;
+      gap: 10px;
+      background: #FFF0F1;
+      border: 2.5px solid #D13438;
+    }
+
+    /* ── ENV SECTION ── */
+    .env { display: flex; flex-direction: column; }
+    .env-hdr {
+      text-align: center; padding: 5px 6px;
+      font-size: 11.5px; font-weight: 700;
+      letter-spacing: .5px; color: #fff;
+      border-radius: 3px; text-transform: uppercase;
+    }
+    .env-hdr.prod { background: #0078D4; }
+    .env-hdr.cval { background: #E87722; }
+    .env-hdr.dr   { background: #107C41; }
+    .env-hdr.fail { background: #D13438; }
+    .env-cells { display: flex; flex-direction: column; gap: 4px; padding-top: 5px; }
+
+    /* ── CUSTOMER CELLS ── */
+    .cell {
+      border-radius: 3px; padding: 5px 8px;
+      font-size: 12.5px; font-weight: 500;
+      text-align: center;
+    }
+    .on  { background: #DFF6DD; color: #107C41; border: 1.5px solid #107C41; }
+    .off { background: #FFF4CE; color: #D13438; border: 1.5px solid #D13438; }
+
+    /* ── FAILED BADGE ── */
+    .fail-badge {
+      background: #D13438; color: #fff;
+      border-radius: 3px; padding: 4px 6px;
+      font-size: 11px; font-weight: 700;
+      text-align: center; letter-spacing: .3px; margin-bottom: 4px;
+    }
+
+    /* ── CENTRE DIVIDER ── */
+    .divider {
+      width: 210px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 13px; padding: 12px 11px;
+      border-left: 1px solid #D9DCE3;
+      border-right: 1px solid #D9DCE3;
+      background: #FAFBFC;
+    }
+    .legend-box, .desc-box {
+      width: 100%;
+      background: #fff;
+      border: 1.5px solid #D9DCE3;
+      border-radius: 6px;
+      padding: 10px 11px;
+    }
+    .leg-ttl {
+      font-size: 10.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: #666; margin-bottom: 7px;
+    }
+    .leg-row {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 11.5px; color: #333; margin-bottom: 5px;
+    }
+    .leg-row:last-child { margin-bottom: 0; }
+    .swatch { width: 18px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    .swatch.on  { background: #DFF6DD; border: 1.5px solid #107C41; }
+    .swatch.off { background: #FFF4CE; border: 1.5px solid #D13438; }
+    .desc-box p { font-size: 11.5px; line-height: 1.55; color: #333; margin-bottom: 6px; }
+    .desc-box p:last-child { margin-bottom: 0; }
+    .warn { color: #D13438; font-weight: 600; }
+    .div-note {
+      font-size: 10.5px; color: #D13438; font-weight: 600;
+      text-align: center; line-height: 1.45;
+    }
+
+    /* ── REGION FOOTER ── */
+    .rfooter {
+      display: flex; flex-direction: row; gap: 8px;
+      padding: 4px 0 7px; flex-shrink: 0;
+    }
+    .rlabel {
+      flex: 1; text-align: center;
+      font-size: 11px; font-weight: 700;
+      color: #444; letter-spacing: .4px; text-transform: uppercase;
+      padding-top: 4px; border-top: 2px solid #D9DCE3;
+    }
+    .rlabel.fail { color: #D13438; border-top-color: #D13438; }
+
+    /* ── ARROW SVG ── */
+    #arrowLayer {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 20;
+    }
+
+    /* ── KEY BAR ── */
+    .bot-key {
+      background: #F4F6F9; border-top: 1px solid #D9DCE3;
+      padding: 5px 0; text-align: center;
+      font-size: 11px; color: #555; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hdr">
+    <h1>ACRME — Three-Region Capacity Distribution Model</h1>
+    <p>Steady-State vs. DR-Event-Active (Region 1 Failure)</p>
+  </div>
+
+  <div id="canvas">
+
+    <!-- ════ LEFT: Steady State ════ -->
+    <div class="panel">
+      <div class="panel-title ss-title">▶ Steady-State — All Regions Operational</div>
+      <div class="regions">
+
+        <!-- SS R1 (arrow source) -->
+        <div class="rcol" id="ss-r1">
+          <div class="env">
+            <div class="env-hdr prod">Prod</div>
+            <div class="env-cells">
+              <div class="cell on">CUST1</div>
+              <div class="cell on">Cust3</div>
+              <div class="cell on">Cust5</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr cval">CVAL</div>
+            <div class="env-cells">
+              <div class="cell on">Cust2</div>
+              <div class="cell on">Cust7</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr dr">DR</div>
+            <div class="env-cells">
+              <div class="cell off">Cust2</div>
+              <div class="cell off">Cust7</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SS R2 -->
+        <div class="rcol">
+          <div class="env">
+            <div class="env-hdr prod">Prod</div>
+            <div class="env-cells">
+              <div class="cell on">Cust2</div>
+              <div class="cell on">Cust4</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr cval">CVAL</div>
+            <div class="env-cells">
+              <div class="cell on">Cust1</div>
+              <div class="cell on">Cust6</div>
+              <div class="cell on">Cust5</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr dr">DR</div>
+            <div class="env-cells">
+              <div class="cell off">Cust1</div>
+              <div class="cell off">Cust6</div>
+              <div class="cell off">Cust5</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SS R3 -->
+        <div class="rcol">
+          <div class="env">
+            <div class="env-hdr prod">Prod</div>
+            <div class="env-cells">
+              <div class="cell on">Cust6</div>
+              <div class="cell on">Cust7</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr cval">CVAL</div>
+            <div class="env-cells">
+              <div class="cell on">Cust3</div>
+              <div class="cell on">Cust4</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr dr">DR</div>
+            <div class="env-cells">
+              <div class="cell off">Cust3</div>
+              <div class="cell off">Cust4</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="rfooter">
+        <div class="rlabel">Region 1</div>
+        <div class="rlabel">Region 2</div>
+        <div class="rlabel">Region 3</div>
+      </div>
+    </div>
+
+    <!-- ════ CENTRE DIVIDER ════ -->
+    <div class="divider">
+      <div class="legend-box">
+        <div class="leg-ttl">Legend</div>
+        <div class="leg-row"><div class="swatch on"></div>Active — capacity allocated &amp; serving</div>
+        <div class="leg-row"><div class="swatch off"></div>Inactive — reserved, no capacity used</div>
+      </div>
+      <div class="desc-box">
+        <p><span class="warn">⚠ Region 1 Failure:</span> All Prod workloads redistribute to Regions 2 and 3 via pre-reserved DR capacity.</p>
+        <p>CVAL capacity is reallocated across regions to absorb overflow from the failed region.</p>
+        <p>During the <strong>Annual Mock DR</strong>, CVAL capacity is shuffled across regions to validate failover readiness.</p>
+      </div>
+      <div class="div-note">←→ Red dashed arrows show<br>workload redistribution path</div>
+    </div>
+
+    <!-- ════ RIGHT: DR Event Active ════ -->
+    <div class="panel">
+      <div class="panel-title dr-title">⚠ DR-Event-Active — Region 1 Failed</div>
+      <div class="regions">
+
+        <!-- DR R1 FAILED -->
+        <div class="rcol fail" id="dr-r1">
+          <div class="fail-badge">⚠ REGION 1 FAILED</div>
+          <div class="env">
+            <div class="env-hdr fail">Prod</div>
+            <div class="env-cells">
+              <div class="cell off">CUST1</div>
+              <div class="cell off">Cust3</div>
+              <div class="cell off">Cust5</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr fail">CVAL</div>
+            <div class="env-cells">
+              <div class="cell off">Cust2</div>
+              <div class="cell off">Cust7</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr fail">DR</div>
+            <div class="env-cells">
+              <div class="cell off">Cust2</div>
+              <div class="cell off">Cust7</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DR R2 -->
+        <div class="rcol">
+          <div class="env">
+            <div class="env-hdr prod">Prod</div>
+            <div class="env-cells">
+              <div class="cell on">Cust2</div>
+              <div class="cell on">Cust4</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr cval">CVAL</div>
+            <div class="env-cells">
+              <div class="cell on">Cust1 ★</div>
+              <div class="cell on">Cust6</div>
+              <div class="cell on">Cust5 ★</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr dr">DR</div>
+            <div class="env-cells">
+              <div class="cell on" id="t1">Cust1 ▲</div>
+              <div class="cell off">Cust6</div>
+              <div class="cell on" id="t2">Cust5 ▲</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DR R3 -->
+        <div class="rcol">
+          <div class="env">
+            <div class="env-hdr prod">Prod</div>
+            <div class="env-cells">
+              <div class="cell on">Cust6</div>
+              <div class="cell on">Cust7</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr cval">CVAL</div>
+            <div class="env-cells">
+              <div class="cell on">Cust3 ★</div>
+              <div class="cell on">Cust4</div>
+            </div>
+          </div>
+          <div class="env">
+            <div class="env-hdr dr">DR</div>
+            <div class="env-cells">
+              <div class="cell on" id="t3">Cust3 ▲</div>
+              <div class="cell off">Cust4</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="rfooter">
+        <div class="rlabel fail">Region 1 ✕</div>
+        <div class="rlabel">Region 2</div>
+        <div class="rlabel">Region 3</div>
+      </div>
+    </div>
+
+    <!-- ARROW LAYER -->
+    <svg id="arrowLayer" xmlns="http://www.w3.org/2000/svg"></svg>
+
+  </div>
+
+  <div class="bot-key">
+    <strong style="color:#107C41">★</strong> Absorbed from Region 1 into CVAL
+    &nbsp;&nbsp;|
+    <strong style="color:#107C41">▲</strong> Promoted from reserved DR to active serving
+  </div>
+
+  <script>
+    function pos(el) {
+      const base = document.getElementById('canvas').getBoundingClientRect();
+      const b    = el.getBoundingClientRect();
+      return {
+        x: b.left - base.left,  y: b.top - base.top,
+        r: b.right - base.left, b: b.bottom - base.top,
+        cx: b.left - base.left + b.width / 2,
+        cy: b.top  - base.top  + b.height / 2,
+        w: b.width, h: b.height
+      };
+    }
+
+    function drawArrows() {
+      const svg = document.getElementById('arrowLayer');
+
+      // Arrowhead marker
+      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      const mk   = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+      mk.setAttribute('id', 'ah');
+      mk.setAttribute('markerWidth', '9');  mk.setAttribute('markerHeight', '6');
+      mk.setAttribute('refX', '8');         mk.setAttribute('refY', '3');
+      mk.setAttribute('orient', 'auto');
+      const pg = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      pg.setAttribute('points', '0 0, 9 3, 0 6');
+      pg.setAttribute('fill', '#D13438');
+      mk.appendChild(pg); defs.appendChild(mk); svg.appendChild(defs);
+
+      // Source: right edge of failed DR-R1 column, at mid-height
+      const r1 = pos(document.getElementById('dr-r1'));
+      const sx  = r1.r;
+      const sy  = r1.cy;
+
+      // Targets: active DR cells in R2 and R3
+      ['t1', 't2', 't3'].forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const t  = pos(el);
+        const tx = t.x;
+        const ty = t.cy;
+
+        // S-curve bending right then to target
+        const dx = tx - sx;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d',
+          `M ${sx} ${sy}` +
+          ` C ${sx + dx * 0.55} ${sy},` +
+          `   ${sx + dx * 0.55} ${ty},` +
+          `   ${tx} ${ty}`);
+        path.setAttribute('stroke',           '#D13438');
+        path.setAttribute('stroke-width',     '2.2');
+        path.setAttribute('stroke-dasharray', '8,5');
+        path.setAttribute('fill',             'none');
+        path.setAttribute('marker-end',       'url(#ah)');
+        svg.appendChild(path);
+      });
+    }
+
+    window.addEventListener('load', drawArrows);
+  </script>
+
+</body>
+</html>
