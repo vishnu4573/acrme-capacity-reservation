@@ -2,9 +2,10 @@
 
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** August 2026  
-**Status:** Accepted
+**Status:** Accepted  
+**Change note (v1.1):** Aligned each ADR with the Production-Readiness Review & Architecture (§26–§32) — added the normative region-classification model, Scenario 1/2 input modes, EC-1..EC-4 exception workflow, VR-1..VR-11, capacity-hold concurrency and corrected scoring (ADR-001); group accounting formulas, dual-validation detector and `groupType` FC-11 preview status (ADR-002); the full five-state engine state machine, `EngineModeState` entity and DR-activation semantics (ADR-003); and the 10-step steady-state lifecycle with auto-decrease exclusion (ADR-004).
 
 ---
 
@@ -66,6 +67,72 @@ Adopt a **staged, constraint-then-score placement pipeline** driven by environme
 6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided — D5]`
 
 7. **Operating mode.** In Phase 1 the engine runs region selection in **recommendation/shadow mode** — it produces and logs the ranked recommendation but does not autonomously place. Autonomous placement is gated on POC validation of the scoring formulas.
+
+#### Region Classification Model (normative)
+
+Every Azure region carries exactly one classification tier, stored in `PlacementPolicy` as config-as-code (versioned, auditable, replayable) — classification is a **governance decision, not a live capability query**. `[Documented — §27]`
+
+| Tier | Eligibility | Regions |
+|---|---|---|
+| **Standard Capacity Region** | Eligible for dynamic selection, scoring, and all env assignments (Prod/CVAL/DR) — the only regions that enter the pipeline | NA: West US 3, Central US, Canada Central · EU: Sweden Central, Belgium Central · ME: Saudi Arabia, UAE North · APAC: Japan East, Southeast Asia, Australia East |
+| **Restricted Capacity Region** | Exception-only (Scenario 2 + Prod + approval); never scored, ranked, or recommended | East US 2, North Europe, West Europe, East Asia, Australia Southeast (all: Azure physical capacity constraint) |
+| **Cross-Geo Extension Region** | DR-only, for geographies that cannot meet the 3-region minimum in-geo | Saudi Arabia → Belgium Central; UAE North → Belgium Central (Middle East only) |
+
+Restricted regions are excluded by a **pre-filter ahead of all hard constraints** (HC-9), never as a scoring penalty.
+
+#### Prod Region Input Modes
+
+The Prod region is the anchor; CVAL and DR are selected sequentially from it. The customer supplies the anchor one of two ways, and both converge on a single validated Prod anchor: `[Documented — §27]`
+
+- **Scenario 1 — geography supplied.** The engine derives Prod via `argmax(PS_Prod)` over Standard Capacity Regions **in that geography only**. Ties break deterministically by the Standard-region list order for the geography; the first-listed region is the deterministic cold-start default when no snapshot exists. Geography exhaustion → reject (never silently cross-geo or use a Restricted region).
+- **Scenario 2 — specific region supplied.** If Standard, validate against HC-1..HC-10 and adopt as the anchor (`PS_Prod` used only for post-selection validation). If Restricted, route to the Exception Deployment Workflow.
+
+#### Exception Deployment Workflow (Scenario 2 — Restricted region)
+
+A Restricted region is used only if **all four** conditions hold; failure rejects at the first failing gate: `[Documented — §27]`
+
+| # | Condition | Check |
+|---|---|---|
+| **EC-1** | Explicit request | Customer named the region; engine never recommended it |
+| **EC-2** | Production only | CVAL and DR may **never** use a Restricted region |
+| **EC-3** | Exception approval | A named, revocable approval record exists for the customer–region pair |
+| **EC-4** | Scenario 2 input | Restricted regions can never be engine-derived |
+
+On success the region becomes the **Exception Prod Anchor**, the placement is marked an **Exception Deployment**, a capacity-constraint warning is emitted to the caller, and the approval ID + restriction status are mandatory `OperationRecord` fields (commit blocked if absent). CVAL/DR still select from Standard regions via normal scoring.
+
+#### Validation Rule Framework (VR-1..VR-11)
+
+| Rule | Check | Failure action |
+|---|---|---|
+| VR-1 | Region exists in classification list | Reject if unknown |
+| VR-2 | Automated placement uses Standard only | Exclude before scoring if Restricted |
+| VR-3 | Scenario 2 Restricted: EC-1..EC-4 all met | Reject at first failing condition |
+| VR-4 | Scenario 1 derived Prod in-geo Standard | Geography-scoped exhaustion error |
+| VR-5 | Standard region passes HC-1..HC-10 | Exclude; exhaustion error if all excluded |
+| VR-6 | Middle East DR = Belgium Central via approved path | Block with ops alert if Belgium Central fails HC-1..HC-10 |
+| VR-7 | Exception approval ID persisted before commit | Block commit if absent |
+| VR-8 | Capacity-constraint warning emitted | Block commit if suppressed |
+| VR-9 | Snapshot age within policy limit | Trigger targeted ARM refresh |
+| VR-10 | Capacity hold acquired before commit | Block commit if hold absent |
+| VR-11 | Restricted regions absent from all recommendation outputs | Post-scoring filter (defence-in-depth) |
+
+#### Capacity Holds & Concurrency
+
+Before returning a committed assignment the engine creates a **capacity hold** keyed by region, SKU, zone, environment, and policy version, using **optimistic concurrency**; the hold expires if Azure provisioning does not begin. This closes the concurrent-placement race (B-7). `[Documented — §29]`
+
+#### Corrected Scoring Model (pilot)
+
+- Default weights retained for pilot comparison: `α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10`; every component is clamped `Clamp(x) = max(0, min(1, x))`. `[Assumed]`
+- To avoid double-counting the same signal under α and δ, the CVAL/NonProd formula is proposed as `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones`. `[Undocumented — §28]`
+- Distribution uses **demand units, not customer count**: `Distribution = 1 − Region_Assigned_Demand / Total_Assigned_Demand`. `[Undocumented — §28]`
+- Revised weights are proposed, not empirically validated — advisory until pilot measurement.
+
+#### Governance & Compliance Controls
+
+- The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented — §27]`
+- Exception approval records are revocable engine artefacts; a revoked approval blocks future exception deployments for the customer–region pair with no code change.
+- Every classification change is audited with approver identity, timestamp, previous/new classification, and affected geography.
+- Belgium Central's regional capacity-planning targets must include potential Middle East DR demand on top of in-geo Europe demand.
 
 ### Consequences
 
@@ -142,6 +209,27 @@ Adopt a **Two-Quota-Group-per-region model with an engine-enforced DR floor**:
 
 **Worked POC topology (GP-06):** Prod group 128 vCPU; NonProd+DR group 80 vCPU; DR floor 32 vCPU → effective NonProd ceiling 48 vCPU.
 
+#### Group Accounting Formulas (normative)
+
+All four are **engine accounting controls** — they do not create a native Azure sub-reservation: `[Documented — §26]`
+```
+DR_Floor_vCPU             = Potential_DR_Demand × vCPU_Per_Instance × DR_Ratio_Max
+Effective_NonProd_Ceiling = NonProd_DR_Group_Limit − DR_Floor_vCPU
+NonProd_Headroom          = Effective_NonProd_Ceiling − NonProd_Used_vCPU
+Group_Headroom            = Group_Limit − Group_Used
+```
+
+#### Exact Enforcement Controls
+
+- Every **NonProd** increase performs a group check **and** a subscription check. `[Documented — §26]`
+- Every **DR** increase performs a group check, subscription check, SKU check, capacity check, **and** active-incident check.
+- A **separate detector** recalculates the DR floor from authoritative assignment/allocation data. Any disagreement between the command-time and detector calculations **disables automatic NonProd expansion** (fail-safe) and raises `DRFloorViolationDetected`.
+- Group propagation is **polled** — no fixed propagation SLA is assumed.
+
+#### `groupType` Preview Dependency (FC-11)
+
+The Quota-Group `groupType` property (`AllocationGroup` = advisory vs `EnforcedGroup` = enforced) is **preview-only** in the Azure Quota REST API and is not GA. `[Documented — Azure Quota REST API reference]` The engine's accounting controls are deliberately **engine-level and do not depend on `groupType` enforcement**. If `EnforcedGroup` is ever relied upon to drop the engine's own subscription-level check, that dependency must pass the preview-acceptance gate (POC-30) and a Decision Log entry first. Engineering constraint: pin the exact preview API version in all quota-group calls and add version-drift detection to the platform health check.
+
 ### Consequences
 
 **Positive:**
@@ -214,6 +302,28 @@ Adopt **NonProd/DR co-location with a coverage floor**, a **formal two-mode engi
 
 6. **Phase-1 safety posture:** Tier 2 is approval-gated; **Tier 3 is blocked** pending the G-14 consumer-credential model and G-15 engine-mode state machine. No invented SLA — propagation/approval times are measured and reported as unknown until observed.
 
+#### Full Engine State Machine (normative)
+
+`engine_mode` is not a two-value flag but a **five-state machine** persisted in Cosmos DB with conditional writes, transition guards, and recovery tests — a production blocker until implemented (G-15): `[Documented — §29]`
+
+| State | Meaning | Permitted transitions |
+|---|---|---|
+| **STEADY_STATE** | Organic growth only; Emergency Transfer rejected | → DR_DECLARATION_PENDING |
+| **DR_DECLARATION_PENDING** | DR requested, awaiting dual approval + validation | → DR_EVENT_ACTIVE (approved) · → STEADY_STATE (rejected/expired) |
+| **DR_EVENT_ACTIVE** | Crisis operations only; auto-increase suppressed | → FAILBACK_PENDING · → INCIDENT_HOLD |
+| **FAILBACK_PENDING** | Failback requested, being validated | → STEADY_STATE (completed) · → DR_EVENT_ACTIVE (validation failed) · → INCIDENT_HOLD |
+| **INCIDENT_HOLD** | State conflict / critical failure — safe hold | → DR_EVENT_ACTIVE · → FAILBACK_PENDING (on recovery approval) |
+
+All transitions are **operator-gated with dual approval** — never automatic.
+
+#### `EngineModeState` Entity
+
+Must carry: environment/control-plane scope · current mode · state version · incident ID · requested-by · approved-by · transition timestamp · transition reason · active operation IDs · lease owner + expiry · recovery checkpoint. `[Documented — §29]`
+
+#### DR Activation Semantics
+
+Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which separately-governed emergency operations may be evaluated — it does **not** automatically authorize Tier 2 or Tier 3. Each tier is independently gated. The DR orchestrator validates group+subscription quota and CR/sharing state before starting any approved failover deployment, and records active-or-incident-hold state back to the state service. `[Documented — §31]`
+
 ### Consequences
 
 **Positive:**
@@ -275,6 +385,29 @@ Adopt **forecast-driven, approval-gated capacity growth** operating exclusively 
 6. **Mode isolation.** Auto-increase runs **only** in `STEADY_STATE` and is **suppressed during `DR_EVENT_ACTIVE`**, keeping organic growth strictly separate from crisis transfer (ADR-003). `[Decided — D10]`
 
 7. **Non-destructive guarantee.** Increases only ever raise CR quantity or request more quota; guarded reduction (right-sizing) never drops a CR below its allocated count (platform floor, FR-1.6) and is itself approval-gated.
+
+#### Steady-State Capacity Lifecycle (normative 10-step policy)
+
+The steady-state increase runs strictly separate from DR crisis operations and follows a fixed sequence, with **no assumed quota-propagation SLA**: `[Documented — §30]`
+
+1. Detect threshold crossing.
+2. Re-read current CR, quota, sharing, and assignment state.
+3. Create `CapacityIncreaseRequest`.
+4. Calculate target quantity (`Forecast_Quantity` formula above).
+5. **Require operator approval (Phase 1).**
+6. Submit the quota action only if validated as required.
+7. Wait for confirmed quota state **without assuming a propagation SLA**.
+8. Update CR quantity.
+9. Confirm the actual quantity.
+10. Refresh the snapshot and close the request.
+
+#### Auto-Decrease Exclusion
+
+Auto-decrease is **excluded from Phase 1**: it can remove future capacity and interact with running VMs. Right-sizing down remains operator-driven and guarded by the platform floor (never below allocated count). `[Documented — §30]`
+
+#### Forecast Advisory Posture
+
+Forecast recommendations stay **advisory until model accuracy and false-positive rates are measured**; the horizon is 30/60/90 days and `Growth_Buffer`/`DR_Buffer` are policy percentages, not fixed constants. `[Documented — §28]`
 
 ### Consequences
 
