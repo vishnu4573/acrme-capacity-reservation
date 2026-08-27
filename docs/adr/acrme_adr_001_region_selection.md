@@ -39,6 +39,15 @@ Adopt a **staged, constraint-then-score placement pipeline** driven by environme
 2. **Stage 2 — Hard-constraint gate.** Each surviving region must pass **HC-1..HC-7 and HC-10** (region separation, capacity floor, quota floor, DR separation class, zone availability, DR coverage floor, DR floor integrity, cross-geo extension approval). Any failure excludes the region from scoring entirely — hard constraints are binary gates, never scored penalties. `[Decided — D4]`
 
 3. **Stage 3 — Environment-type-specific scoring.** Rank survivors using three formulas sharing default weights (α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10) but with env-type-specific semantics for α (capacity signal) and δ (DR readiness): `[Decided — D9]`
+   ```
+   alpha (α) = 0.30   # capacity / headroom signal
+   beta  (β) = 0.20   # quota headroom signal
+   gamma (γ) = 0.25   # capacity-weighted distribution
+   delta (δ) = 0.15   # DR-coverage / overflow-integrity signal
+   epsilon(ε)= 0.10   # zone diversity
+   Clamp(x)  = max(0, min(1, x))       # every component clamped to [0,1] before weighting
+   
+   ```
    - **Prod:** `Prod_region = argmax(PS_Prod(r))` over eligible Standard regions in-geo.
    - **NonProd/CVAL:** `argmax(PS_NonProd(r))` over survivors, excluding the Prod region.
    - **DR:** `argmax(PS_DR(r))` over survivors, excluding the Prod region (but **may** share with NonProd per D8).
