@@ -33,8 +33,8 @@ evidence tag:
 
 | # | Scenario | Core calculation | Status |
 |---|---|---|---|
-| 1 | Prod region derivation — customer picks a **geography** | `argmax(PS_Prod)` over Standard regions | Current |
-| 2 | Prod region validation — customer picks a **specific region** | HC-1..HC-10 gate + `PS_Prod` post-validation | Current |
+| 1 | Prod region derivation — customer picks a **geography** (**exception path**; explicit approval + customer acknowledgement required) | `argmax(PS_Prod)` over Standard regions | Current |
+| 2 | Prod region validation — customer supplies the **exact region** (**default input**; ACRME validates, does not derive) | HC-1..HC-10 gate + `PS_Prod` post-validation | Current |
 | 3 | Restricted region request | Exception workflow (no scoring) | Current |
 | 4 | Middle East three-region deployment | `argmax(PS_Prod)` in-geo + **Switzerland North** cross-geo DR | **Updated** |
 | 5 | CVAL / NonProd region selection | `argmax(PS_NonProd)` | Current |
@@ -94,8 +94,9 @@ potential_dr_demand(region)= Σ prod_allocated  for all customers whose dr_regio
 ## Scenario 1 — Prod Region Derivation (Customer Chooses a Geography)
 
 **Trigger:** customer supplies a geography (e.g. "Europe"), not a specific region.  
-**Note (PLC-001/PLC-002):** Exact-region input (Scenario 2) is the preferred default. Geography-based
-selection is an exception path requiring approval and customer acknowledgement. `[Decided]`
+**Status: Exception path — not the default (PLC-002).** Requires explicit exception approval and
+customer acknowledgement that the **derived production region becomes fixed until an approved migration
+changes the seed**. Cannot be invoked without a recorded exception reference. `[Decided]`
 
 **Logic:**
 
@@ -126,7 +127,9 @@ validation in Scenario 2. Every candidate score and the policy version are writt
 
 ## Scenario 2 — Prod Region Validation (Customer Supplies a Specific Region)
 
-**Trigger:** customer names an exact Azure region — the preferred/default input mode (PLC-001). `[Decided]`
+**Trigger:** customer names an exact Azure region — the **default** input mode (PLC-001). ACRME
+**validates** the supplied region against HC-1..HC-10 and placement-policy rules; it does **not**
+derive a region from geography. `[Decided]`
 
 **Logic:**
 
