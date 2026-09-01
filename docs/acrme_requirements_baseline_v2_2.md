@@ -710,6 +710,8 @@ distribution diagram. It is the canonical picture the engine
 
 ### 12A.2 Worked example (from the reviewed diagram)
 
+![ACRME Distributed DR Reference Model](adr/diagrams/acrme_three_region_capacity_model.png)
+
 | Region       | Prod customers      | CVAL hosted         | DR standby hosted (source region)  |
 |--------------|---------------------|---------------------|------------------------------------|
 | **Region 1** | Cust1, Cust3, Cust5 | Cust2, Cust7        | Cust2 (R2), Cust7 (R3)             |
