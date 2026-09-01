@@ -104,6 +104,14 @@
     }
     .on  { background: #DFF6DD; color: #107C41; border: 1.5px solid #107C41; }
     .off { background: #FFF4CE; color: #D13438; border: 1.5px solid #D13438; }
+    .src {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      color: #5B6472; background: #EEF1F6;
+      border: 1px solid #C7CDD8; border-radius: 3px;
+      padding: 0 4px; margin-left: 5px; vertical-align: middle;
+      letter-spacing: .2px;
+    }
 
     /* ── FAILED BADGE ── */
     .fail-badge {
@@ -182,8 +190,8 @@
 <body>
 
   <div class="hdr">
-    <h1>ACRME — Three-Region Capacity Distribution Model</h1>
-    <p>Steady-State vs. DR-Event-Active (Region 1 Failure)</p>
+    <h1>ACRME — Distributed DR Reference Model (§12A.2 Worked Example)</h1>
+    <p>Steady-State vs. DR-Event-Active (Region 1 Failure) — DR standby cells tagged with the source Prod region they protect</p>
   </div>
 
   <div id="canvas">
@@ -213,8 +221,8 @@
           <div class="env">
             <div class="env-hdr dr">DR</div>
             <div class="env-cells">
-              <div class="cell off">Cust2</div>
-              <div class="cell off">Cust7</div>
+              <div class="cell off">Cust2<span class="src">src R2</span></div>
+              <div class="cell off">Cust7<span class="src">src R3</span></div>
             </div>
           </div>
         </div>
@@ -239,9 +247,9 @@
           <div class="env">
             <div class="env-hdr dr">DR</div>
             <div class="env-cells">
-              <div class="cell off">Cust1</div>
-              <div class="cell off">Cust6</div>
-              <div class="cell off">Cust5</div>
+              <div class="cell off">Cust1<span class="src">src R1</span></div>
+              <div class="cell off">Cust6<span class="src">src R3</span></div>
+              <div class="cell off">Cust5<span class="src">src R1</span></div>
             </div>
           </div>
         </div>
@@ -265,8 +273,8 @@
           <div class="env">
             <div class="env-hdr dr">DR</div>
             <div class="env-cells">
-              <div class="cell off">Cust3</div>
-              <div class="cell off">Cust4</div>
+              <div class="cell off">Cust3<span class="src">src R1</span></div>
+              <div class="cell off">Cust4<span class="src">src R2</span></div>
             </div>
           </div>
         </div>
@@ -285,6 +293,7 @@
         <div class="leg-ttl">Legend</div>
         <div class="leg-row"><div class="swatch on"></div>Active — capacity allocated &amp; serving</div>
         <div class="leg-row"><div class="swatch off"></div>Inactive — reserved, no capacity used</div>
+        <div class="leg-row"><span class="src" style="margin-left:0">src Rn</span>DR standby's source Prod region</div>
       </div>
       <div class="desc-box">
         <p><span class="warn">⚠ Region 1 Failure:</span> All Prod workloads redistribute to Regions 2 and 3 via pre-reserved DR capacity.</p>
@@ -320,8 +329,8 @@
           <div class="env">
             <div class="env-hdr fail">DR</div>
             <div class="env-cells">
-              <div class="cell off">Cust2</div>
-              <div class="cell off">Cust7</div>
+              <div class="cell off">Cust2<span class="src">src R2</span></div>
+              <div class="cell off">Cust7<span class="src">src R3</span></div>
             </div>
           </div>
         </div>
@@ -346,9 +355,9 @@
           <div class="env">
             <div class="env-hdr dr">DR</div>
             <div class="env-cells">
-              <div class="cell on" id="t1">Cust1 ▲</div>
-              <div class="cell off">Cust6</div>
-              <div class="cell on" id="t2">Cust5 ▲</div>
+              <div class="cell on" id="t1">Cust1<span class="src">src R1</span> ▲</div>
+              <div class="cell off">Cust6<span class="src">src R3</span></div>
+              <div class="cell on" id="t2">Cust5<span class="src">src R1</span> ▲</div>
             </div>
           </div>
         </div>
@@ -372,8 +381,8 @@
           <div class="env">
             <div class="env-hdr dr">DR</div>
             <div class="env-cells">
-              <div class="cell on" id="t3">Cust3 ▲</div>
-              <div class="cell off">Cust4</div>
+              <div class="cell on" id="t3">Cust3<span class="src">src R1</span> ▲</div>
+              <div class="cell off">Cust4<span class="src">src R2</span></div>
             </div>
           </div>
         </div>
