@@ -1,171 +1,168 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
-**Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.2  
-**Date:** August 2026  
-**Status:** Accepted  
-**Part of:** ACRME Architecture Decision Records — one of four standalone, self-contained records.
+**Classification:** Principal Cloud Architect - Architecture Governance  
+**Version:** 2.1  
+**Date:** 27 August 2026  
+**Status:** Accepted - supersedes ADR-001 v1.2 region-selection content  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements v2.1.
 
-> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. This record is self-contained: it can be read without any companion document. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.1 ADR updates the accepted region-selection decision to match the consolidated requirements baseline. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 
-# ADR-001 — Region Selection
+# ADR-001 - Region Selection and Customer Placement
 
 **Status:** Accepted  
-**Date:** August 2026  
-**Deciders:** Principal Cloud Architect, Platform Engineering, DR Owner  
-**Related constraints:** HC-1..HC-10 (hard constraints); VR-1..VR-11 (validation rules)  
+**Date:** 27 August 2026  
+**Deciders:** Principal Cloud Architect, Platform Engineering, DR Owner, Product Platform  
+**Related requirements:** REG-001..REG-005, PLC-001..PLC-010, RDY-001..RDY-004, DR-014, DR-016..DR-019, DAT-002, DAT-005  
+**Related constraints:** ENV-003, CAP-011, CAP-012, QUA-012, NFR-002, NFR-010
 
-### Context
+## Context
 
-Customers request capacity by supplying either a specific Azure region or an Azure geography (e.g. "US", "Europe", "Middle East"). The engine must derive three environment regions — **Prod**, **NonProd/CVAL**, and **DR** — that satisfy isolation, resilience, capacity, quota, and data-residency requirements.
+Requirements v2.1 changes the placement model from repeated geography-driven selection to a seeded, production-region-first model. Customers and product teams must know the exact Azure production region up front because a broad geography selection creates contract churn, data-residency ambiguity, and inconsistent product placement for the same customer. `[Derived]`
 
-Forces at play:
+ACRME must still calculate CVAL and DR placement using current capacity, reservation, quota, zone, sharing, restriction, and DR-readiness state. The first valid decision becomes an authoritative seed that future products reuse. `[Decided]`
 
-- Azure regions differ in SKU availability, zone count, capacity headroom, and quota posture. A naive "pick the nearest region" approach silently produces single-zone or capacity-starved placements.
-- Some regions are **Restricted Capacity Regions** (sovereign clouds, limited-SKU regions) that must never be selected by automated placement.
-- Certain geographies (notably the **Middle East**, with only UAE North and Saudi Arabia Central) do not have enough Standard regions to satisfy a three-region model in-geo, forcing a governed cross-geo DR path.
-- Placement decisions must be **deterministic, auditable, and replayable** — the same inputs must always produce the same output, and every decision must be reconstructable for compliance.
+Key forces:
 
-### Decision
+- Production protection is the primary objective. `[Decided]`
+- Region, zone, quota, and capacity are hard isolation boundaries; capacity is never counted across regions or zones. `[Documented]`
+- Region strategy is configuration-driven and currently focused on North America and Europe; APAC and Middle East entries are policy data, not automatic rollout commitments. `[Derived]`
+- Middle East DR may be unavailable because legal/data-sovereignty constraints can require a `DR_NOT_OFFERED` result instead of a cross-border DR placement. `[Derived]`
+- Placement must return a fresh, machine-readable readiness state to AEP/provisioning and must fail safely on stale or incomplete state. `[Decided]`
 
-Adopt a **staged, constraint-then-score placement pipeline** driven by environment-type-specific scoring formulas:
+## Decision
 
-1. **Stage 1 — Eligibility pre-filtering.** Reduce all Azure regions to Standard Capacity Regions within the customer's geography.
-   - **HC-9 STANDARD_REGION_ONLY** excludes Restricted regions before scoring. `[Decided]`
-   - **HC-8 GEOGRAPHY_CONTAINMENT** confines the Prod anchor to the customer's chosen geography. `[Derived]`
+Adopt a **production-region-first, seeded placement architecture**:
 
-2. **Stage 2 — Hard-constraint gate.** Each surviving region must pass **HC-1..HC-7 and HC-10** (region separation, capacity floor, quota floor, DR separation class, zone availability, DR coverage floor, DR floor integrity, cross-geo extension approval). Any failure excludes the region from scoring entirely — hard constraints are binary gates, never scored penalties. `[Decided]`
+1. **Exact production region is the default input.** The default onboarding path requires the customer or platform workflow to provide the exact Azure production region. ACRME validates it rather than deriving it from a broad geography. `[Decided]`
 
-3. **Stage 3 — Environment-type-specific scoring.** Rank survivors using three formulas sharing default weights (α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10) but with env-type-specific semantics for α (capacity signal) and δ (DR readiness): `[Decided — D9]`
+2. **Geography-only selection is an exception path.** Geography input is retained only with explicit exception approval and customer acknowledgement that the selected production region becomes fixed until an approved migration changes the seed. `[Decided]`
+
+3. **Customer seed record is authoritative.** The first placement decision writes `CustomerSeedRecord`; subsequent products/environments for the same customer and geography reuse it instead of re-running production selection. `[Decided]`
+
+4. **CVAL and DR are selected after production is fixed.** Once the production region is validated, ACRME selects or validates CVAL and DR using current readiness, environment separation, restriction flags, workload distribution, quota/capacity state, and state freshness. `[Derived]`
+
+5. **Placement creates readiness output, not just a region tuple.** Every evaluation returns a `DeploymentReadinessResult` state:
+
+   ```text
+   READY | READY_WITH_RISK | QUOTA_DEFICIT | RESERVATION_DEFICIT |
+   CAPACITY_UNAVAILABLE | STALE_STATE | POLICY_BLOCKED | VALIDATION_REQUIRED
    ```
-   alpha (α) = 0.30   # capacity / headroom signal
-   beta  (β) = 0.20   # quota headroom signal
-   gamma (γ) = 0.25   # capacity-weighted distribution
-   delta (δ) = 0.15   # DR-coverage / overflow-integrity signal
-   epsilon(ε)= 0.10   # zone diversity
-   Clamp(x)  = max(0, min(1, x))       # every component clamped to [0,1] before weighting
-   
-   ```
-   - **Prod:** `Prod_region = argmax(PS_Prod(r))` over eligible Standard regions in-geo.
-   - **NonProd/CVAL:** `argmax(PS_NonProd(r))` over survivors, excluding the Prod region.
-   - **DR:** `argmax(PS_DR(r))` over survivors, excluding the Prod region (but **may** share with NonProd).
 
-4. **Selection order is sequential — Prod → NonProd → DR** — not joint optimization. With 3–4 regions the greedy sequential result equals the joint-optimal result in nearly all practical cases, while remaining transparent and auditable. `[Decided]`
+   `[Decided]`
 
-5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Belgium Central** via the only approved Cross-Geo Extension paths (Saudi Arabia → Belgium Central, UAE North → Belgium Central). Belgium Central must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided]`
+6. **Atomic holds prevent double-commit.** Committed placement creates a hold keyed by customer, region, zone, SKU/family, environment, policy version, and snapshot version. Conditional writes reject concurrent requests that attempt to consume the same headroom. `[Decided]`
 
-6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided]`
+7. **DR placement contributes to the DR index.** The seed drives the `SourceDestinationDRIndex` maintained by ADR-003 so a declared source-region failure activates only that source's mapped standby set. `[Derived]`
 
-7. **Operating mode.** In Phase 1 the engine runs region selection in **recommendation/shadow mode** — it produces and logs the ranked recommendation but does not autonomously place. Autonomous placement is gated on POC validation of the scoring formulas.
+## Region Classification and Policy
 
-![**Figure 1.** ACRME staged placement pipeline — Stage 1 eligibility pre-filter, Stage 2 hard-constraint gate, Stage 3 environment-type-specific scoring, then sequential Prod → NonProd → DR selection.](diagrams/adr001_pipeline.png){ width=80% }
+`PlacementPolicy` is the authoritative, versioned region catalogue. It includes region classification, supported geographies, zone support, SKU/family eligibility, separation class, approved cross-geo extension paths, `DR_NOT_OFFERED` flags, stale-state thresholds, weights, and exception metadata. `[Decided]`
 
-#### Region Classification Model (normative)
-
-Every Azure region carries exactly one classification tier, stored in `PlacementPolicy` as config-as-code (versioned, auditable, replayable) — classification is a **governance decision, not a live capability query**. `[Documented]`
-
-| Tier | Eligibility | Regions |
-|---|---|---|
-| **Standard Capacity Region** | Eligible for dynamic selection, scoring, and all env assignments (Prod/CVAL/DR) — the only regions that enter the pipeline | NA: West US 3, Central US, Canada Central · EU: Sweden Central, Belgium Central · ME: Saudi Arabia, UAE North · APAC: Japan East, Southeast Asia, Australia East |
-| **Restricted Capacity Region** | Exception-only (Scenario 2 + Prod + approval); never scored, ranked, or recommended | East US 2, North Europe, West Europe, East Asia, Australia Southeast (all: Azure physical capacity constraint) |
-| **Cross-Geo Extension Region** | DR-only, for geographies that cannot meet the 3-region minimum in-geo | Saudi Arabia → Belgium Central; UAE North → Belgium Central (Middle East only) |
-
-Restricted regions are excluded by a **pre-filter ahead of all hard constraints** (HC-9), never as a scoring penalty.
-
-#### Prod Region Input Modes
-
-The Prod region is the anchor; CVAL and DR are selected sequentially from it. The customer supplies the anchor one of two ways, and both converge on a single validated Prod anchor: `[Documented]`
-
-- **Scenario 1 — geography supplied.** The engine derives Prod via `argmax(PS_Prod)` over Standard Capacity Regions **in that geography only**. Ties break deterministically by the Standard-region list order for the geography; the first-listed region is the deterministic cold-start default when no snapshot exists. Geography exhaustion → reject (never silently cross-geo or use a Restricted region).
-- **Scenario 2 — specific region supplied.** If Standard, validate against HC-1..HC-10 and adopt as the anchor (`PS_Prod` used only for post-selection validation). If Restricted, route to the Exception Deployment Workflow.
-
-![**Figure 2.** Prod region input modes — geography-supplied (Scenario 1) versus specific-region (Scenario 2), including the restricted-region Exception Deployment Workflow.](diagrams/adr001_input_modes.png){ width=72% }
-
-#### Exception Deployment Workflow (Scenario 2 — Restricted region)
-
-A Restricted region is used only if **all four** conditions hold; failure rejects at the first failing gate: `[Documented]`
-
-| # | Condition | Check |
-|---|---|---|
-| **EC-1** | Explicit request | Customer named the region; engine never recommended it |
-| **EC-2** | Production only | CVAL and DR may **never** use a Restricted region |
-| **EC-3** | Exception approval | A named, revocable approval record exists for the customer–region pair |
-| **EC-4** | Scenario 2 input | Restricted regions can never be engine-derived |
-
-On success the region becomes the **Exception Prod Anchor**, the placement is marked an **Exception Deployment**, a capacity-constraint warning is emitted to the caller, and the approval ID + restriction status are mandatory `OperationRecord` fields (commit blocked if absent). CVAL/DR still select from Standard regions via normal scoring.
-
-#### Validation Rule Framework (VR-1..VR-11)
-
-| Rule | Check | Failure action |
-|---|---|---|
-| VR-1 | Region exists in classification list | Reject if unknown |
-| VR-2 | Automated placement uses Standard only | Exclude before scoring if Restricted |
-| VR-3 | Scenario 2 Restricted: EC-1..EC-4 all met | Reject at first failing condition |
-| VR-4 | Scenario 1 derived Prod in-geo Standard | Geography-scoped exhaustion error |
-| VR-5 | Standard region passes HC-1..HC-10 | Exclude; exhaustion error if all excluded |
-| VR-6 | Middle East DR = Belgium Central via approved path | Block with ops alert if Belgium Central fails HC-1..HC-10 |
-| VR-7 | Exception approval ID persisted before commit | Block commit if absent |
-| VR-8 | Capacity-constraint warning emitted | Block commit if suppressed |
-| VR-9 | Snapshot age within policy limit | Trigger targeted ARM refresh |
-| VR-10 | Capacity hold acquired before commit | Block commit if hold absent |
-| VR-11 | Restricted regions absent from all recommendation outputs | Post-scoring filter (defence-in-depth) |
-
-#### Capacity Holds & Concurrency
-
-Before returning a committed assignment the engine creates a **capacity hold** keyed by region, SKU, zone, environment, and policy version, using **optimistic concurrency**; the hold expires if Azure provisioning does not begin. This closes the concurrent-placement race. `[Documented]`
-
-#### Corrected Scoring Model (pilot)
-
-- Default weights retained for pilot comparison: `α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10`; every component is clamped `Clamp(x) = max(0, min(1, x))`. `[Assumed]`
-- To avoid double-counting the same signal under α and δ, the CVAL/NonProd formula is proposed as `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones`. `[Assumed]`
-- Distribution uses **demand units, not customer count**: `Distribution = 1 − Region_Assigned_Demand / Total_Assigned_Demand`. `[Assumed]`
-- Revised weights are proposed, not empirically validated — advisory until pilot measurement.
-
-#### Governance & Compliance Controls
-
-- The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented]`
-- Exception approval records are revocable engine artefacts; a revoked approval blocks future exception deployments for the customer–region pair with no code change.
-- Every classification change is audited with approver identity, timestamp, previous/new classification, and affected geography.
-- Belgium Central's regional capacity-planning targets must include potential Middle East DR demand on top of in-geo Europe demand.
-
-### Consequences
-
-**Positive:**
-- Deterministic, replayable placement with a complete audit trail satisfies compliance and post-incident review.
-- Hard constraints guarantee no placement ever violates isolation, zone, quota, or residency rules regardless of score.
-- Restricted regions are structurally impossible to select automatically; exceptions flow through a governed Scenario 2 workflow with a persisted, revocable approval ID.
-- Env-type-specific formulas let Prod optimise for capacity/isolation while DR optimises for overflow readiness.
-
-**Negative / trade-offs:**
-- Three formulas plus 16 per-CRG-type `RegionalSnapshot` fields increase implementation and snapshot-maintenance cost.
-- Sequential selection is greedy; if the region count ever exceeds 6, joint optimization should be revisited.
-- Cross-geo extension paths are a manual governance artefact — adding a path requires a PlacementPolicy update, governance approval, and a Decision Log entry.
-- Worked scoring examples remain a known gap until per-CRG-type inputs are finalised.
-
-**Neutral:**
-- CRG_Score (Regional Capacity Weight) is demoted from a primary scoring input to a monitoring-only signal.
-
-### Alternatives Considered
-
-| Alternative | Why Rejected |
+| Attribute | Requirement |
 |---|---|
-| **Joint optimization** (select all three regions simultaneously) | Higher combinatorial complexity; opaque and harder to audit; identical result to sequential for 3–4 regions. `[Decided]` |
-| **Single generic PS(r, env_type) formula** | α and δ have fundamentally different meanings per env type; a single formula needs so many branches it becomes three formulas anyway. `[Decided]` |
-| **Geographic distance as a scored soft objective** | Operators already choose geographically independent region sets at design time; HC-4 as a hard constraint is sufficient and simpler. `[Decided]` |
-| **Silent fallback region for failed Middle East DR** | Violates governance and residency guarantees; the engine must fail loudly and require an approved extension path. `[Documented]` |
+| Standard region | Eligible for automated placement and scoring. |
+| Restricted region | Never recommended, scored, or auto-selected; usable only for explicit production-region exception. |
+| Cross-geo extension | Usable only when explicitly approved for the source geography. |
+| `DR_NOT_OFFERED` | Produces seed value `DR region = NOT_OFFERED`; ACRME must not silently substitute another geography. |
+| Policy version | Every change increments version and is recorded with approver, reason, effective date, and replay/audit metadata. |
 
----
+Three to four regions per geography is the normal design goal. A two-region geography cannot guarantee in-geo Prod + CVAL + DR separation; it requires either an approved cross-geo path or `DR_NOT_OFFERED`. `[Derived]`
 
----
+## Placement Flow
 
-## Appendix — ADR Summary
+```mermaid
+flowchart TD
+    Request[Placement request] --> ExistingSeed{Seed exists?}
+    ExistingSeed -- Yes --> Reuse[Reuse CustomerSeedRecord]
+    ExistingSeed -- No --> Input{Input mode}
+    Input -- Exact production region --> ValidateProd[Validate production region]
+    Input -- Geography exception --> GeoApproval{Exception approved and acknowledged?}
+    GeoApproval -- No --> PolicyBlocked[POLICY_BLOCKED]
+    GeoApproval -- Yes --> DeriveProd[Derive production from Standard regions]
+    ValidateProd --> ProdOk{Region valid, fresh, supported?}
+    DeriveProd --> ProdOk
+    ProdOk -- No --> NotReady[Readiness reason]
+    ProdOk -- Yes --> SelectCVAL[Select or validate CVAL]
+    SelectCVAL --> SelectDR[Select DR or NOT_OFFERED]
+    SelectDR --> Fresh{State fresh?}
+    Fresh -- No --> Stale[STALE_STATE]
+    Fresh -- Yes --> Hold[Create atomic placement hold]
+    Hold --> Seed[Write CustomerSeedRecord]
+    Reuse --> Readiness[Return DeploymentReadinessResult]
+    Seed --> Readiness
+```
 
-| ADR | Hard Constraints Applied | Key Open Items |
+## CustomerSeedRecord
+
+`CustomerSeedRecord` must include:
+
+- seed ID and customer/realm identifier;
+- geography;
+- production region;
+- CVAL region;
+- DR region or `NOT_OFFERED`;
+- products covered;
+- region/zone/SKU-family policy context;
+- decision timestamp;
+- policy version and engine version;
+- capacity/quota snapshot references and freshness;
+- exception approval reference and customer acknowledgement, where applicable;
+- active hold IDs;
+- migration status and audit metadata. `[Decided]`
+
+Seeds are not regenerated on upgrades, rebuilds, or routine deployments. Changes require an approved migration/exception workflow with impact analysis. `[Decided]`
+
+## Validation Rules
+
+| Rule | Check | Failure state |
 |---|---|---|
-| ADR-001 Region Selection | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 | Worked scoring examples pending final per-CRG-type inputs |
+| Exact Prod default | Request includes a specific production region unless an exception is approved. | `POLICY_BLOCKED` |
+| Region catalogue | Region is present in active `PlacementPolicy`. | `VALIDATION_REQUIRED` |
+| Standard automated path | Automated selection uses Standard regions only. | `POLICY_BLOCKED` |
+| Restricted region exception | Restricted regions require explicit production-only request and approval. | `POLICY_BLOCKED` |
+| `DR_NOT_OFFERED` | Geography/country flagged as no-DR writes `NOT_OFFERED` and blocks cross-geo substitution. | `READY_WITH_RISK` or `POLICY_BLOCKED` per policy |
+| Three-region gate | Geography must provide Prod, CVAL, and DR separation or approved cross-geo/no-DR path. | `POLICY_BLOCKED` |
+| Freshness | Snapshot age <= configured maximum or synchronous refresh succeeds. | `STALE_STATE` |
+| Capacity | Required reserved capacity exists or over-allocation is approved. | `RESERVATION_DEFICIT` or `CAPACITY_UNAVAILABLE` |
+| Quota | Consumer/deploying subscription has required quota. | `QUOTA_DEFICIT` |
+| Concurrency | Atomic hold commit succeeds. | `VALIDATION_REQUIRED` |
 
-## Appendix — Status Legend
+## Consequences
+
+**Positive**
+
+- Avoids production-region ambiguity and customer contract churn. `[Derived]`
+- Produces stable placement across products for the same customer/geography. `[Decided]`
+- Makes CVAL/DR decisions replayable from seed, policy version, and snapshot references. `[Decided]`
+- Gives AEP/provisioning an explicit readiness contract instead of implicit success/failure. `[Decided]`
+
+**Negative / trade-offs**
+
+- Geography-only onboarding now needs exception governance and customer acknowledgement. `[Decided]`
+- Seed migration becomes a governed workflow, not a simple re-run of scoring. `[Derived]`
+- `DR_NOT_OFFERED` can create a readiness-with-risk outcome that must be handled commercially and operationally. `[Derived]`
+- Atomic holds add state-management complexity but are required to prevent double-committed capacity/quota. `[Decided]`
+
+## Alternatives Considered
+
+| Alternative | Why rejected or constrained |
+|---|---|
+| Geography selection as default | Caused ambiguous customer intent and inconsistent product placement. `[Derived]` |
+| Re-run placement per product | Risks drift across products for the same customer/geography. `[Decided]` |
+| Use stale daily/weekly snapshots for deployment | Can deploy into capacity/quota that is no longer available. `[Derived]` |
+| Auto-select cross-geo DR for two-region geographies | Violates sovereignty/contract controls; must be explicit or `DR_NOT_OFFERED`. `[Decided]` |
+
+---
+
+## Appendix - ADR Summary
+
+| ADR | Requirements Applied | Key Open Items |
+|---|---|---|
+| ADR-001 Region Selection and Customer Placement | REG-001..005, PLC-001..010, RDY-001..004, DR-014 | DEC-001 Middle East/no-DR policy; DEC-003 geography exception approver; production stale-state threshold |
+
+## Appendix - Status Legend
 
 | Status | Meaning |
 |---|---|
@@ -174,7 +171,7 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 | **Deprecated** | No longer recommended but not yet replaced |
 | **Superseded** | Replaced by a later ADR |
 
-## Appendix — Evidence Tag Taxonomy
+## Appendix - Evidence Tag Taxonomy
 
 | Tag | Meaning |
 |---|---|
@@ -185,12 +182,11 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 
 ## Related ADRs
 
-- **ADR-002 — Quota and Capacity Management** (`acrme_adr_002_quota_and_capacity_management.md`)
-- **ADR-003 — Capacity Management during Disaster Recovery (DR)** (`acrme_adr_003_capacity_management_during_dr.md`)
-- **ADR-004 — Forecast and Increase of Capacity and Quota** (`acrme_adr_004_forecast_and_increase_of_capacity_and_quota.md`)
+- **ADR-002 - Quota and Capacity Management** (`acrme_adr_002_quota_and_capacity_management.md`)
+- **ADR-003 - Capacity Management during Disaster Recovery (DR)** (`acrme_adr_003_capacity_management_during_dr.md`)
+- **ADR-004 - Forecast, Reconciliation, and Increase of Capacity and Quota** (`acrme_adr_004_forecast_and_increase_of_capacity_and_quota.md`)
 
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After proof-of-concept validation of Azure Quota Groups GA and quota-release latency, and on resolution of the consumer-credential model and engine-mode state-machine items.
-
+**Next Review:** After DEC-001/DEC-003 decisions, readiness API contract review, and first seed-record implementation test.

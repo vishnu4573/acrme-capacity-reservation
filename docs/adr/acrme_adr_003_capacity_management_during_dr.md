@@ -1,123 +1,201 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
-**Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.2  
-**Date:** August 2026  
-**Status:** Accepted  
-**Part of:** ACRME Architecture Decision Records — one of four standalone, self-contained records.
+**Classification:** Principal Cloud Architect - Architecture Governance  
+**Version:** 2.1  
+**Date:** 27 August 2026  
+**Status:** Accepted - supersedes ADR-003 v1.2 fixed-ratio DR model  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements v2.1.
 
-> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. This record is self-contained: it can be read without any companion document. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.1 ADR updates disaster-recovery capacity management to the lean bootstrap and distributed DR model. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 
-# ADR-003 — Capacity Management during Disaster Recovery (DR)
+# ADR-003 - Capacity Management during Disaster Recovery (DR)
 
 **Status:** Accepted  
-**Date:** August 2026  
-**Deciders:** Principal Cloud Architect, DR Owner, Platform Engineering, Security  
-**Related constraints:** HC-1, HC-4, HC-6 (hard constraints)  
+**Date:** 27 August 2026  
+**Deciders:** Principal Cloud Architect, DR Owner, Platform Engineering, Security, FinOps  
+**Related requirements:** ENV-003..ENV-006, DR-001..DR-019, PLC-010, DAT-002, DAT-003, OBS-001..OBS-004, OPS-001  
+**Related POCs/decisions:** POC-001, POC-006, POC-007, POC-011, DEC-001, DEC-002, DEP-001
 
-### Context
+## Context
 
-When a primary region fails, customers must recover in their DR region within a committed RTO. Pre-positioning a full 1:1 DR reserve is prohibitively expensive, yet under-provisioning risks a failed failover. During a crisis, waiting on Azure quota-increase approvals (hours) is unacceptable. The engine must also strictly separate **routine growth** from **destructive crisis operations** so that reconciliation can never accidentally trigger VM disruption.
+The v1 DR model assumed a fixed 30-40% reserve relative to production. Requirements v2.1 explicitly rejects that as the default because idle DR reservations at platform scale are too expensive and do not reflect the single-region-failure assumption. `[Decided]`
 
-Two capabilities are needed:
-- A way to reuse otherwise-idle NonProd capacity as DR overflow.
-- A safe, tiered escalation model for expanding DR capacity during a declared event.
+ACRME now needs a DR model that:
 
-### Decision
+- starts with configurable bootstrap capacity, not a percentage clone of production;
+- reconciles reserved capacity dynamically against allocated demand and policy buffers;
+- uses CVAL/NonProd as a potential DR capacity source only under authorised runbooks;
+- supports reciprocal multi-source DR hosting, where any region may simultaneously host Prod, CVAL, and DR standby for different customers;
+- sizes each DR destination using max-over-non-concurrent-source demand;
+- activates the correct standby set by source-region failure; and
+- preserves auditability and failback reversibility. `[Derived]`
 
-Adopt **NonProd/DR co-location with a coverage floor**, a **formal two-mode engine state**, and a **three-tier emergency transfer model**:
+## Decision
 
-1. **NonProd and DR may share a region (HC-1 constraint removed).** This lets the NonProd CRG's `effective_free` (after `dr_overflow_reserve`) count as DR overflow headroom. `[Decided]`
-   - **HC-6 DR_COVERAGE_FLOOR** guarantees the combined pool can absorb demand before DR placement is accepted:
-     ```
-     dr_crg_free_slots(R) + nonprod_crg_effective_free(R) ≥ prod_vm_count × dr_ratio_max
-     ```
-   - **HC-4 DR_SEPARATION_CLASS** still guarantees Prod and DR sit in non-correlated failure domains (HIGH separation for non-paired regions).
+Adopt a **lean bootstrap plus distributed DR capacity architecture**:
 
-2. **Two separate operating systems gated by `engine_mode`:** `[Decided]`
-   - **`STEADY_STATE`** — organic growth via the reconciliation loop and `CapacityIncreaseRequest` (see ADR-004). Emergency Transfer is **rejected** in this mode.
-   - **`DR_EVENT_ACTIVE`** — crisis operations only. The auto-increase trigger is **suppressed** in this mode. Mode transitions are operator-gated with dual approval (state machine `EngineModeState`), never automatic. `[Decided]`
+1. **DR starts lean.** DR holds a configurable bootstrap target by workload, product, region, zone, SKU/family, and subscription model. It must not default to a fixed 30-40% copy of production. Zero bootstrap is allowed only through explicit approved policy. `[Decided]`
 
-3. **Three-tier Emergency Capacity Transfer escalation:** `[Decided]`
-   - **Tier 1 — DirectExpansion (automated):** expand DR CR quantity using free headroom in the DR group. No approval beyond DR-event declaration.
-   - **Tier 2 — QuotaNeutralTransfer (policy-gated):** reduce a NonProd CR (releasing quota to the shared NonProd+DR group pool) and expand the DR CR from that same pool. Net group headroom change ≈ 0 — **quota-neutral, no VM execution-state change** (only NonProd SLA is removed). This is possible *only* because of the two-group model (see ADR-002).
-   - **Tier 3 — DestructiveTransfer (dual approval + elevated RBAC):** the only tier that modifies VM-to-CRG associations. The operator supplies an explicit `vm_disassociation_list` (no automated VM selection in Phase 1); executed via 6-step Path B with Path A fallback per VM. VMSS entries are rejected in Phase 1.
+2. **Destination sizing uses max-not-sum.** For a destination region, standby capacity is sized to the largest non-concurrent protected source workload portion, not the sum of all sources. `[Decided]`
 
-4. **Quota-neutral math (Tier 2):**
-   ```
-   NonProd CR reduction  → releases quota to shared NonProd+DR GROUP pool
-   DR CR expansion       → consumes from the SAME pool
-   ⇒ net group headroom change ≈ 0  (ARM operations only; no Azure quota approval)
-   ```
+3. **SUM remains a conservative override.** If a customer contract, geography, or risk decision requires simultaneous source-region failure coverage, policy may switch that scope to SUM sizing. `[Decided]`
 
-5. **DR reserve sizing** is `30–40%` of Prod (`dr_ratio_min=0.30`, `dr_ratio_max=0.40`, `dr_ratio_target=0.35`); the protected floor uses `dr_ratio_max` (see ADR-002).
+4. **Every region can have three concurrent roles.** A region may host its own production, CVAL for customers whose production is elsewhere, and standby DR for customers from multiple source regions. `[Decided]`
 
-6. **Phase-1 safety posture:** Tier 2 is approval-gated; **Tier 3 is blocked** pending the consumer-credential model and the engine-mode state machine. No invented SLA — propagation/approval times are measured and reported as unknown until observed.
+5. **CVAL is a DR capacity source, not free capacity.** CVAL capacity can be shut down, disassociated, or reassigned only on an authorised DR declaration and per approved priority/runbook. `[Decided]`
 
-![**Figure 1.** Three-tier Emergency Capacity Transfer escalation — Tier 1 automated, Tier 2 quota-neutral, Tier 3 destructive (blocked in Phase 1).](diagrams/adr003_transfer_tiers.png){ width=33% }
+6. **DR activation is per customer and priority wave.** A declared region failure changes engine mode, then ACRME activates the affected source region's mapped standby instances from associated/inactive state to allocated/active state in approved business-priority waves. `[Decided]`
 
-#### Full Engine State Machine (normative)
+7. **Failback is reversible and audited.** Every activation records customer state, source/destination, capacity acquisition path, approvals, and rollback/failback checkpoint. `[Decided]`
 
-`engine_mode` is not a two-value flag but a **five-state machine** persisted in Cosmos DB with conditional writes, transition guards, and recovery tests — a production blocker until implemented: `[Documented]`
+## Distributed DR Reference Model
+
+The authoritative mapping is `SourceDestinationDRIndex`:
+
+| Field | Purpose |
+|---|---|
+| `source_region` | Failed or protected production source. |
+| `destination_region` | Region holding standby DR capacity. |
+| `customer_or_realm_id` | Customer/realm whose standby set is mapped. |
+| `seed_id` | Link back to `CustomerSeedRecord` from ADR-001. |
+| `standby_instance_set` | VM/VMSS/node-pool/application set eligible for activation. |
+| `sku_family`, `sku`, `zone`, `quantity` | Capacity/quota dimensions. |
+| `activation_state` | `standby`, `activation_pending`, `active`, `failback_pending`, `returned`. |
+| `priority_wave` | Business priority for activation order. |
+| `policy_version`, `last_updated` | Replay, freshness, and audit fields. |
+
+The index must be queryable in both directions:
+
+- source -> destinations, to know where a failed region's customers activate;
+- destination -> sources, to compute max-source coverage and dashboard exposure. `[Decided]`
+
+## DR Sizing Formula
+
+For each destination, SKU, zone, and policy scope:
+
+```text
+Destination_DR_Requirement(d)
+  = MAX over non-concurrent source regions s protected by d (
+      Workload_Portion(s -> d)
+    )
+```
+
+With vCPU expansion:
+
+```text
+DR_Floor_vCPU(d, sku, zone)
+  = Destination_DR_Requirement(d, sku, zone) * vCPU_Per_Instance(sku)
+```
+
+The old formula `prod_vm_count * dr_ratio_max` is superseded. It may appear only in legacy examples, never as the default production sizing rule. `[Decided]`
+
+## DR Activation Sequence
+
+```mermaid
+flowchart TD
+    Declare[Authorised DR declaration] --> Mode[Set DR_EVENT_ACTIVE]
+    Mode --> Index[Read SourceDestinationDRIndex]
+    Index --> Waves[Order customers by priority wave]
+    Waves --> Bootstrap[Use bootstrap capacity]
+    Bootstrap --> Quota[Use available destination quota]
+    Quota --> CVAL[Release approved CVAL earmark]
+    CVAL --> Share[Use approved shared reservation]
+    Share --> Pool[Allocate pooled quota]
+    Pool --> AzureReq[Submit Azure request if still deficient]
+    AzureReq --> Activate[Transition standby associated to allocated active]
+    Activate --> Audit[Record activation and failback checkpoint]
+```
+
+Capacity acquisition order:
+
+1. existing bootstrap capacity;
+2. available destination quota/capacity;
+3. approved CVAL release;
+4. approved capacity sharing;
+5. pooled quota allocation;
+6. Azure quota/capacity request with exposed deficit if Azure cannot supply it. `[Decided]`
+
+## CVAL Earmark and No-Double-Count Rule
+
+When CVAL and DR co-locate, ACRME must create a `CVALEarmarkRecord` that identifies which CVAL capacity is releasable for a customer's DR activation. Earmarked CVAL capacity counts toward DR headroom, not live CVAL headroom. It must never be credited as both live CVAL capacity and available DR capacity. `[Decided]`
+
+`CVALEarmarkRecord` contains customer/realm, CVAL region, DR destination, SKU/zone/quantity, release action, approval policy, priority wave, expiry/review status, and audit references. `[Decided]`
+
+## Engine State Machine
+
+`engine_mode` is a persisted state machine with conditional writes and operator-gated transitions:
 
 | State | Meaning | Permitted transitions |
 |---|---|---|
-| **STEADY_STATE** | Organic growth only; Emergency Transfer rejected | → DR_DECLARATION_PENDING |
-| **DR_DECLARATION_PENDING** | DR requested, awaiting dual approval + validation | → DR_EVENT_ACTIVE (approved) · → STEADY_STATE (rejected/expired) |
-| **DR_EVENT_ACTIVE** | Crisis operations only; auto-increase suppressed | → FAILBACK_PENDING · → INCIDENT_HOLD |
-| **FAILBACK_PENDING** | Failback requested, being validated | → STEADY_STATE (completed) · → DR_EVENT_ACTIVE (validation failed) · → INCIDENT_HOLD |
-| **INCIDENT_HOLD** | State conflict / critical failure — safe hold | → DR_EVENT_ACTIVE · → FAILBACK_PENDING (on recovery approval) |
+| `STEADY_STATE` | Normal inventory, reconciliation, placement, and approved growth. | `DR_DECLARATION_PENDING` |
+| `DR_DECLARATION_PENDING` | DR requested and awaiting approval/validation. | `DR_EVENT_ACTIVE`, `STEADY_STATE` |
+| `DR_EVENT_ACTIVE` | Source-specific DR activation and emergency operations permitted. | `FAILBACK_PENDING`, `INCIDENT_HOLD` |
+| `FAILBACK_PENDING` | Return/reversal is being validated and executed. | `STEADY_STATE`, `DR_EVENT_ACTIVE`, `INCIDENT_HOLD` |
+| `INCIDENT_HOLD` | Safe degraded state after conflict or critical failure. | Recovery-approved transition only |
 
-All transitions are **operator-gated with dual approval** — never automatic.
+Entering `DR_EVENT_ACTIVE` does not automatically authorise service-impacting CVAL action, Tier 2, or Tier 3. Each action still requires its own policy gate. `[Decided]`
 
-![**Figure 2.** Five-state engine mode machine — every transition is operator-gated with dual approval.](diagrams/adr003_state_machine.png){ width=98% }
+## Relationship to Emergency Tiers
 
-#### `EngineModeState` Entity
+The previous three-tier emergency transfer model remains as an implementation pattern, but v2.1 scopes it behind bootstrap-first activation:
 
-Must carry: environment/control-plane scope · current mode · state version · incident ID · requested-by · approved-by · transition timestamp · transition reason · active operation IDs · lease owner + expiry · recovery checkpoint. `[Documented]`
-
-#### DR Activation Semantics
-
-Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which separately-governed emergency operations may be evaluated — it does **not** automatically authorize Tier 2 or Tier 3. Each tier is independently gated. The DR orchestrator validates group and subscription quota and CR/sharing state before starting any approved failover deployment, and records active-or-incident-hold state back to the state service. `[Documented]`
-
-### Consequences
-
-**Positive:**
-- Idle NonProd capacity doubles as DR overflow, cutting the cost of pre-positioned DR reserve while HC-6 guarantees sufficiency.
-- The `engine_mode` gate makes it structurally impossible for routine reconciliation to trigger destructive VM operations.
-- Tier 2 delivers meaningful crisis capacity **with zero VM disruption and zero Azure quota wait** — the common escalation path avoids Tier 3 entirely.
-- Every operation is tagged with its operating mode for a clean audit trail.
-
-**Negative / trade-offs:**
-- Co-location adds risk that NonProd over-consumption erodes DR overflow; mitigated by HC-6, `dr_overflow_reserve`, and floor alerting.
-- `engine_mode` must be a formal Cosmos DB state propagated to every reconciliation cycle, with operator-gated, dual-approval transitions.
-- **Tier 3 is blocked** until the consumer-credential model (Managed Identity vs cross-tenant service-principal) and the engine-mode state machine are resolved — a known Phase-1 limitation.
-- Tier 3 requires a rare, audited break-glass role (`ACRME.SuperAdmin`) for single-approver override.
-- Requires per-CRG-type `RegionalSnapshot` fields to evaluate HC-6.
-
-### Alternatives Considered
-
-| Alternative | Why Rejected |
+| Tier | v2.1 treatment |
 |---|---|
-| **Keep DR_region ≠ NonProd_region** | Prevents using NonProd as DR overflow — the whole point of co-location. `[Decided]` |
-| **Remove separation with no compensating HC** | Risks NonProd over-consumption leaving no DR headroom. `[Decided]` |
-| **Unified capacity engine with mode flags** | Mode flags create complex conditionals and risk triggering VM disassociation during routine reconciliation. `[Decided]` |
-| **Emergency transfer as an extension of auto-increase** | Conflates policy-driven growth with operator-gated crisis response; could run destructive ops without a DR declaration. `[Decided]` |
-| **Two tiers only (automated + destructive)** | Loses the quota-neutral Tier 2 — the critical low-risk intermediate that avoids Tier 3 in most crises. `[Decided]` |
-| **Four tiers (separate VMSS tier)** | VMSS disassociation deferred as a Phase-1 limitation rather than a distinct tier. `[Decided]` |
+| Tier 1 - direct expansion | Permitted after DR declaration when quota/capacity/sharing preconditions are fresh. |
+| Tier 2 - quota-neutral transfer | Approval-gated until quota group release and consumer quota behavior are proven. |
+| Tier 3 - destructive VM association changes | Blocked in Phase 1; VMSS entries are rejected. |
+
+## Observability and Runbooks
+
+ACRME dashboards and alerts must show:
+
+- DR bootstrap below target;
+- destination coverage below max protected source;
+- source <-> destination mapping;
+- activation state by customer and priority wave;
+- CVAL earmarks and releasable capacity;
+- quota/capacity deficits after each acquisition stage;
+- failed/stale activation state;
+- failback pending age. `[Decided]`
+
+Runbooks must cover DR declaration, standby activation, CVAL release/shutdown/disassociation, quota allocation to DR, sharing activation, manual emergency override, regional recovery, and failback. `[Decided]`
+
+## Consequences
+
+**Positive**
+
+- Removes the high-cost fixed 30-40% standby reserve as the default. `[Decided]`
+- Aligns standby sizing with the single-region-failure assumption. `[Derived]`
+- Supports reciprocal multi-source hosting without summing unrelated non-concurrent sources. `[Decided]`
+- Makes activation deterministic from the DR index and seed records. `[Decided]`
+
+**Negative / trade-offs**
+
+- Max-not-sum under-protects two simultaneous source-region failures unless SUM override is configured. `[Derived]`
+- Capacity Reservation Sharing remains a preview/feature-maturity dependency for parts of the cost model. `[Assumed]`
+- Bootstrap sizing requires workload-specific POC evidence. `[Assumed]`
+- CVAL release can be service-impacting and therefore requires explicit authorisation. `[Decided]`
+
+## Alternatives Considered
+
+| Alternative | Disposition |
+|---|---|
+| Fixed 30-40% production copy | Rejected as default because of idle cost and v2.1 pivot. `[Decided]` |
+| Sum all sources per destination | Rejected as default; too expensive under single-region-failure assumption. `[Decided]` |
+| Zero DR bootstrap by default | Rejected; zero is allowed only by explicit approved policy. `[Decided]` |
+| Treat CVAL free capacity as always available | Rejected; requires earmark, authorisation, and no-double-count controls. `[Decided]` |
+| Activate all destination standby capacity during any event | Rejected; activation is source-specific via the DR index. `[Decided]` |
 
 ---
 
----
+## Appendix - ADR Summary
 
-## Appendix — ADR Summary
-
-| ADR | Hard Constraints Applied | Key Open Items |
+| ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-003 Capacity during DR | HC-1, HC-4, HC-6 | Consumer-credential model and engine-mode state machine; quota-release latency measured |
+| ADR-003 Capacity Management during DR | ENV-003..006, DR-001..019, PLC-010, DAT-002, OBS-004 | POC-006 topology, POC-007 bootstrap sizing, POC-011 max-not-sum safety, DEC-001 Middle East DR, DEC-002 failback duration, DEP-001 sharing maturity |
 
-## Appendix — Status Legend
+## Appendix - Status Legend
 
 | Status | Meaning |
 |---|---|
@@ -126,7 +204,7 @@ Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which sepa
 | **Deprecated** | No longer recommended but not yet replaced |
 | **Superseded** | Replaced by a later ADR |
 
-## Appendix — Evidence Tag Taxonomy
+## Appendix - Evidence Tag Taxonomy
 
 | Tag | Meaning |
 |---|---|
@@ -137,12 +215,11 @@ Entering `DR_EVENT_ACTIVE` **only establishes the operating mode** in which sepa
 
 ## Related ADRs
 
-- **ADR-001 — Region Selection** (`acrme_adr_001_region_selection.md`)
-- **ADR-002 — Quota and Capacity Management** (`acrme_adr_002_quota_and_capacity_management.md`)
-- **ADR-004 — Forecast and Increase of Capacity and Quota** (`acrme_adr_004_forecast_and_increase_of_capacity_and_quota.md`)
+- **ADR-001 - Region Selection and Customer Placement** (`acrme_adr_001_region_selection.md`)
+- **ADR-002 - Quota and Capacity Management** (`acrme_adr_002_quota_and_capacity_management.md`)
+- **ADR-004 - Forecast, Reconciliation, and Increase of Capacity and Quota** (`acrme_adr_004_forecast_and_increase_of_capacity_and_quota.md`)
 
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After proof-of-concept validation of Azure Quota Groups GA and quota-release latency, and on resolution of the consumer-credential model and engine-mode state-machine items.
-
+**Next Review:** After POC-006, POC-007, POC-011, DEC-001, DEC-002, and Capacity Reservation Sharing maturity review.

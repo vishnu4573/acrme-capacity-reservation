@@ -1,107 +1,192 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
-**Classification:** Principal Cloud Architect — Architecture Governance  
-**Version:** 1.2  
-**Date:** August 2026  
-**Status:** Accepted  
-**Part of:** ACRME Architecture Decision Records — one of four standalone, self-contained records.
+**Classification:** Principal Cloud Architect - Architecture Governance  
+**Version:** 2.1  
+**Date:** 27 August 2026  
+**Status:** Accepted - supersedes ADR-004 v1.2 forecast-only sizing content  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements v2.1.
 
-> **About ADRs.** An Architecture Decision Record captures a single significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. ADRs are immutable once accepted — a superseding decision is recorded as a new ADR rather than editing the original. This record is self-contained: it can be read without any companion document. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]` (see Appendix).
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.1 ADR separates continuous reconciliation from longer-horizon forecasting and quota/capacity increase workflows. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 
-# ADR-004 — Forecast and Increase of Capacity and Quota
+# ADR-004 - Forecast, Reconciliation, and Increase of Capacity and Quota
 
 **Status:** Accepted  
-**Date:** August 2026  
-**Deciders:** Principal Cloud Architect, Platform Engineering, FinOps, Capacity Planning  
-**Related constraints:** HC-3 (applied at increase-execution time)  
+**Date:** 27 August 2026  
+**Deciders:** Principal Cloud Architect, Platform Engineering, FinOps, Capacity Planning, Operations  
+**Related requirements:** CAP-003..CAP-010, QUA-006..QUA-010, RDY-001..RDY-004, FIN-001..FIN-006, OBS-001..OBS-005, NFR-003..NFR-010, OPS-001..OPS-005  
+**Related POCs:** POC-004, POC-005, POC-008, POC-009, POC-010
 
-### Context
+## Context
 
-Reserved capacity must grow ahead of demand — but Azure quota increases take time to approve, and over-reservation wastes money. The engine needs to forecast demand, recommend right-sized capacity, and drive quota/CR increases with enough lead time, **without** ever autonomously performing material or destructive changes in Phase 1. This growth path must be architecturally distinct from crisis operations (see ADR-003).
+The earlier ADR treated forecast demand as the primary capacity sizing formula. Requirements v2.1 splits this into two distinct control loops:
 
-### Decision
+- **Continuous reconciliation** keeps current reservations aligned to actual allocated demand plus a configurable buffer.
+- **Forecast and increase planning** predicts future demand, quota needs, and cost exposure, then drives approval-gated quota/capacity changes. `[Decided]`
 
-Adopt **forecast-driven, approval-gated capacity growth** operating exclusively in `STEADY_STATE`:
+This distinction matters because associated-but-deallocated VMs should not automatically preserve expensive reservations, while production growth still needs proactive planning and alerting. `[Derived]`
 
-1. **Forecasting** analyses historical CR allocation and projects demand over a configurable window (default 30/60/90 days), exposing raw time series and derived recommendations via API. `[Documented]`
+## Decision
 
-2. **Capacity sizing formula:** `[Documented]`
+Adopt a **two-path capacity management model**:
+
+1. **Reconciliation floor is allocated demand plus buffer.** The normative steady-state floor is:
+
+   ```text
+   Target Reserved Capacity = Allocated VM Count + Configured Buffer
    ```
-   Forecast_Quantity = ceil(Forecast_Peak × (1 + Growth_Buffer) + DR_Buffer)
-   ```
-   Increase when forecast demand exceeds current reserved quantity within the window; right-size down when demand is consistently below current, honouring a configurable buffer.
 
-3. **Lead-time alerting:** when forecast demand approaches a quota limit (default **80%**), emit `ForecastApproachingQuotaLimit` with a **14-day lead time** — enough for quota-increase processing. `[Documented]`
+   `[Decided]`
 
-4. **Auto-increase is approval-gated in Phase 1.** The trigger uses utilisation thresholds with **debounce/cooldown** to avoid thrashing; a `CapacityIncreaseRequest` entity carries the full lifecycle (create → approve → execute → retry → cancel), and Phase 1 requires **operator approval** before execution. `[Decided]`
+2. **Forecasting is advisory and proactive.** Forecasting estimates future peaks and produces recommendations, quota lead-time alerts, and increase requests; it does not override the reconciliation floor without policy approval. `[Decided]`
 
-5. **Quota increases** are initiated via the Azure Support REST API (`Microsoft.Capacity/.../serviceLimits`) — at group level where Quota Groups apply (see ADR-002) — subject to the same operator-approval gate. `[Documented]`
+3. **Associated-but-deallocated VMs are separate.** They are visible in dashboards and restart-risk reporting, but they do not automatically force reservation retention unless policy explicitly requires it. `[Decided]`
 
-6. **Mode isolation.** Auto-increase runs **only** in `STEADY_STATE` and is **suppressed during `DR_EVENT_ACTIVE`**, keeping organic growth strictly separate from crisis transfer (see ADR-003). `[Decided]`
+4. **The reconciliation interval is configurable.** The reference implementation runs as a container-app job every six minutes; production interval is tuned from API throttling, cost, operational risk, and deployment responsiveness. `[Decided]`
 
-7. **Non-destructive guarantee.** Increases only ever raise CR quantity or request more quota; guarded reduction (right-sizing) never drops a CR below its allocated count (the platform floor) and is itself approval-gated.
+5. **Scale-up failure is surfaced, not hidden.** If allocated demand rises and Azure cannot supply capacity, ACRME holds the current safe state, raises an alert, exposes the buffer deficit, and records the Microsoft/Azure negotiation path. `[Decided]`
 
-#### Steady-State Capacity Lifecycle (normative 10-step policy)
+6. **Scale-down is guarded.** Reductions apply minimum-hold interval, DR protection, maintenance exclusion, approved overrides, cost policy, and Azure safety validation. `[Decided]`
 
-The steady-state increase runs strictly separate from DR crisis operations and follows a fixed sequence, with **no assumed quota-propagation SLA**: `[Documented]`
+7. **No automatic deletion.** Normal reconciliation can reduce to zero where Azure permits but never deletes CRGs or reservation definitions. Deletion is a separate approved decommissioning workflow. `[Decided]`
 
-1. Detect threshold crossing.
-2. Re-read current CR, quota, sharing, and assignment state.
-3. Create `CapacityIncreaseRequest`.
-4. Calculate target quantity (`Forecast_Quantity` formula above).
-5. **Require operator approval (Phase 1).**
-6. Submit the quota action only if validated as required.
-7. Wait for confirmed quota state **without assuming a propagation SLA**.
-8. Update CR quantity.
-9. Confirm the actual quantity.
-10. Refresh the snapshot and close the request.
+## Reconciliation Loop
 
-![**Figure 1.** Ten-step steady-state capacity-increase lifecycle, running only in STEADY_STATE behind an operator-approval gate.](diagrams/adr004_lifecycle.png){ width=25% }
+Each reconciliation cycle reads:
 
-#### Auto-Decrease Exclusion
+- scope-file desired state and policy version;
+- reservation quantity;
+- allocated VM count;
+- associated VM count;
+- available reserved capacity;
+- configured production/DR buffer;
+- quota assigned/used/available;
+- sharing relationships;
+- state age and Azure API health. `[Decided]`
 
-Auto-decrease is **excluded from Phase 1**: it can remove future capacity and interact with running VMs. Right-sizing down remains operator-driven and guarded by the platform floor (never below allocated count). `[Documented]`
+Decision logic:
 
-#### Forecast Advisory Posture
+```text
+target = allocated_vm_count + configured_buffer
 
-Forecast recommendations stay **advisory until model accuracy and false-positive rates are measured**; the horizon is 30/60/90 days and `Growth_Buffer`/`DR_Buffer` are policy percentages, not fixed constants. `[Documented]`
+if reserved_quantity < target:
+    attempt scale-up to target
+    if Azure cannot supply:
+        keep current reservation
+        alert buffer deficit
 
-### Consequences
+if reserved_quantity > target:
+    reduce toward target only after hold interval, DR guard,
+    maintenance exclusion, override, and cost-policy checks
+```
 
-**Positive:**
-- Capacity grows ahead of demand with sufficient lead time for quota approvals — reducing capacity-exhaustion incidents.
-- The debounce/cooldown and approval gate prevent runaway or thrashing increases.
-- `CapacityIncreaseRequest` gives a fully auditable, retryable, cancellable growth workflow.
-- Right-sizing recovers cost from over-reserved CRs without risking allocated VMs.
+The loop is idempotent, uses durable operation keys for mutations, and confirms Azure resource-provider state before committing engine state. `[Decided]`
 
-**Negative / trade-offs:**
-- Approval-gated in Phase 1 means growth is not instantaneous — acceptable because Emergency Transfer (see ADR-003) covers crisis speed.
-- Forecast accuracy depends on history; workload-tagged per-workload forecasts are only partially covered.
-- Threshold, buffer, and cooldown values are empirical and require tuning during the pilot; SLA/propagation times are measured, not invented.
-- the `CapacityIncreaseRequest` lifecycle (entity, approval, retry, cancellation) is still a backlog item requiring an end-to-end approved-increase test.
+## Forecast and Increase Formula
 
-### Alternatives Considered
+Forecasting remains a separate planning signal:
 
-| Alternative | Why Rejected |
+```text
+Forecast_Quantity = ceil(Forecast_Peak * (1 + Growth_Buffer) + Approved_DR_Buffer)
+```
+
+Variables:
+
+- `Forecast_Peak`: predicted peak allocated or policy-protected demand for the horizon;
+- `Growth_Buffer`: configurable uncertainty/growth percentage;
+- `Approved_DR_Buffer`: DR-specific buffer from ADR-003 policy, not a fixed percentage clone;
+- `Forecast_Horizon`: configurable, with 30/60/90 days retained as starting options. `[Decided]`
+
+Forecast output can create a `CapacityIncreaseRequest` or `QuotaIncreaseRequest`, but Phase 1 execution remains approval-gated. `[Decided]`
+
+## Capacity and Quota Increase Workflow
+
+```mermaid
+flowchart TD
+    Detect[Detect threshold or forecast breach] --> Refresh[Read current capacity, quota, sharing, seed, and policy state]
+    Refresh --> Request[Create CapacityIncreaseRequest or QuotaIncreaseRequest]
+    Request --> Readiness[Evaluate DeploymentReadinessResult]
+    Readiness --> Approve{Approval required?}
+    Approve -- Yes --> Wait[Wait for operator approval]
+    Approve -- No --> Execute[Execute allowed increase]
+    Wait --> Execute
+    Execute --> Poll[Poll Azure operation and quota state]
+    Poll --> Confirm[Confirm actual CR/quota state]
+    Confirm --> Snapshot[Refresh snapshot and close request]
+```
+
+Increase requests record justification, target workload, SKU/family, region, amount, existing usage, target date, owner, policy version, approval, and before/after values. Requests without sufficient justification are not auto-escalated to Microsoft. `[Decided]`
+
+## Readiness and Alerting Integration
+
+Reconciliation and forecast output feed the readiness states defined in ADR-001:
+
+| Condition | State or alert |
 |---|---|
-| **Fully autonomous auto-increase** | Removes human control over material cost/quota changes; unacceptable in Phase 1. `[Documented]` |
-| **Auto-increase escalating into emergency tiers** | Conflates growth with crisis response; could run emergency ops without a DR declaration. `[Decided]` |
-| **Fixed-timer cooldown** | Less adaptive than recovering the budget incrementally using observed success rates. `[Assumed]` |
-| **No lead-time alerting (react on exhaustion)** | Quota approvals take too long; reacting at exhaustion guarantees deployment failures. `[Documented]` |
-| **Sizing without a DR buffer** | Under-reserves relative to DR obligations; the formula includes an explicit `DR_Buffer` term. `[Documented]` |
+| Snapshot older than max age and refresh fails | `STALE_STATE` |
+| Reservation below target | `RESERVATION_DEFICIT` and production/DR buffer alert |
+| Azure cannot raise reservation | Scale-up failure alert and exposed buffer deficit |
+| Consumer quota below deployment requirement | `QUOTA_DEFICIT` |
+| Reservation exists but quota cannot deploy it | `READY_WITH_RISK` or `QUOTA_DEFICIT` by policy |
+| Policy exception required | `POLICY_BLOCKED` |
+| Unknown Azure/preview behavior | `VALIDATION_REQUIRED` |
+| Sustained zero allocation with cost | Idle reservation cost alert |
+
+Core metrics include reserved quantity, allocated count, associated count, available reserved capacity, configured buffer, buffer deficit/surplus, quota assigned/used/available, pooled quota, reservation utilization, unused reservation cost, reconciliation success/failure, throttling/latency, state age, and deployment blocks. `[Decided]`
+
+## Scale-Down and Cost Policy
+
+Scale-down is cost-positive but risk-sensitive:
+
+- never reduce below allocated demand plus protected buffer;
+- do not treat associated-but-deallocated VMs as allocated, but report restart risk;
+- respect DR protection and CVAL earmarks from ADR-003;
+- honor active maintenance windows and manual overrides;
+- apply minimum-hold intervals to avoid thrashing;
+- reduce unused reservations to zero where allowed instead of deleting them;
+- require separate approval for deletion/decommissioning. `[Decided]`
+
+## API and Operational Controls
+
+All mutating operations return an operation resource rather than implying synchronous completion. Mutations require idempotency key, caller identity, expected state version, policy version, dry-run support for high-impact changes, structured precondition failures, and an operation polling URL. `[Decided]`
+
+Operators can pause mutation while retaining inventory and alerting. Manual overrides must include owner, reason, desired value, expiry, and audit metadata; reconciliation must not overwrite an active approved override. `[Decided]`
+
+## Consequences
+
+**Positive**
+
+- Aligns reservation cost with actual allocated demand while preserving configurable buffers. `[Decided]`
+- Prevents non-paying or deliberately deallocated associated VMs from silently driving paid reservation retention. `[Derived]`
+- Keeps forecast planning useful without making it a destructive automation path. `[Decided]`
+- Produces clear AEP/provisioning readiness states and operational alerts. `[Decided]`
+
+**Negative / trade-offs**
+
+- Reductions require richer policy checks and may be slower than simple right-sizing. `[Derived]`
+- Forecast recommendations remain advisory until accuracy and false-positive rates are measured. `[Assumed]`
+- Six-minute reference reconciliation must be tuned at scale to avoid API storms. `[Assumed]`
+- Zero-capacity behavior must be validated per Azure scenario before broad production dependency. `[Assumed]`
+
+## Alternatives Considered
+
+| Alternative | Disposition |
+|---|---|
+| Forecast formula as the continuous floor | Rejected; continuous floor is allocated demand plus buffer. `[Decided]` |
+| Preserve reservations for all associated VMs | Rejected as too costly unless explicitly required by policy. `[Decided]` |
+| Automatic deletion of unused reservations | Rejected; set to zero where possible and use separate decommissioning workflow. `[Decided]` |
+| Fixed five-minute or six-minute production interval | Rejected as a universal guarantee; six minutes is the reference implementation only. `[Decided]` |
+| Silent fallback when Azure cannot supply capacity | Rejected; alert and expose the deficit. `[Decided]` |
 
 ---
 
----
+## Appendix - ADR Summary
 
-## Appendix — ADR Summary
-
-| ADR | Hard Constraints Applied | Key Open Items |
+| ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-004 Forecast & Increase | HC-3 (at execution) | Workload-tagged forecasts; `CapacityIncreaseRequest` lifecycle end-to-end test |
+| ADR-004 Forecast, Reconciliation, and Increase | CAP-003..010, QUA-006..010, RDY-001..004, OBS-001..005, OPS-001..005 | POC-004 throttling, POC-005 allocation states, POC-008/009 buffer policies, POC-010 production interval |
 
-## Appendix — Status Legend
+## Appendix - Status Legend
 
 | Status | Meaning |
 |---|---|
@@ -110,7 +195,7 @@ Forecast recommendations stay **advisory until model accuracy and false-positive
 | **Deprecated** | No longer recommended but not yet replaced |
 | **Superseded** | Replaced by a later ADR |
 
-## Appendix — Evidence Tag Taxonomy
+## Appendix - Evidence Tag Taxonomy
 
 | Tag | Meaning |
 |---|---|
@@ -121,12 +206,11 @@ Forecast recommendations stay **advisory until model accuracy and false-positive
 
 ## Related ADRs
 
-- **ADR-001 — Region Selection** (`acrme_adr_001_region_selection.md`)
-- **ADR-002 — Quota and Capacity Management** (`acrme_adr_002_quota_and_capacity_management.md`)
-- **ADR-003 — Capacity Management during Disaster Recovery (DR)** (`acrme_adr_003_capacity_management_during_dr.md`)
+- **ADR-001 - Region Selection and Customer Placement** (`acrme_adr_001_region_selection.md`)
+- **ADR-002 - Quota and Capacity Management** (`acrme_adr_002_quota_and_capacity_management.md`)
+- **ADR-003 - Capacity Management during Disaster Recovery (DR)** (`acrme_adr_003_capacity_management_during_dr.md`)
 
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After proof-of-concept validation of Azure Quota Groups GA and quota-release latency, and on resolution of the consumer-credential model and engine-mode state-machine items.
-
+**Next Review:** After POC-004, POC-005, POC-008, POC-009, POC-010, and first reconciliation dry-run against production-like scope.

@@ -1,5 +1,6 @@
 # Azure Capacity Reservation Management Engine Production-Readiness Review and Final Architecture
-*Vishnuvardhan Reddy — August 21, 2026*
+*Vishnuvardhan Reddy — August 27, 2026*  
+*Reconciled against Capacity & Quota Management Requirements v2.1*
 
 # Part I — Production-Readiness Review
 
@@ -16,10 +17,11 @@ The following are production blockers:
 1. **The consumer credential model is unresolved.** Tier 3 requires ACRME to modify VM-to-CRG associations in consumer-owned subscriptions, but the design has not selected and governed either delegated Managed Identity access or a cross-tenant service principal model. [Derived]
 2. **The engine state machine is incomplete.** `STEADY_STATE`, `DR_EVENT_ACTIVE`, and `FAILBACK_PENDING` are referenced, but authoritative transition rules, concurrency controls, recovery rules, and operator APIs are not fully specified. [Derived]
 3. **CRG Sharing is a preview dependency in the supplied design.** Preview behavior and internal POC results are not contractual Microsoft commitments. [Assumed]
-4. **Quota Group behavior required by the two-group architecture has not been proven by executed evidence in the supplied workbook.** The workbook is marked draft and pending engineering execution. [Derived]
+4. **The quota-group topology is unresolved against the v2.1 preference for one governed pool.** The existing two-group design remains a pilot hypothesis until governance isolation, Azure limits, and quota-neutral transfer behavior are proven. [Derived]
 5. **The quota-neutral Tier 2 transfer claim remains conditional.** It depends on group-pool release, subscription-level eligibility, and propagation behavior that must be measured rather than presumed. [Derived]
 6. **Tier 3 is blocked for VM Scale Sets in Phase 1.** The engine must reject VMSS entries rather than claim automated support. [Derived]
-7. **Concurrent placement and mutation races are not fully controlled.** Two placements can evaluate the same capacity snapshot and both pass before either commits. [Derived]
+7. **Distributed DR overcommit is unproven.** Max-not-sum sizing is valid only under the single-region-failure assumption and requires POC-011 plus an explicit SUM override for stricter customers. [Derived]
+8. **Concurrent placement and mutation races are not fully controlled.** Two placements can evaluate the same capacity snapshot and both pass before either commits. [Derived]
 
 Governance may accept preview risk for a bounded pilot, but it must not represent preview behavior, workbook expectations, or POC observations as an Azure SLA or Microsoft contractual commitment. [Undocumented — architectural judgement]
 
@@ -31,11 +33,12 @@ The original design defines 49 functional sub-requirements, 29 non-functional su
 
 The final architecture adds:
 
-- A three-CRG-per-region pattern: Prod, NonProd, and DR. [Derived]
-- Two quota groups per region: Prod and NonProd plus DR. [Derived]
+- A three-CRG-per-region policy default: Prod, NonProd, and DR, with SKU/zone/isolation sharding when required. [Derived]
+- One governed quota group per applicable scope is preferred by v2.1; the existing Prod plus NonProd/DR two-group topology remains an explicitly justified pilot fallback where governance isolation requires it. [Derived]
 - Environment-specific placement formulas. [Derived]
-- A 30–40% DR coverage range. [Assumed]
-- A 30% emergency-transfer headroom target. [Assumed]
+- Configurable lean DR bootstrap capacity rather than a fixed percentage copy of production. [Derived]
+- Distributed DR sizing using the maximum workload portion over non-concurrent source regions, with SUM as a conservative override. [Derived]
+- A 30% emergency-transfer headroom target only as a tunable scenario parameter. [Assumed]
 - Separate steady-state and crisis operating systems. [Derived]
 - Tier 1, Tier 2, and Tier 3 emergency escalation. [Derived]
 
@@ -81,11 +84,15 @@ The final design improves separation of steady-state and emergency operations, b
 
 ### Three-CRG model
 
-Exactly one Prod CRG, one NonProd CRG, and one DR CRG per region simplifies policy and reporting. [Derived] It may not scale where multiple SKUs, zones, hardware generations, isolation requirements, or customer-specific CRGs are needed. [Derived] A CRG count multiplier must therefore be modeled rather than assuming three CRGs is sufficient for every region. [Undocumented — architectural judgement]
+Exactly one Prod CRG, one NonProd CRG, and one DR CRG per region is a policy default that simplifies reporting. [Derived] It may not scale where multiple SKUs, zones, hardware generations, isolation requirements, or customer-specific CRGs are needed. [Derived] A CRG count multiplier must therefore be modeled rather than assuming three CRGs is sufficient for every region. [Undocumented — architectural judgement]
+
+### Distributed DR reference model
+
+Each region may simultaneously host its own production, CVAL for another source region, and standby DR for customers from multiple source regions. [Derived] The authoritative `SourceDestinationDRIndex` maps source region, destination region, customer/realm, standby instance set, SKU/quantity, activation state, policy version, and freshness. [Derived] Destination standby capacity is sized as the maximum protected workload portion across non-concurrent source regions, not the sum; the single-region-failure assumption is the explicit safety boundary. [Derived] Customers requiring simultaneous-failure coverage use the configurable SUM override. [Undocumented — architectural judgement]
 
 ### NonProd and DR co-location
 
-Allowing NonProd and DR to share a region enables capacity reuse but introduces correlated regional loss. [Derived] If both are in the same region, a regional outage can remove both the DR target and the NonProd overflow pool for that customer. [Derived] The co-location rule is therefore acceptable only when the failure-domain policy confirms that the shared region remains independent of Prod and the customer accepts simultaneous NonProd loss. [Undocumented — architectural judgement]
+Allowing NonProd and DR to share a region enables capacity reuse but introduces correlated regional loss. [Derived] Co-location is permitted only when the engine-enforced DR floor and CVAL earmark rules prevent double counting. [Derived] If both are in the same region, a regional outage can remove both the DR target and the NonProd overflow pool for that customer. [Derived] The co-location rule is therefore acceptable only when the failure-domain policy confirms that the shared region remains independent of Prod and the customer accepts simultaneous NonProd loss. [Undocumented — architectural judgement]
 
 ### Sequential placement
 
@@ -269,7 +276,7 @@ Engineering teams must treat the documented baselines as the upper bound for new
 | A-06 | Azure natively protects the DR share within NonProd plus DR | Rejected | Engine floor is design-derived | Protect with engine control and independent detector |
 | A-07 | NonProd reduction immediately funds DR expansion | Unproven | POC-31 and POC-32 | Tier 2 blocked until measured |
 | A-08 | Quantity can safely reduce to zero while VMs run | Unproven as general guarantee | Workbook test hypothesis | Pilot-only after scenario-specific proof |
-| A-09 | 30–40% DR baseline is sufficient | Unsupported business assumption | Architecture decision | Require workload impact analysis |
+| A-09 | Lean bootstrap plus max-not-sum DR is sufficient | Unproven | v2.1 requirements direction | Require POC-007, POC-011, workload recovery analysis, and SUM override where required |
 | A-10 | 30% emergency headroom is economically and operationally optimal | Unsupported | Policy default | Treat as tunable scenario parameter |
 | A-11 | NonProd and DR co-location is acceptable | Conditional | D8 design decision | Customer and risk approval required |
 | A-12 | Sequential placement is near-optimal | Unproven | Design assertion | Shadow against joint optimization |
@@ -767,7 +774,7 @@ flowchart TB
 
 ### Formulas
 
-`DR_Floor_vCPU = Potential_DR_Demand × vCPU_Per_Instance × DR_Ratio_Max`
+`DR_Floor_vCPU(destination, SKU, zone) = MAX over non-concurrent source regions (Protected_Workload_Portion(source, destination, SKU, zone))`
 
 [Derived]
 
@@ -783,7 +790,7 @@ flowchart TB
 
 [Derived]
 
-These formulas are engine accounting controls. [Derived] They do not create a native Azure sub-reservation. [Assumed]
+These formulas are engine accounting controls. [Derived] They do not create a native Azure sub-reservation. [Assumed] A configured SUM basis is available for customers whose recovery objective requires simultaneous source-region failure coverage. [Derived]
 
 ### Exact controls
 
@@ -811,11 +818,13 @@ Throughout this section and Section 28, **CVAL (Customer Validation)** is the cu
 
 ### Region Classification Model
 
-All regions are assigned one of three classification tiers. Classification is a governance decision, not a live Azure capability query; it is stored in `PlacementPolicy` (config-as-code, versioned and auditable) and flows through the same policy-versioning and replay path as the scoring weights. [Undocumented — architectural judgement]
+All regions are assigned one of three classification tiers. Classification is a governance decision, not a live Azure capability query; it is stored in `PlacementPolicy` (config-as-code, versioned and auditable) and flows through the same policy-versioning and replay path as the scoring weights. [Undocumented — architectural judgement] Each geography also carries a `DR_NOT_OFFERED` flag where legal or sovereignty constraints prevent an acceptable DR design. [Derived]
 
 #### Standard Capacity Regions
 
 Standard Capacity Regions are eligible for dynamic selection, automated placement, capacity scoring, and all environment assignments (Prod, CVAL, DR). These are the only regions that enter the scoring pipeline. [Undocumented — architectural judgement]
+
+The current active strategy is North America and Europe; Asia Pacific entries remain configuration-driven and are not an implicit rollout commitment. [Derived]
 
 | Geography | Standard Capacity Regions |
 |---|---|
@@ -849,6 +858,8 @@ Cross-Geo Extension regions serve DR placement for geographies that cannot satis
 
 Cross-Geo Extension is currently approved only for Middle East DR. Belgium Central is a Standard Capacity Region and participates normally in Europe in-geo scoring; its Cross-Geo Extension role is additive and is invoked only when the DR selection algorithm cannot satisfy the three-region minimum in-geo for Middle East. Additional extension paths require a `PlacementPolicy` update, governance approval, and Decision Log entry before activation. [Undocumented — architectural judgement]
 
+Three-region placement is the default design gate for geographies offering DR. A two-region geography cannot guarantee failover capacity and therefore requires either an approved cross-geo path or `DR_NOT_OFFERED`; it must never silently receive a DR assignment. [Derived]
+
 ---
 
 ### Region Distribution Model by Geography
@@ -861,7 +872,7 @@ Cross-Geo Extension is currently approved only for Middle East DR. Belgium Centr
 | Asia Pacific | Japan East, Southeast Asia, Australia East, Australia Southeast †, East Asia † |
 | Cross-Geo Extension | Saudi Arabia → Belgium Central, UAE North → Belgium Central |
 
-† Restricted Capacity Region — excluded from all automated placement; eligible only under the Scenario 2 exception path (Production workload, explicit customer request, exception approval). [Undocumented — architectural judgement]
+† Restricted Capacity Region — excluded from all automated placement; eligible only under the Scenario 1 restricted-region exception path (Production workload, explicit customer request, exception approval). [Undocumented — architectural judgement]
 
 ---
 
@@ -891,7 +902,7 @@ Surviving Standard Capacity Region candidates are evaluated against HC-1 through
 flowchart TD
     Candidate[Region Candidate] --> ClassCheck{Stage 1: Classification}
     ClassCheck -- Standard --> HCFilter[Stage 2: Apply HC-1 to HC-10]
-    ClassCheck -- Restricted --> EnvCheck{Scenario 2 + Prod + Exception}
+    ClassCheck -- Restricted --> EnvCheck{Scenario 1 + Prod + Exception}
     EnvCheck -- All conditions met --> ExceptionFlow[Exception Deployment Workflow]
     EnvCheck -- Any condition fails --> Reject1[Reject: restricted region not eligible]
     HCFilter --> HCPass{All HCs pass}
@@ -903,11 +914,11 @@ flowchart TD
 
 ### Prod region input modes
 
-The Prod region is the anchor of every placement: CVAL and DR are selected sequentially from the fixed Prod anchor. A customer may supply the Prod anchor in one of two ways. [Undocumented — architectural judgement]
+The Prod region is the anchor of every placement: CVAL and DR are selected sequentially from the fixed Prod anchor. Exact region input is the default; geography-only selection is an exception path. [Derived]
 
-**Scenario 1 — Customer chooses an Azure geography (not a region).** The engine derives the Prod region using `PS_Prod` (Section 28), restricted to the **Standard Capacity Regions** within the chosen geography. Restricted Capacity Regions are excluded before the candidate set is formed — they never reach the scorer. Once the Prod anchor is derived, sequential CVAL → DR selection runs on the same Standard Capacity Region pool with the Middle East special handling applied where required. [Undocumented — architectural judgement]
+**Scenario 1 — Customer provides a specific Azure region (default).** If the supplied region is a Standard Capacity Region it is validated against HC-1 through HC-10 and, if eligible, becomes the Prod anchor directly; `PS_Prod` is used only for post-selection validation. If the supplied region is Restricted, the request is routed to the exception workflow. [Derived]
 
-**Scenario 2 — Customer provides a specific Azure region.** If the supplied region is a Standard Capacity Region it is validated against HC-1 through HC-10 and, if eligible, becomes the Prod anchor directly; `PS_Prod` is used only for post-selection validation. If the supplied region is a Restricted Capacity Region the request is routed to the Exception Deployment Workflow (see below). [Derived]
+**Scenario 2 — Customer chooses an Azure geography (exception).** The engine requires an approved exception and binding customer acknowledgement, then derives the Prod region using `PS_Prod` over the Standard Capacity Regions within the chosen geography. Restricted Capacity Regions are excluded before the candidate set is formed. [Derived]
 
 The two modes converge at the same point — a fixed, validated Prod anchor — after which the downstream design is identical for Standard placements. [Undocumented — architectural judgement]
 
@@ -915,14 +926,14 @@ The two modes converge at the same point — a fixed, validated Prod anchor — 
 flowchart TD
     Input[Placement Request] --> ClassFilter[Stage 1 Classification Filter]
     ClassFilter --> Mode{Prod input mode}
-    Mode -- Geography Scenario 1 --> GeoStd[Standard Capacity Regions in geography]
+    Mode -- Geography Scenario 2 + approval --> GeoStd[Standard Capacity Regions in geography]
     GeoStd --> GeoHC[Apply HC-1 to HC-10]
     GeoHC --> GeoEligible{Eligible candidates exist}
     GeoEligible -- No --> GeoReject[Reject: geography exhausted]
     GeoEligible -- Yes --> GeoScore[Score candidates with PS_Prod]
     GeoScore --> GeoPick[argmax PS_Prod = derived Prod anchor]
     GeoPick --> Anchor[Fixed Prod Anchor]
-    Mode -- Region Scenario 2 --> S2Class{Standard or Restricted}
+    Mode -- Region Scenario 1 --> S2Class{Standard or Restricted}
     S2Class -- Standard --> S2HC[Apply HC-1 to HC-10]
     S2HC --> S2Ok{HC passes}
     S2Ok -- No --> S2Reject[Reject or request alternative]
@@ -934,7 +945,7 @@ flowchart TD
     Anchor --> SeqSelect[Sequential CVAL then DR selection]
 ```
 
-#### Scenario 1 derivation — semantics
+#### Scenario 2 geography derivation — semantics
 
 - **Candidate set:** Standard Capacity Regions within the chosen geography, minus any region excluded by HC-1 through HC-10. [Derived]
 - **Scoring:** each surviving candidate is scored with `PS_Prod` from the same versioned regional snapshot used for CVAL/DR, so the Prod anchor is chosen on live capacity, quota headroom, distribution fairness, DR-coverage readiness, and zone diversity — identical signals to the rest of the model. [Derived]
@@ -967,7 +978,7 @@ flowchart TD
 
 ### Middle East Special Handling
 
-Middle East is a **special-case geography**: only two Standard Capacity Regions exist in-geo (Saudi Arabia, UAE North). The three-region minimum required for Prod + CVAL + DR cannot be satisfied within the geography boundary alone. The engine resolves this via the approved Cross-Geo Extension Group. [Undocumented — architectural judgement]
+Middle East is a **special-case geography**: only two Standard Capacity Regions exist in-geo (Saudi Arabia, UAE North). The three-region minimum required for Prod + CVAL + DR cannot be satisfied within the geography boundary alone. The current legal direction is `DR_NOT_OFFERED`; the Belgium Central Cross-Geo Extension is usable only when DEC-001 and the customer's sovereignty/contract approval explicitly permit it. [Derived]
 
 #### Required placement for Middle East three-region deployments
 
@@ -1005,7 +1016,7 @@ flowchart TD
 
 ---
 
-### Exception-Based Placement Workflow (Scenario 2 — Restricted region)
+### Exception-Based Placement Workflow (Scenario 1 — Restricted region)
 
 When a customer explicitly requests a Restricted Capacity Region all four exception conditions (EC-1 through EC-4) must be satisfied before the engine proceeds. [Undocumented — architectural judgement]
 
@@ -1014,7 +1025,7 @@ When a customer explicitly requests a Restricted Capacity Region all four except
 | EC-1 Explicit request | Customer explicitly named the restricted region; the engine did not recommend or suggest it |
 | EC-2 Production only | Workload type is Production; CVAL and DR must not use Restricted Capacity Regions under any condition |
 | EC-3 Exception approval | Named exception approval record exists for this customer–region pair |
-| EC-4 Scenario 2 input | Input mode is Scenario 2 (customer-supplied region); restricted regions cannot be derived by the engine |
+| EC-4 Scenario 1 input | Input mode is Scenario 1 (customer-supplied region); restricted regions cannot be derived by the engine |
 
 If all four conditions are met the engine assigns the restricted region as the **Exception Prod Anchor** and marks the placement record as an **Exception Deployment**. CVAL and DR are then selected from Standard Capacity Regions only, using the normal scoring model. [Undocumented — architectural judgement]
 
@@ -1026,7 +1037,7 @@ flowchart TD
     EC2 -- No --> R2[Reject: restricted regions not eligible for CVAL or DR]
     EC2 -- Yes --> EC3{EC-3 Exception approval record exists}
     EC3 -- No --> R3[Reject: exception approval required before proceeding]
-    EC3 -- Yes --> EC4{EC-4 Scenario 2 input mode}
+    EC3 -- Yes --> EC4{EC-4 Scenario 1 input mode}
     EC4 -- No --> R4[Reject: restricted region cannot be engine-derived]
     EC4 -- Yes --> Warn[Emit capacity-constraint warning to caller]
     Warn --> ExAnchor[Assign as Exception Prod Anchor]
@@ -1046,8 +1057,8 @@ The engine must emit a capacity-constraint warning to the caller on exception ap
 |---|---|---|---|
 | VR-1 | All paths | Region exists in classification list (Standard, Restricted, or Cross-Geo Extension) | Reject if unknown |
 | VR-2 | Automated placement | Region classification is Standard | Exclude before scoring if Restricted |
-| VR-3 | Scenario 2 Restricted | EC-1 through EC-4 all satisfied | Reject at first failing condition |
-| VR-4 | Scenario 1 | Derived Prod region is within Standard Capacity Regions for chosen geography | Geography-scoped exhaustion error |
+| VR-3 | Scenario 1 Restricted | EC-1 through EC-4 all satisfied | Reject at first failing condition |
+| VR-4 | Scenario 2 geography exception | Approval and acknowledgement exist; derived Prod region is within Standard Capacity Regions for chosen geography | Geography-scoped exhaustion error |
 | VR-5 | All paths | Standard region passes HC-1 through HC-10 | Exclude from scoring; exhaustion error if all excluded |
 | VR-6 | Middle East | DR region is Belgium Central via approved Cross-Geo Extension path | Block placement with ops alert if Belgium Central fails HC-1–HC-10 |
 | VR-7 | Exception deployment | Exception approval ID persisted in `OperationRecord` before commit | Block commit if absent |
@@ -1073,15 +1084,15 @@ The engine must emit a capacity-constraint warning to the caller on exception ap
 
 HC-1 through HC-8 are defined in the [Multi-Region Placement Design](./research/multi_region_placement_design.md) (`docs/research/multi_region_placement_design.md`). HC-9 and HC-10 are added by this section.
 
-**HC-9  STANDARD_REGION_ONLY:** Automated placement, scoring, recommendation, and all environment assignments (Prod, CVAL, DR) must use Standard Capacity Regions only. Restricted Capacity Regions are excluded before the scoring pipeline runs; their exclusion is enforced at Stage 1 of the eligibility decision tree, not as a scoring penalty. Exception deployments proceed via the Scenario 2 exception path only. [Undocumented — architectural judgement]
+**HC-9  STANDARD_REGION_ONLY:** Automated placement, scoring, recommendation, and all environment assignments (Prod, CVAL, DR) must use Standard Capacity Regions only. Restricted Capacity Regions are excluded before the scoring pipeline runs; their exclusion is enforced at Stage 1 of the eligibility decision tree, not as a scoring penalty. Exception deployments proceed via the Scenario 1 exception path only. [Undocumented — architectural judgement]
 
 **HC-10  CROSS_GEO_EXTENSION_PATH_APPROVED:** Any DR assignment to a region outside the customer's chosen geography must match an explicitly enumerated Cross-Geo Extension path in the active `PlacementPolicy`. DR assignments to Standard Capacity Regions in a different geography are rejected if no approved extension path exists for the source geography. [Undocumented — architectural judgement]
 
 The following hard constraint list applies to all placement paths:
 
 - Restricted Capacity Regions excluded before scoring pipeline (HC-9). [Undocumented — architectural judgement]
-- In Scenario 1, derived Prod region must be within the Standard Capacity Regions for the customer's chosen geography (HC-8 geography containment). [Undocumented — architectural judgement]
-- Prod and DR must not share a region (HC-1). [Derived]
+- In Scenario 2, derived Prod region must be within the Standard Capacity Regions for the customer's chosen geography (HC-8 geography containment), with the exception approval and customer acknowledgement persisted. [Derived]
+- Prod and DR must not share a region (HC-1); NonProd and DR co-location is permitted only when the DR floor and earmark controls pass. [Derived]
 - CVAL and Prod must not share a region (HC-1). [Derived]
 - CVAL and DR may share a region only under the approved policy (HC-1 update per D8). [Derived]
 - For Middle East three-region placements, DR must be Belgium Central via the approved Cross-Geo Extension path (HC-10). [Undocumented — architectural judgement]
@@ -1144,12 +1155,20 @@ Distribution should use demand units rather than customer count:
 
 [Derived]
 
+The forecast formula is for proactive production growth planning. It is not the continuous reservation floor. The steady-state reconciliation floor is:
+
+`Target_Reserved_Capacity = Allocated_VM_Count + Configured_Buffer`
+
+[Derived]
+
 Variables:
 
 - `Forecast_Peak`: predicted peak associated VM demand in the horizon. [Derived]
 - `Growth_Buffer`: policy percentage for forecast uncertainty. [Assumed]
 - `DR_Buffer`: additional units required by the approved recovery policy. [Assumed]
 - `Forecast_Horizon`: 30, 60, or 90 days in the original design. [Assumed]
+
+Associated-but-deallocated VMs are reported separately and do not increase the floor unless an explicit policy requires retention. [Derived]
 
 Forecast recommendations remain advisory until model accuracy and false-positive rates are measured. [Undocumented — architectural judgement]
 
@@ -1200,6 +1219,8 @@ Before returning a committed assignment, the engine creates a hold keyed by regi
 
 Steady-state increases remain separate from DR crisis operations. [Derived]
 
+The reference reconciliation job runs every six minutes; the production interval is configurable and must be tuned from API throttling, operational risk, cost, and deployment responsiveness. Each cycle compares reserved quantity, allocated VMs, associated-but-deallocated VMs, available capacity, quota, and configured buffers. [Derived]
+
 Recommended policy:
 
 1. Detect threshold crossing.
@@ -1215,7 +1236,7 @@ Recommended policy:
 
 [Undocumented — architectural judgement]
 
-Auto-decrease is excluded from Phase 1 because it can remove future capacity and interact with running VMs. [Undocumented — architectural judgement]
+Auto-decrease is excluded from Phase 1 because it can remove future capacity and interact with running VMs. [Undocumented — architectural judgement] Where Azure permits, an unused reservation is reduced to zero rather than deleted; normal reconciliation never deletes CRGs or reservation definitions. Decommissioning is a separate approved workflow. [Derived]
 
 ## 31. DR Activation Architecture
 
@@ -1241,6 +1262,10 @@ sequenceDiagram
 ```
 
 DR activation does not automatically authorize Tier 2 or Tier 3. [Undocumented — architectural judgement] It establishes the operating mode in which separately governed emergency operations may be evaluated. [Undocumented — architectural judgement]
+
+On an authorised declaration, the DR orchestrator reads `SourceDestinationDRIndex` and activates only the affected source region's standby set. [Derived] Customers are processed in approved priority waves; each customer's standby instances transition from `associated` to `allocated`, with the acquisition sequence evaluated in order: bootstrap capacity, available quota, releasable CVAL, approved sharing, pooled quota, then an Azure capacity request. [Derived] Every transition is auditable and failback reverses the customer activation state only after the target region passes readiness checks. [Undocumented — architectural judgement]
+
+When CVAL is co-located with DR, `CVALEarmarkRecord` identifies capacity that may be released for that customer's activation. Earmarked capacity is counted toward DR headroom, not live CVAL headroom, so it is never credited twice. [Derived]
 
 ## 32. Tier Escalation Architecture
 
@@ -1306,6 +1331,10 @@ Tier 3 is not automated in Phase 1. [Undocumented — architectural judgement]
 - OperationRecord.
 - PolicyVersion.
 - ForecastRecord.
+- CustomerSeedRecord.
+- SourceDestinationDRIndex.
+- CVALEarmarkRecord.
+- DeploymentReadinessResult.
 
 [Derived]
 
@@ -1323,6 +1352,12 @@ Closure control: define an internal incident entity that can reference an extern
 
 Closure control: include `EmergencyCapacityTransfer` and `CapacityIncreaseRequest` in the canonical API, schema, authorization model, audit model, and backlog before implementation begins. [Undocumented — architectural judgement]
 
+The v2.1 placement and DR contracts also require a durable customer seed, a bidirectional source-to-destination DR index, and an explicit CVAL earmark record. These are authoritative engine entities, not derived dashboard views. [Derived]
+
+`CustomerSeedRecord` is created on first placement and contains customer/realm, geography, Prod/CVAL/DR (or `NOT_OFFERED`), products, decision timestamp, policy/engine versions, snapshot reference, exception reference, and approval metadata. Subsequent products reuse the seed; changes require an approved migration or exception workflow. [Derived]
+
+`SourceDestinationDRIndex` is maintained in both source→destination and destination→source views and contains source region, destination region, customer/realm, standby set, SKU/quantity, activation state, last-updated time, and policy version. [Derived]
+
 ## 35. API Architecture
 
 All state-changing endpoints return an operation resource rather than implying synchronous Azure completion. [Undocumented — architectural judgement]
@@ -1336,7 +1371,7 @@ All state-changing endpoints return an operation resource rather than implying s
 - `/zones/resolve`
 - `/quota`
 - `/placement/evaluate`
-- `/placement/select-regions` — accepts **either** a specific Prod region (Scenario 2) **or** an Azure geography (Scenario 1); when a geography is supplied the engine derives the Prod region via `PS_Prod` over the geography's approved regions before running sequential NonProd/DR selection (Section 27). [Undocumented — architectural judgement]
+- `/placement/select-regions` — accepts **either** a specific Prod region (Scenario 1, default) **or** an Azure geography (Scenario 2, approved exception); when a geography is supplied the engine derives the Prod region via `PS_Prod` over the geography's approved regions before running sequential NonProd/DR selection (Section 27). [Undocumented — architectural judgement]
 - `/capacity/increase-requests`
 - `/capacity/emergency-transfer`
 - `/dr/incidents`
@@ -1358,6 +1393,12 @@ Every mutation requires:
 - Operation polling URL.
 
 [Undocumented — architectural judgement]
+
+The placement readiness result is machine-readable and must be one of:
+
+`READY | READY_WITH_RISK | QUOTA_DEFICIT | RESERVATION_DEFICIT | CAPACITY_UNAVAILABLE | STALE_STATE | POLICY_BLOCKED | VALIDATION_REQUIRED`
+
+[Derived] A stale snapshot, missing zone mapping, failed quota/capacity validation, policy exception, or unresolved provider read must produce the corresponding non-ready state rather than a successful-looking default.
 
 ## 36. RBAC and Managed Identity Model
 
@@ -1817,7 +1858,7 @@ flowchart TD
 | Shared NonProd and DR | Retain conditionally; customer acceptance and failure-domain review required. [Undocumented — architectural judgement] |
 | Preview sharing dependency | Accept only for bounded pilot; separate production governance decision required. [Undocumented — architectural judgement] |
 | Non-paired regional strategy | Retain only with explicit workload recovery analysis; do not market as equivalent to paired-region behavior. [Undocumented — architectural judgement] |
-| DR baseline of 30–40% | Treat as policy input, not universal requirement. [Undocumented — architectural judgement] |
+| DR sizing basis | Use configurable lean bootstrap and max-not-sum distributed sizing by default; retain SUM as a conservative override. [Derived] |
 | Emergency headroom of 30% | Treat as scenario parameter; validate cost and RTO consequences. [Undocumented — architectural judgement] |
 | Auto-increase | Approval-gated in Phase 1. [Undocumented — architectural judgement] |
 | Tier 1 | Conditional automation after state and precondition gates. [Undocumented — architectural judgement] |
@@ -1836,7 +1877,7 @@ flowchart TD
 3. Assign owners for G-14 and G-15.
 4. Require executed POC evidence before quota-group engineering.
 5. Require customer-specific recovery objectives for non-paired-region use.
-6. Approve adaptive reconciliation instead of a universal five-minute full scan.
+6. Approve adaptive reconciliation with a configurable six-minute reference interval instead of a universal full scan.
 7. Require a separate production authorization after pilot completion.
 
 [Undocumented — architectural judgement]
@@ -1850,7 +1891,7 @@ Its principal weaknesses are equally clear:
 - Preview sharing is a governance and behavioral dependency. [Assumed]
 - The two-group quota model relies on unexecuted assumptions. [Derived]
 - The engine-enforced DR floor is not a native reservation. [Derived]
-- The 30–40% DR baseline and 30% emergency headroom are policy choices, not demonstrated universal requirements. [Derived]
+- Lean bootstrap sizing, max-not-sum DR sizing, and 30% emergency headroom are policy choices/parameters, not demonstrated universal requirements. [Derived]
 - Placement formulas require normalization and concurrency protection. [Derived]
 - ARG cannot be an authoritative mutation source. [Undocumented — architectural judgement]
 - The credential model and engine state machine are production blockers. [Undocumented — architectural judgement]

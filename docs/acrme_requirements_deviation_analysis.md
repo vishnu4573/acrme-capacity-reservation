@@ -1,6 +1,6 @@
 # ACRME — Requirements v2.1 vs Production-Ready Design: Deviation Analysis
 
-**Document:** Requirements Baseline v2.1 (27 Aug 2026) vs ACRME ADRs v1.2  
+**Document:** Requirements Baseline v2.1 (27 Aug 2026) vs ACRME ADRs v1.2 and production-readiness architecture  
 **Analyst:** Azure Capacity & Platform Architect  
 **Date:** August 2026  
 **Classification:** Principal Cloud Architect — Architecture Governance
@@ -21,6 +21,12 @@ Requirements v2.1 represents a significant pivot from the earlier design baselin
 | **Minor** | 3 | Reconciliation mechanics, Three-region minimum, Configurable region catalogue |
 
 **Recommended action:** Update ADR-001, ADR-002, ADR-003, and ADR-004 to reflect the v2.1 direction. A new ADR-005 (Distributed DR Reference Model) is warranted for the §12A topology. The two-group quota model deviation has a documented design justification — confirm whether QUA-004's preference overrides it before resolving.
+
+### Reconciliation status after the v2.1 production-readiness update
+
+The production-readiness architecture has now adopted the v2.1 direction for its normative model: lean configurable DR bootstrap, distributed max-not-sum sizing, exact-region-first onboarding, readiness-state output, customer seed reuse, reciprocal DR hosting, source↔destination indexing, CVAL earmarking, and zero-capacity/no-auto-delete reconciliation. These changes close the requirements-to-architecture inconsistencies in the review document; they do **not** by themselves close the ADR deviations below. ADR-001 through ADR-004 and the proposed ADR-005 remain the decision-record update workstream, and all Azure preview behavior and business choices remain subject to their named POCs/decisions.
+
+The old 30–40% values, where retained in this analysis, describe the superseded ADR/design baseline and must not be read as the current production-readiness requirement. The current model treats bootstrap, DR sizing basis (MAX or configured SUM), quota grouping, reconciliation interval, and geography flags as policy/configuration inputs with explicit evidence gates.
 
 ---
 
@@ -183,7 +189,7 @@ ADR-001 describes how a placement decision is made per invocation but does not m
 
 **Severity:** 🟠 Significant  
 **Requirement:** PLC-001, PLC-002, DEC-003  
-**Current ADR:** ADR-001 treats Scenario 1 (geography) and Scenario 2 (specific region) as two equal, equivalent input modes.
+**Current ADR:** ADR-001 treats geography and specific-region input as two equal, equivalent input modes.
 
 **Conflict:**
 
@@ -196,8 +202,8 @@ Requirements v2.1 reverse the priority:
 The current ADR-001 presents Scenario 1 and Scenario 2 symmetrically — both are standard documented modes. Historically, geography was the dominant path. Under v2.1, geography selection requires an exception process with an approver and binding customer acknowledgement (DEC-003). This reverses the operational default and substantially changes the pipeline entry point.
 
 **Required action:**
-- ADR-001: Reframe Scenario 2 (specific region) as the **primary/default** path.
-- Reframe Scenario 1 (geography) as an **exception path** requiring approval workflow and customer acknowledgement (add to Exception Deployment Workflow section alongside Restricted region exceptions).
+- ADR-001: Reframe Scenario 1 (specific region) as the **primary/default** path.
+- Reframe Scenario 2 (geography) as an **exception path** requiring approval workflow and customer acknowledgement (add to Exception Deployment Workflow section alongside Restricted region exceptions).
 - Update Figure 2 (input modes diagram) to reflect this priority reversal.
 
 ---
@@ -426,7 +432,7 @@ These areas in the requirements are well-covered by the current ADRs:
 
 | ADR | Changes Required |
 |---|---|
-| **ADR-001** | (1) Reframe Scenario 2 (specific region) as primary default; Scenario 1 (geography) as exception path. (2) Add `CustomerSeedRecord` entity and seed-reuse/seed-change governance. (3) Add `DR_NOT_OFFERED` flag in `PlacementPolicy`. (4) Add three-region minimum as normative constraint. (5) Add deployment readiness state enum (RDY-002). (6) Version `PlacementPolicy` config with REG-002 discipline. |
+| **ADR-001** | (1) Reframe Scenario 1 (specific region) as primary default; Scenario 2 (geography) as exception path. (2) Add `CustomerSeedRecord` entity and seed-reuse/seed-change governance. (3) Add `DR_NOT_OFFERED` flag in `PlacementPolicy`. (4) Add three-region minimum as normative constraint. (5) Add deployment readiness state enum (RDY-002). (6) Version `PlacementPolicy` config with REG-002 discipline. |
 | **ADR-002** | (1) Add quota-as-governor strategic framing. (2) Add explicit cross-reference resolving the QUA-004 vs two-group tension. (3) Update `DR_Floor_vCPU` formula to align with max-not-sum distributed portions rather than fixed ratio. |
 | **ADR-003** | (1) Replace `dr_ratio_*` constants with configurable bootstrap target. (2) Replace DR sizing formula with Appendix A.6 max-not-sum. (3) Add per-customer activation workflow (DR-019): associated→allocated transition, priority waves, DR-006 staged acquisition, failback reversal. (4) Add `CVALEarmarkRecord` / double-count guard (PLC-010). (5) Add zero-capacity and no-auto-delete policy (CAP-009/010). (6) Add reciprocal multi-source DR topology (DR-016) and reference to DR index. (7) Add POC-011 as a required validation gate. |
 | **ADR-004** | (1) Add `Target = Allocated + Buffer` floor formula alongside forecast formula; clarify allocated/associated distinction. (2) Add reconciliation engine normative spec (frequency, inputs, raise/lower logic, scale-down guards). |
