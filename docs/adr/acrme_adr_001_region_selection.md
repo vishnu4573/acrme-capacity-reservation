@@ -28,7 +28,7 @@ Key forces:
 - Production protection is the primary objective. `[Decided]`
 - Region, zone, quota, and capacity are hard isolation boundaries; capacity is never counted across regions or zones. `[Documented]`
 - Region strategy is configuration-driven and currently focused on North America and Europe; APAC and Middle East entries are policy data, not automatic rollout commitments. `[Derived]`
-- **Middle East DR is currently `DR_NOT_OFFERED` (DR-014, DEC-001 — under legal review).** As it stands, DR is **not offered** in the Middle East: Legal owns the programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline §2, §5.2, §6). Middle East placement therefore defaults to `dr_region = NOT_OFFERED`; production may still be placed in-geo without DR. Switzerland North is a **pre-configured, conditional** cross-geo extension that activates **only if** Legal clears DEC-001. `[Documented]`
+- **Middle East DR is currently `DR_NOT_OFFERED` (DR-014, DEC-001 — under legal review).** As it stands, DR is **not offered** in the Middle East: Legal owns the programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline Section 2, Section 5.2, Section 6). Middle East placement therefore defaults to `dr_region = NOT_OFFERED`; production may still be placed in-geo without DR. Switzerland North is a **pre-configured, conditional** cross-geo extension that activates **only if** Legal clears DEC-001. `[Documented]`
 - Placement must return a fresh, machine-readable readiness state to AEP/provisioning and must fail safely on stale or incomplete state. `[Decided]`
 
 ## Decision

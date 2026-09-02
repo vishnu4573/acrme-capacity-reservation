@@ -1396,7 +1396,7 @@ CustomerRegionAssignment {
 ```
 
 ### Updated PlacementPolicy fields [UPDATED — Pass 2 and Pass 3]
-Extend `PlacementPolicy.rules` (design §4.1) with:
+Extend `PlacementPolicy.rules` (design Section 4.1) with:
 ```jsonc
 {
   "weights": { "alpha": 0.30, "beta": 0.20, "gamma": 0.25, "delta": 0.15, "epsilon": 0.10 },

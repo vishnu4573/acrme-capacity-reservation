@@ -60,7 +60,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Stand up the buildable core: CQRS command/query separation, saga orchestration, the command/event bus, the authoritative engine state store, and provider-isolated Azure adapters.
 
-**PRR references.** §23 Logical Component Architecture, §24 MG & Subscription Topology, §38 WAF  
+**PRR references.** Section 23 Logical Component Architecture, Section 24 MG & Subscription Topology, Section 38 WAF  
 **Rollup.** 5 stories · 39 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -76,7 +76,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** platform engineer, **I want** a Command API and a Query API fronted by an API gateway, **so that** state-changing and read operations are cleanly separated and independently scalable.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §23, §35
+- **PRR refs:** Section 23, Section 35
 - **Depends on:** —
 
 **Acceptance criteria**
@@ -98,7 +98,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** platform engineer, **I want** a persisted saga orchestrator driving operation workers over a command/event bus, **so that** multi-step Azure operations run reliably with checkpoints and compensation.
 
 - **Priority:** Highest · **Points:** 13 · **Phase:** P1
-- **PRR refs:** §23, §38 Reliability
+- **PRR refs:** Section 23, Section 38 Reliability
 - **Depends on:** ACRME-S0101
 
 **Acceptance criteria**
@@ -120,7 +120,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** platform engineer, **I want** an authoritative engine-intent store plus a regional snapshot store, **so that** engine intent and cached Azure state are separated with clear ownership.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §23, §34, R-33
+- **PRR refs:** Section 23, Section 34, R-33
 - **Depends on:** ACRME-S0101
 
 **Acceptance criteria**
@@ -141,7 +141,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** platform engineer, **I want** Azure API adapters isolated per resource provider behind a stable interface, **so that** preview APIs can be flag-gated and swapped without touching business logic.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §23, §21, R-01
+- **PRR refs:** Section 23, Section 21, R-01
 - **Depends on:** ACRME-S0102
 
 **Acceptance criteria**
@@ -161,7 +161,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** platform operator, **I want** the platform/customer MG and provider/consumer subscription topology provisioned as code, **so that** the engine UAMI and CRGs live in a governed, repeatable hierarchy.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §24
+- **PRR refs:** Section 24
 - **Depends on:** —
 
 **Acceptance criteria**
@@ -180,7 +180,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Onboard and offboard customer subscriptions with provider/consumer authorization validation, location-separation enforcement, and full read-back before a customer is marked ready.
 
-**PRR references.** §22 Must, §26, §43 Onboarding, Runbook B  
+**PRR references.** Section 22 Must, Section 26, Section 43 Onboarding, Runbook B  
 **Rollup.** 4 stories · 34 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -195,7 +195,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** operations engineer, **I want** a gated onboarding workflow that collects inputs and validates every prerequisite, **so that** no customer reaches shared capacity until all checks pass and are recorded.
 
 - **Priority:** Highest · **Points:** 13 · **Phase:** P1
-- **PRR refs:** §43 Onboarding, §22 Must
+- **PRR refs:** Section 43 Onboarding, Section 22 Must
 - **Depends on:** ACRME-S0102
 
 **Acceptance criteria**
@@ -217,7 +217,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** security-conscious operator, **I want** provider registration and consumer deployment rights validated during onboarding, **so that** sharing and deployment cannot proceed on an unauthorized subscription.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §25, §22 Must
+- **PRR refs:** Section 25, Section 22 Must
 - **Depends on:** ACRME-S0201
 
 **Acceptance criteria**
@@ -237,7 +237,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** capacity architect, **I want** onboarding to reject layouts where Prod/NonProd/DR are not correctly separated, **so that** a single regional event cannot take out incompatible environments.
 
 - **Priority:** Highest · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §43 Onboarding, HC separation
+- **PRR refs:** Section 43 Onboarding, HC separation
 - **Depends on:** ACRME-S0201
 
 **Acceptance criteria**
@@ -274,7 +274,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Inventory, create, and safely mutate Capacity Reservation Groups and Capacity Reservations modeled by SKU and zone, with guarded quantity changes and no unsafe auto-decrease in Phase 1.
 
-**PRR references.** §25, §30, §5 CR quantity update  
+**PRR references.** Section 25, Section 30, Section 5 CR quantity update  
 **Rollup.** 3 stories · 21 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -288,7 +288,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** capacity operator, **I want** authoritative inventory of CRGs and CRs modeled per SKU and zone, **so that** placement and scaling decisions run on accurate capacity state.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §25, §34
+- **PRR refs:** Section 25, Section 34
 - **Depends on:** ACRME-S0104
 
 **Acceptance criteria**
@@ -308,7 +308,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** capacity operator, **I want** approval-gated CR quantity increases via tracked operations, **so that** capacity grows safely without cost or capacity surprises.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §30, R-15, G-24
+- **PRR refs:** Section 30, R-15, G-24
 - **Depends on:** ACRME-S0301, ACRME-S0902
 
 **Acceptance criteria**
@@ -329,7 +329,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** capacity operator, **I want** CR reduction blocked for unknown/destructive scenarios, **so that** reductions never silently remove capacity relied on by running VMs.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §5 CR quantity update, R-09
+- **PRR refs:** Section 5 CR quantity update, R-09
 - **Depends on:** ACRME-S0301
 
 **Acceptance criteria**
@@ -347,7 +347,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Explicit, read-back-verified CRG sharing across subscriptions with the 100-consumer ceiling handled by sharding, plus safe and forced unsharing.
 
-**PRR references.** §25 Sharing, §5 CRG sharing, Runbook B, R-02  
+**PRR references.** Section 25 Sharing, Section 5 CRG sharing, Runbook B, R-02  
 **Rollup.** 4 stories · 21 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -362,7 +362,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** sharing operator, **I want** a sharing sequence that validates, adds, grants, and reads back every step, **so that** a relationship is only 'active' after confirmed state.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §25 Sharing sequence
+- **PRR refs:** Section 25 Sharing sequence
 - **Depends on:** ACRME-S0202
 
 **Acceptance criteria**
@@ -382,7 +382,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** capacity architect, **I want** continuous relationship-count monitoring and a sharding path, **so that** the pool never silently breaches the 100-consumer platform limit.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** R-02, §5 CRG sharing
+- **PRR refs:** R-02, Section 5 CRG sharing
 - **Depends on:** ACRME-S0401
 
 **Acceptance criteria**
@@ -420,7 +420,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** detection when desired and actual sharing profiles differ, **so that** unauthorized or missing consumers are surfaced immediately.
 
 - **Priority:** High · **Points:** 3 · **Phase:** P1
-- **PRR refs:** §37 Alerts, R-03
+- **PRR refs:** Section 37 Alerts, R-03
 - **Depends on:** ACRME-S0401
 
 **Acceptance criteria**
@@ -437,7 +437,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Two-group-per-region quota model (Prod group; shared NonProd+DR group) with provider/consumer/group validation and Preview groupType handling.
 
-**PRR references.** §26, §5 Quota Groups, FC-11, R-05, R-06, R-43  
+**PRR references.** Section 26, Section 5 Quota Groups, FC-11, R-05, R-06, R-43  
 **Rollup.** 4 stories · 21 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -452,13 +452,13 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** quota owner, **I want** a Prod quota group and a shared NonProd+DR quota group per region, **so that** budgets are governed separately without DR starving on NonProd demand.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §26
+- **PRR refs:** Section 26
 - **Depends on:** ACRME-S0104
 
 **Acceptance criteria**
 
 - QuotaGroup entities model Prod and shared NonProd+DR groups per region.
-- Group formulas and exact controls implemented per §26.
+- Group formulas and exact controls implemented per Section 26.
 - Membership never treated as proof a specific subscription can deploy (R-06).
 
 **Tasks**
@@ -472,7 +472,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** quota owner, **I want** independent validation of provider, consumer, and group quota, **so that** placement never assumes quota it does not have.
 
 - **Priority:** Highest · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §5, R-39
+- **PRR refs:** Section 5, R-39
 - **Depends on:** ACRME-S0501
 
 **Acceptance criteria**
@@ -492,7 +492,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** quota owner, **I want** a tracked quota-increase submission that polls for confirmed state, **so that** the engine never assumes a propagation SLA.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §30, B-6, R-08
+- **PRR refs:** Section 30, B-6, R-08
 - **Depends on:** ACRME-S0502
 
 **Acceptance criteria**
@@ -527,7 +527,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Build and apply per-subscription physical-to-logical zone mapping so shared reservations land in the correct physical zone; reject on missing mapping.
 
-**PRR references.** §5 FC-06, §42 POC 6a, R-11, R-41  
+**PRR references.** Section 5 FC-06, Section 42 POC 6a, R-11, R-41  
 **Rollup.** 2 stories · 13 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -579,7 +579,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Production-ready region selection: classification model, two-stage eligibility filter, Scenario 1/2 input modes, Middle East cross-geo extension, and the restricted-region exception workflow.
 
-**PRR references.** §27, §43 Region selection, HC-1..HC-10, VR-1..VR-11  
+**PRR references.** Section 27, Section 43 Region selection, HC-1..HC-10, VR-1..VR-11  
 **Rollup.** 8 stories · 49 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -598,7 +598,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement owner, **I want** every managed region classified and Restricted regions pre-filtered before scoring, **so that** constrained regions never enter automated placement.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §27 Classification
+- **PRR refs:** Section 27 Classification
 - **Depends on:** ACRME-S0103
 
 **Acceptance criteria**
@@ -618,7 +618,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement engine, **I want** surviving candidates evaluated against hard constraints HC-1..HC-10 before scoring, **so that** only fully eligible Standard regions reach the scorer.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §27 Decision tree, §27 HC-1..HC-10
+- **PRR refs:** Section 27 Decision tree, Section 27 HC-1..HC-10
 - **Depends on:** ACRME-S0701
 
 **Acceptance criteria**
@@ -638,7 +638,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** customer, **I want** to supply an Azure geography and have the engine derive the Prod anchor, **so that** I get the best Standard region in my geography without naming one.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §27 Prod input modes, §28 PS_Prod, VR-4
+- **PRR refs:** Section 27 Prod input modes, Section 28 PS_Prod, VR-4
 - **Depends on:** ACRME-S0702, ACRME-S0801
 
 **Acceptance criteria**
@@ -660,7 +660,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** customer, **I want** to name a specific region and have it validated or routed to exception, **so that** a Standard region is used directly and a Restricted region needs approval.
 
 - **Priority:** Highest · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §27 Prod input modes
+- **PRR refs:** Section 27 Prod input modes
 - **Depends on:** ACRME-S0702
 
 **Acceptance criteria**
@@ -679,7 +679,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement engine, **I want** CVAL and DR selected sequentially from the fixed Prod anchor, **so that** the three-environment layout respects separation and scoring.
 
 - **Priority:** Highest · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §27, §28 PS_NonProd/PS_DR
+- **PRR refs:** Section 27, Section 28 PS_NonProd/PS_DR
 - **Depends on:** ACRME-S0703, ACRME-S0704
 
 **Acceptance criteria**
@@ -698,7 +698,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement owner, **I want** Middle East DR to use the approved Switzerland North extension path, **so that** the three-region minimum is met where only two in-geo regions exist.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §27 Middle East, HC-10, R-12
+- **PRR refs:** Section 27 Middle East, HC-10, R-12
 - **Depends on:** ACRME-S0705
 
 **Acceptance criteria**
@@ -718,7 +718,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** governance owner, **I want** restricted-region use gated behind four exception conditions, **so that** no Restricted region enters production without explicit approval.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §27 Exception workflow, VR-3
+- **PRR refs:** Section 27 Exception workflow, VR-3
 - **Depends on:** ACRME-S0704
 
 **Acceptance criteria**
@@ -738,7 +738,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** governance owner, **I want** the full validation-rule framework and PlacementPolicy governance enforced, **so that** region-selection changes require approval and are auditable.
 
 - **Priority:** Medium · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §27 VR framework, §27 Governance
+- **PRR refs:** Section 27 VR framework, Section 27 Governance
 - **Depends on:** ACRME-S0701
 
 **Acceptance criteria**
@@ -756,7 +756,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Implement the corrected, clamped scoring formulas (PS_Prod/PS_NonProd/PS_DR) with demand-weighted distribution, versioned weights, and advisory forecasting.
 
-**PRR references.** §28, §4 Scoring, R-36, R-37, R-29  
+**PRR references.** Section 28, Section 4 Scoring, R-36, R-37, R-29  
 **Rollup.** 4 stories · 23 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -771,7 +771,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement owner, **I want** PS_Prod/PS_NonProd/PS_DR with clamped components and versioned weights, **so that** scores are bounded [0,1], replayable, and auditable.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §28 Corrected scoring
+- **PRR refs:** Section 28 Corrected scoring
 - **Depends on:** ACRME-S0103
 
 **Acceptance criteria**
@@ -791,7 +791,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement owner, **I want** distribution computed from demand units and scoring per SKU/zone, **so that** fairness reflects real demand, not customer count.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §28 Distribution, R-36, R-37
+- **PRR refs:** Section 28 Distribution, R-36, R-37
 - **Depends on:** ACRME-S0801
 
 **Acceptance criteria**
@@ -809,7 +809,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** capacity planner, **I want** forecast quantity recommendations that stay advisory until accuracy is measured, **so that** forecasts never drive unsafe automatic reduction.
 
 - **Priority:** Medium · **Points:** 5 · **Phase:** P2
-- **PRR refs:** §28 Forecast, R-29, ForecastError alert
+- **PRR refs:** Section 28 Forecast, R-29, ForecastError alert
 - **Depends on:** ACRME-S0801
 
 **Acceptance criteria**
@@ -828,7 +828,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement owner, **I want** the sequential method compared against a shadow joint-optimization method, **so that** divergence evidence is gathered before trusting either for auto-commit.
 
 - **Priority:** Medium · **Points:** 5 · **Phase:** P2
-- **PRR refs:** §4 Sequential placement, §22 Should
+- **PRR refs:** Section 4 Sequential placement, Section 22 Should
 - **Depends on:** ACRME-S0801
 
 **Acceptance criteria**
@@ -845,7 +845,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Implement the engine state machine (EngineModeState) with conditional transitions and dual approval, and atomic capacity holds to prevent over-assignment. Production blocker G-15 / B-7.
 
-**PRR references.** §29, G-15, B-3, B-7, R-35  
+**PRR references.** Section 29, G-15, B-3, B-7, R-35  
 **Rollup.** 2 stories · 21 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -858,7 +858,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** EngineModeState with guarded transitions, dual approval, and incident hold, **so that** normal and crisis operations can never illegally mix.
 
 - **Priority:** Highest · **Points:** 13 · **Phase:** P1
-- **PRR refs:** §29 State machine, G-15, R-35
+- **PRR refs:** Section 29 State machine, G-15, R-35
 - **Depends on:** ACRME-S0103
 
 **Acceptance criteria**
@@ -881,7 +881,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** placement engine, **I want** an atomic hold keyed by region/SKU/zone/env/policy before returning an assignment, **so that** concurrent placements cannot double-assign the same capacity.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §29 Capacity holds, B-7, R-23, G-20
+- **PRR refs:** Section 29 Capacity holds, B-7, R-23, G-20
 - **Depends on:** ACRME-S0103
 
 **Acceptance criteria**
@@ -901,7 +901,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Implement guarded DR declaration, per-workload failover orchestration, engine-enforced DR floor with independent detector, and wave-based failback.
 
-**PRR references.** §31, Runbook E, §5 DR floor, R-07, R-27, R-38  
+**PRR references.** Section 31, Runbook E, Section 5 DR floor, R-07, R-27, R-38  
 **Rollup.** 3 stories · 24 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -915,7 +915,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** DR operator, **I want** a guarded DR declaration that validates state then orchestrates approved failover, **so that** failover only runs in a validated DR_EVENT_ACTIVE mode.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P2
-- **PRR refs:** §31, IncidentRecord G-21
+- **PRR refs:** Section 31, IncidentRecord G-21
 - **Depends on:** ACRME-S0901
 
 **Acceptance criteria**
@@ -936,7 +936,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** an engine-enforced DR floor plus an independent recalculating detector, **so that** NonProd expansion fails closed when the floor is at risk.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §5 DR floor, R-07, R-38, DRFloorViolation alert
+- **PRR refs:** Section 5 DR floor, R-07, R-38, DRFloorViolation alert
 - **Depends on:** ACRME-S0901
 
 **Acceptance criteria**
@@ -976,7 +976,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Implement the tiered emergency-capacity ladder: Tier 1 additive expansion (gated), Tier 2 quota-neutral transfer (disabled until proven), Tier 3 blocked in Phase 1.
 
-**PRR references.** §32, Runbook C, Runbook D, R-16, R-17, R-18  
+**PRR references.** Section 32, Runbook C, Runbook D, R-16, R-17, R-18  
 **Rollup.** 3 stories · 19 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -990,7 +990,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** DR operator, **I want** Tier 1 expansion allowed only in DR_EVENT_ACTIVE with fresh checks, **so that** pre-staged headroom is used safely and never outside an incident.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P2
-- **PRR refs:** §32, Runbook C, R-16
+- **PRR refs:** Section 32, Runbook C, R-16
 - **Depends on:** ACRME-S0901, ACRME-S0302
 
 **Acceptance criteria**
@@ -1009,7 +1009,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** DR operator, **I want** Tier 2 reallocation behind a proven+approved flag with impact preview, **so that** NonProd guarantees are never removed unexpectedly.
 
 - **Priority:** Medium · **Points:** 8 · **Phase:** P2
-- **PRR refs:** §32, Runbook D, B-2, R-17
+- **PRR refs:** Section 32, Runbook D, B-2, R-17
 - **Depends on:** ACRME-S1101, ACRME-S0503
 
 **Acceptance criteria**
@@ -1030,7 +1030,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** security owner, **I want** Tier 3 calls rejected while disabled, **so that** no VM association change happens before the credential model is closed.
 
 - **Priority:** Highest · **Points:** 3 · **Phase:** P1
-- **PRR refs:** §32, R-18, Tier3AttemptBlocked alert
+- **PRR refs:** Section 32, R-18, Tier3AttemptBlocked alert
 - **Depends on:** ACRME-S0901
 
 **Acceptance criteria**
@@ -1047,7 +1047,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Validate AKS node-pool/autoscaler integration with CRGs and enforce VMSS controls, including rejecting VMSS in emergency transfers (Preview limit).
 
-**PRR references.** §33, §6 AKS/VMSS, FC-08, R-20, R-21, R-22, R-42  
+**PRR references.** Section 33, Section 6 AKS/VMSS, FC-08, R-20, R-21, R-22, R-42  
 **Rollup.** 2 stories · 13 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1060,7 +1060,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** AKS owner, **I want** new node pools validated against zone/SKU/sharing/quota and bounded autoscaler, **so that** AKS never repeatedly requests unavailable nodes or exceeds reservation.
 
 - **Priority:** Medium · **Points:** 8 · **Phase:** P2
-- **PRR refs:** §33 AKS, R-21, R-22
+- **PRR refs:** Section 33 AKS, R-21, R-22
 - **Depends on:** ACRME-S0502, ACRME-S0602
 
 **Acceptance criteria**
@@ -1080,7 +1080,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** compute owner, **I want** VMSS operations gated and VMSS excluded from emergency transfers, **so that** a Preview reprovisioning limitation cannot cause a failed DR.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §33 VMSS, FC-08, R-20, R-42, VMSSEmergencyAttempt alert
+- **PRR refs:** Section 33 VMSS, FC-08, R-20, R-42, VMSSEmergencyAttempt alert
 - **Depends on:** ACRME-S1103
 
 **Acceptance criteria**
@@ -1098,7 +1098,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Establish the canonical authoritative entity model and close data-model gaps (G-20, G-21, G-23, G-24) with schema, audit, and policy versioning.
 
-**PRR references.** §34, G-20, G-21, G-23, G-24  
+**PRR references.** Section 34, G-20, G-21, G-23, G-24  
 **Rollup.** 2 stories · 13 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1111,12 +1111,12 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** data owner, **I want** all authoritative entities modeled with a shared schema and PolicyVersion, **so that** engine intent is consistent, versioned, and replayable.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §34 Authoritative entities
+- **PRR refs:** Section 34 Authoritative entities
 - **Depends on:** ACRME-S0103
 
 **Acceptance criteria**
 
-- All §34 entities have a canonical schema with IDs, timestamps, and version fields.
+- All Section 34 entities have a canonical schema with IDs, timestamps, and version fields.
 - PolicyVersion referenced by placement, scoring, and quota decisions.
 - Schema migrations are versioned and reversible.
 
@@ -1131,7 +1131,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** compliance owner, **I want** every accepted mutation to produce an append-only audit record, **so that** incidents and decisions can always be reconstructed.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §34, R-31, §37 Audit completeness SLI
+- **PRR refs:** Section 34, R-31, Section 37 Audit completeness SLI
 - **Depends on:** ACRME-S1301
 
 **Acceptance criteria**
@@ -1149,7 +1149,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Deliver the canonical async API: operation-resource responses, mandatory mutation metadata, dry-run for high-impact ops, and disabled-by-default emergency endpoints.
 
-**PRR references.** §35, G-23, R-34  
+**PRR references.** Section 35, G-23, R-34  
 **Rollup.** 3 stories · 16 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1163,12 +1163,12 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** API consumer, **I want** state-changing endpoints to return an operation resource, not synchronous completion, **so that** callers poll for true Azure state instead of assuming completion.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §35 Core endpoints
+- **PRR refs:** Section 35 Core endpoints
 - **Depends on:** ACRME-S0101
 
 **Acceptance criteria**
 
-- All §35 core endpoints implemented; mutations return an operation + polling URL.
+- All Section 35 core endpoints implemented; mutations return an operation + polling URL.
 - /placement/select-regions accepts either a specific region (Scenario 2) or a geography (Scenario 1).
 - /operations/{id} returns current operation state.
 
@@ -1183,7 +1183,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** API consumer, **I want** every mutation to require idempotency key, expected version, policy version, and support dry-run, **so that** high-impact operations are safe, idempotent, and previewable.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §35 Every mutation
+- **PRR refs:** Section 35 Every mutation
 - **Depends on:** ACRME-S1401
 
 **Acceptance criteria**
@@ -1201,7 +1201,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** governance owner, **I want** emergency-transfer/increase endpoints in the canonical API but disabled by default, **so that** they exist in the contract and audit model before being enabled.
 
 - **Priority:** Medium · **Points:** 3 · **Phase:** P1
-- **PRR refs:** §35, G-23, G-24
+- **PRR refs:** Section 35, G-23, G-24
 - **Depends on:** ACRME-S1401
 
 **Acceptance criteria**
@@ -1218,7 +1218,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Implement split UAMIs and application roles with least privilege, and close G-14 (customer-consented, RG-scoped Tier 3 credential model) or keep Tier 3 blocked.
 
-**PRR references.** §36, §11, G-14, R-19, R-32  
+**PRR references.** Section 36, Section 11, G-14, R-19, R-32  
 **Rollup.** 3 stories · 19 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1232,7 +1232,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** security owner, **I want** the RBAC matrix realized as narrow custom roles and separated identities, **so that** privilege is never concentrated and duties are separated.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §36 RBAC matrix, R-19
+- **PRR refs:** Section 36 RBAC matrix, R-19
 - **Depends on:** ACRME-S0105
 
 **Acceptance criteria**
@@ -1252,7 +1252,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** security owner, **I want** a customer-consented UAMI with RG-scoped custom rights for exact VM association ops, **so that** Tier 3 can eventually be enabled without subscription-wide VM Contributor.
 
 - **Priority:** Highest · **Points:** 8 · **Phase:** P2
-- **PRR refs:** §36 MI scope, G-14
+- **PRR refs:** Section 36 MI scope, G-14
 - **Depends on:** ACRME-S1501
 
 **Acceptance criteria**
@@ -1272,7 +1272,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** security owner, **I want** break-glass access to be time-bound, alerted, and post-reviewed, **so that** emergency bypass cannot be silently abused.
 
 - **Priority:** Medium · **Points:** 3 · **Phase:** P1
-- **PRR refs:** §11, R-32
+- **PRR refs:** Section 11, R-32
 - **Depends on:** ACRME-S1501
 
 **Acceptance criteria**
@@ -1289,7 +1289,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Deliver SLI/SLO instrumentation, operational dashboards, and the full critical alert catalog so operators can see floor integrity, drift, and blocks.
 
-**PRR references.** §37  
+**PRR references.** Section 37  
 **Rollup.** 3 stories · 15 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1303,7 +1303,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** the proposed SLIs measured against SLO targets, **so that** engine health is observable and reportable.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §37 SLI/SLO
+- **PRR refs:** Section 37 SLI/SLO
 - **Depends on:** ACRME-S0101
 
 **Acceptance criteria**
@@ -1321,7 +1321,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** operator, **I want** dashboards for capacity, quota, DR floor, sharing, placement, engine mode, and failures, **so that** state is visible at a glance during steady state and incidents.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §37 Dashboards
+- **PRR refs:** Section 37 Dashboards
 - **Depends on:** ACRME-S1601
 
 **Acceptance criteria**
@@ -1339,7 +1339,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** the full alert catalog wired with severities and triggers, **so that** critical guardrail violations page the right responders.
 
 - **Priority:** Highest · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §37 Alert catalog
+- **PRR refs:** Section 37 Alert catalog
 - **Depends on:** ACRME-S1601
 
 **Acceptance criteria**
@@ -1356,7 +1356,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Adaptive, delta-based reconciliation that stays within API budgets at hundreds–thousands of customers, with drift handling and throttle resilience.
 
-**PRR references.** §10, §7, R-04, R-24, R-25, R-40, FC-16  
+**PRR references.** Section 10, Section 7, R-04, R-24, R-25, R-40, FC-16  
 **Rollup.** 4 stories · 23 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1371,7 +1371,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** targeted, event-triggered reconciliation instead of naive full scans, **so that** reconciliation stays within API budgets at scale.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §10 Adaptive reconciliation, R-24
+- **PRR refs:** Section 10 Adaptive reconciliation, R-24
 - **Depends on:** ACRME-S0103
 
 **Acceptance criteria**
@@ -1391,7 +1391,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** SRE, **I want** per-service API budgets, adaptive backoff, and a manual path, **so that** throttling never blocks DR actions.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §7 FC-16, R-25, ARMThrottling alert
+- **PRR refs:** Section 7 FC-16, R-25, ARMThrottling alert
 - **Depends on:** ACRME-S0104
 
 **Acceptance criteria**
@@ -1409,7 +1409,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** operations engineer, **I want** maintenance mode and a clear drift policy, **so that** manual Azure changes are not unexpectedly reverted.
 
 - **Priority:** Medium · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §10, R-40
+- **PRR refs:** Section 10, R-40
 - **Depends on:** ACRME-S1701
 
 **Acceptance criteria**
@@ -1427,7 +1427,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** operator, **I want** a capacity-exhaustion queue with incident creation and re-evaluation on confirmed state, **so that** exhaustion is handled deterministically, not by elapsed time.
 
 - **Priority:** Medium · **Points:** 5 · **Phase:** P2
-- **PRR refs:** Runbook A, §22 Should, CapacityExhausted alert
+- **PRR refs:** Runbook A, Section 22 Should, CapacityExhausted alert
 - **Depends on:** ACRME-S0701
 
 **Acceptance criteria**
@@ -1444,7 +1444,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Execute the critical POC sequence and record structured evidence so preview behaviors and unknowns are proven before production, not asserted.
 
-**PRR references.** §42, B-1..B-7, all FC items  
+**PRR references.** Section 42, B-1..B-7, all FC items  
 **Rollup.** 4 stories · 29 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1459,7 +1459,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** validation engineer, **I want** a POC harness that records API version, region, SKU, zone, IDs, timings, and evidence class, **so that** every result is production-grade evidence, not an assumption.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §42 evidence fields
+- **PRR refs:** Section 42 evidence fields
 - **Depends on:** ACRME-S0104
 
 **Acceptance criteria**
@@ -1477,7 +1477,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** validation engineer, **I want** sharing/RBAC, unsharing, quota independence, quantity, and zone-alignment POCs executed, **so that** foundational platform behaviors are proven before pilot.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P1
-- **PRR refs:** §42 seq 1-8, B-1, B-2, B-5, FC-06
+- **PRR refs:** Section 42 seq 1-8, B-1, B-2, B-5, FC-06
 - **Depends on:** ACRME-S1801
 
 **Acceptance criteria**
@@ -1497,7 +1497,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** validation engineer, **I want** DR-floor, concurrency, engine-mode, and Tier 1/2/3 POCs executed, **so that** safety-critical behaviors are proven before enabling automation.
 
 - **Priority:** High · **Points:** 8 · **Phase:** P2
-- **PRR refs:** §42 seq 9-15, B-7, B-3
+- **PRR refs:** Section 42 seq 9-15, B-7, B-3
 - **Depends on:** ACRME-S1802, ACRME-S0901, ACRME-S0902
 
 **Acceptance criteria**
@@ -1515,7 +1515,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** validation engineer, **I want** VMSS/AKS behavior and scale testing executed, **so that** workload integration and scale limits are measured, not assumed.
 
 - **Priority:** Medium · **Points:** 5 · **Phase:** P2
-- **PRR refs:** §42 seq 16-18, FC-08, R-33
+- **PRR refs:** Section 42 seq 16-18, FC-08, R-33
 - **Depends on:** ACRME-S1803
 
 **Acceptance criteria**
@@ -1532,7 +1532,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 
 **Goal.** Track gap-closure evidence, preview feature-flag governance, and the production entry gates so pilot→production transitions are evidence-based.
 
-**PRR references.** §14, §16, §17, §39, §44, R-01, R-34  
+**PRR references.** Section 14, Section 16, Section 17, Section 39, Section 44, R-01, R-34  
 **Rollup.** 3 stories · 13 points
 
 | Story | Title | Priority | Points | Phase | Depends on |
@@ -1546,7 +1546,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** product owner, **I want** every preview dependency behind a flag with a governance acceptance + exit path, **so that** preview changes never silently break production.
 
 - **Priority:** Highest · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §21, R-01, R-34, R-42, R-43
+- **PRR refs:** Section 21, R-01, R-34, R-42, R-43
 - **Depends on:** ACRME-S0104
 
 **Acceptance criteria**
@@ -1566,7 +1566,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** program owner, **I want** a live tracker mapping each gap to its closure control and acceptance evidence, **so that** production gates are provably met, not assumed.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §39 Gap closure
+- **PRR refs:** Section 39 Gap closure
 - **Depends on:** —
 
 **Acceptance criteria**
@@ -1584,7 +1584,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 > **As a** council/board, **I want** the pilot and production entry gates encoded as an auditable checklist, **so that** pilot success is not mistaken for production approval.
 
 - **Priority:** High · **Points:** 3 · **Phase:** P1
-- **PRR refs:** §16, §17, §44 Board actions
+- **PRR refs:** Section 16, Section 17, Section 44 Board actions
 - **Depends on:** ACRME-S1902
 
 **Acceptance criteria**

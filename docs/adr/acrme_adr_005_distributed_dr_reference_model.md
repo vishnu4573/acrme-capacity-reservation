@@ -5,7 +5,7 @@
 **Status:** Accepted - new ADR introduced with Requirements Baseline v2.2  
 **Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR consolidates the distributed DR reference model (§12A of the requirements baseline) that was previously distributed across ADR-003 and the calculation logic reference. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR consolidates the distributed DR reference model (Section 12A of the requirements baseline) that was previously distributed across ADR-003 and the calculation logic reference. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 
@@ -20,11 +20,11 @@
 
 ## Context
 
-Requirements Baseline v2.2 replaces the fixed-ratio, per-customer DR clone with a **distributed, reciprocal DR reference model** (§12A). At platform scale, dedicating a fixed 30-40% standby copy of every production region is prohibitively expensive and does not reflect the operating assumption that **one source region fails at a time**. `[Decided]`
+Requirements Baseline v2.2 replaces the fixed-ratio, per-customer DR clone with a **distributed, reciprocal DR reference model** (Section 12A). At platform scale, dedicating a fixed 30-40% standby copy of every production region is prohibitively expensive and does not reflect the operating assumption that **one source region fails at a time**. `[Decided]`
 
 The distributed model spreads each customer's standby capacity across the same shared regional footprint that already hosts production and CVAL. This creates a many-to-many topology in which a single region is simultaneously a **production** region for some customers, a **CVAL** host for others, and a **DR standby** host for customers whose production is in one or more *different* source regions. `[Decided]`
 
-Because ADR-003 already carries the operational DR decisions (bootstrap, activation waves, CVAL earmark, engine state machine), this ADR fixes the **reference model itself**: the topology, the authoritative source→destination mapping, the destination-sizing boundary, the single-failure assumption, and the observability contract that makes the model auditable. It is the design anchor for the §12A worked example and the `acrme_three_region_capacity_model` diagram. `[Derived]`
+Because ADR-003 already carries the operational DR decisions (bootstrap, activation waves, CVAL earmark, engine state machine), this ADR fixes the **reference model itself**: the topology, the authoritative source→destination mapping, the destination-sizing boundary, the single-failure assumption, and the observability contract that makes the model auditable. It is the design anchor for the Section 12A worked example and the `acrme_three_region_capacity_model` diagram. `[Derived]`
 
 ## Decision
 
@@ -50,7 +50,7 @@ Adopt the **distributed, reciprocal DR reference model** with the following norm
 
 ## Middle East DR Carve-Out (DR-014, DEC-001) — currently `DR_NOT_OFFERED`
 
-> **As it stands, DR is NOT offered in the Middle East.** Baseline v2.2 records that Legal has taken ownership of the Middle East programme and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements** (baseline §2 Strategic Drivers, §5.2 Out of Scope "Final Middle East DR offering (pending legal/business direction)", §6 "Middle East is legal-owned with no DR", and **DR-014**). This is an open **legal/business decision, DEC-001**, and one of the programme's remaining major architectural risks (baseline §25).
+> **As it stands, DR is NOT offered in the Middle East.** Baseline v2.2 records that Legal has taken ownership of the Middle East programme and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements** (baseline Section 2 Strategic Drivers, Section 5.2 Out of Scope "Final Middle East DR offering (pending legal/business direction)", Section 6 "Middle East is legal-owned with no DR", and **DR-014**). This is an open **legal/business decision, DEC-001**, and one of the programme's remaining major architectural risks (baseline Section 25).
 
 Normative consequences for this reference model:
 
@@ -66,11 +66,11 @@ Normative consequences for this reference model:
 
 > **Scope note.** The three-region reciprocal footprint below is illustrative of a **DR-offered geography** (e.g., North America or Europe under the current NA+Europe focus). It is **not** the Middle East: per the carve-out above, Middle East regions are excluded from this reciprocal model while `DR_NOT_OFFERED` holds.
 
-The reference footprint used in the §12A worked example spans three regions (R1, R2, R3). Each region carries its own production and CVAL workloads and hosts distributed DR standby for the *other* regions' production. The `src Rn` tag on each standby cell identifies the source region whose production that standby protects.
+The reference footprint used in the Section 12A worked example spans three regions (R1, R2, R3). Each region carries its own production and CVAL workloads and hosts distributed DR standby for the *other* regions' production. The `src Rn` tag on each standby cell identifies the source region whose production that standby protects.
 
 ![ACRME Distributed DR Reference Model](diagrams/acrme_three_region_capacity_model.png)
 
-*Figure 1. Distributed DR reference model (§12A worked example). Each region simultaneously hosts Prod, CVAL, and DR standby for other source regions; every DR standby cell is tagged with its `src Rn` source region. See `diagrams/acrme_three_region_capacity_model.html` for the self-contained source.*
+*Figure 1. Distributed DR reference model (Section 12A worked example). Each region simultaneously hosts Prod, CVAL, and DR standby for other source regions; every DR standby cell is tagged with its `src Rn` source region. See `diagrams/acrme_three_region_capacity_model.html` for the self-contained source.*
 
 ```mermaid
 flowchart LR
@@ -140,7 +140,7 @@ DR_Capacity_Gap(d) = Destination_DR_Requirement(d) - Standby_Provisioned(d)
 - `Overcommit_Ratio(d) > 1` is expected and healthy — it quantifies how much cheaper the distributed max-not-sum model is than summed clones. It is surfaced, not alerted, unless it exceeds a configured safety ceiling (POC-011). `[Derived]`
 - `DR_Capacity_Gap(d) > 0` means the destination cannot currently satisfy its worst-case single-source activation and must raise a coverage alert. `[Decided]`
 
-## Worked Example (§12A)
+## Worked Example (Section 12A)
 
 Using the reference footprint, assume for one SKU/zone that region R1's DR cell protects R2 (portion 40 instances) and R3 (portion 55 instances), non-concurrently:
 

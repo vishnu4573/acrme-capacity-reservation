@@ -161,6 +161,48 @@ using the analogy of placing desks in office buildings:
 hardcoded. The team can adjust them if priorities change (see Section 6 for the weight-sum validation
 requirement).
 
+#### Alternative Configuration: Distribution-First Priority
+
+The weights above reflect the **baseline default** where capacity headroom is the top priority. However,
+if **minimizing blast radius** (spreading customers across regions) becomes more important than keeping
+maximum headroom, the weights can be adjusted. Here are two alternative configurations:
+
+**Option 1: Distribution-First (Conservative)**
+
+| Weight | Baseline | Alternative | What changes |
+|---|---|---|---|
+| **γ** (Distribution) | 0.25 | **0.35** | **Now highest** — spreading customers is the top goal |
+| **α** (Capacity headroom) | 0.30 | **0.25** | Reduced — still important but no longer dominant |
+| **β** (Quota headroom) | 0.20 | 0.20 | Unchanged — quota is always a hard gate |
+| **δ** (DR readiness) | 0.15 | 0.12 | Slightly reduced |
+| **ε** (Zone diversity) | 0.10 | 0.08 | Slightly reduced |
+| **Sum** | 1.0 | **1.0** | ✓ Valid |
+
+**Building analogy for distribution-first:** "We never want all customers in the same building. If one
+building catches fire (fails), we want as few customers affected as possible. **This is now our
+highest priority** — we're willing to run buildings a bit fuller if it means better customer spread."
+
+**Option 2: Distribution-First (Aggressive)**
+
+| Weight | Baseline | Alternative | What changes |
+|---|---|---|---|
+| **γ** (Distribution) | 0.25 | **0.40** | **Heavily dominant** — blast radius minimization is paramount |
+| **α** (Capacity headroom) | 0.30 | **0.20** | Significantly reduced — willing to accept tighter capacity |
+| **β** (Quota headroom) | 0.20 | 0.20 | Unchanged |
+| **δ** (DR readiness) | 0.15 | 0.12 | Reduced |
+| **ε** (Zone diversity) | 0.10 | 0.08 | Reduced |
+| **Sum** | 1.0 | **1.0** | ✓ Valid |
+
+**Trade-offs of distribution-first weighting:**
+- ✅ **Better blast radius control** — regional failures affect fewer customers
+- ✅ **More even spread** across regions — reduces hot spots
+- ✅ **Better alignment with reliability/resilience goals**
+- ⚠️ **May place workloads in regions with less headroom** → faster capacity exhaustion
+- ⚠️ **Engine will score a crowded-but-balanced region higher** than an empty-but-unbalanced one
+- ⚠️ **Could trigger more frequent quota/capacity increases** if chosen regions fill faster
+
+See Section 3.8 for the full Weight Tuning Guide.
+
 #### Component α (weight 0.30) — Headroom or Capacity Signal
 
 This is the single biggest factor. It answers: *"How much free capacity does this region have?"*
@@ -338,6 +380,221 @@ If Central US has Prod_Group_headroom = 32 vCPU → FAIL (32 < 48) → excluded
 Scoring runs on: { West US 3, Canada Central }
 Winner: argmax of those two
 ```
+
+### 3.8 Weight Tuning Guide — How to Adjust Priorities
+
+This section explains **how** and **when** to adjust the five scoring weights (α, β, γ, δ, ε) to
+reflect different business priorities, and what happens when you do.
+
+#### 3.8.1 The Weight-Sum Constraint
+
+**CRITICAL RULE:** The five weights must **always sum to exactly 1.0**. This is a mathematical
+requirement enforced by the Config/Scope-File Service at policy load time (see Section 6).
+
+```
+α + β + γ + δ + ε = 1.0
+```
+
+**Why this matters:**
+- When weights sum to 1.0, placement scores range from 0.0 (worst) to 1.0 (best)
+- Scores are directly comparable across all regions
+- Each weight represents its **exact contribution** to the final score
+- Validation tolerance: ±0.001 (to handle IEEE 754 floating-point rounding)
+
+**If weights don't sum to 1.0, the policy is rejected** and a `PolicyValidationError` is raised.
+
+#### 3.8.2 What Each Weight Controls
+
+| Weight | What it measures | When to increase | When to decrease |
+|---|---|---|---|
+| **α** | Capacity headroom | Growth is frequent; deployments are large; running out of capacity is costly | Utilization is more important than headroom; willing to run regions fuller |
+| **β** | Quota headroom | Microsoft quota increases are slow; hitting quota limits blocks deployments | Quota is abundant; rarely hit limits |
+| **γ** | Distribution fairness | Blast radius minimization is critical; want even customer spread | Hot spots are acceptable; concentration is not a concern |
+| **δ** | DR readiness | DR coverage is a top-tier SLA/compliance requirement | DR is lower priority; willing to accept gaps |
+| **ε** | Zone diversity | Zone-level failures are common; zone spread is critical | Single-zone is acceptable; zones are equally reliable |
+
+#### 3.8.3 Common Tuning Scenarios
+
+**Scenario A: Headroom-First (Baseline Default)**
+
+*"Growth is inevitable and unpredictable. Never run out of capacity."*
+
+| Weight | Value | Rationale |
+|---|---|---|
+| α | 0.30 | Highest — capacity headroom is paramount |
+| γ | 0.25 | Second — still want distribution |
+| β | 0.20 | Third — quota is a hard gate |
+| δ | 0.15 | Fourth — DR is important but secondary |
+| ε | 0.10 | Lowest — zones are least critical |
+
+**Use this when:** Your workload grows rapidly, deployments are large, and running out of capacity
+would block business-critical launches.
+
+---
+
+**Scenario B: Distribution-First (Blast Radius Control)**
+
+*"Minimize blast radius. Spread customers evenly even if it means tighter capacity."*
+
+| Weight | Value | Rationale |
+|---|---|---|
+| γ | 0.35 | Highest — customer spread is paramount |
+| α | 0.25 | Second — still need some headroom |
+| β | 0.20 | Unchanged — quota is always a gate |
+| δ | 0.12 | Reduced — DR is secondary |
+| ε | 0.08 | Lowest — zones are least critical |
+
+**Use this when:** Reliability/resilience is the top goal, and you want to minimize the number of
+customers affected by a single regional failure — even if it means placing workloads in fuller regions.
+
+---
+
+**Scenario C: DR-Readiness-First (Compliance-Driven)**
+
+*"DR coverage is a contractual/compliance SLA. DR must always be ready."*
+
+| Weight | Value | Rationale |
+|---|---|---|
+| δ | 0.30 | Highest — DR readiness is the top goal |
+| α | 0.25 | Second — still need capacity |
+| γ | 0.20 | Third — distribution matters |
+| β | 0.15 | Fourth — quota is secondary |
+| ε | 0.10 | Lowest — zones are least critical |
+
+**Use this when:** You have contractual/regulatory DR commitments (e.g., SOC 2, financial services),
+and DR readiness must be continuously validated and reported.
+
+---
+
+**Scenario D: Quota-Constrained Environment**
+
+*"Microsoft quota increases are slow. Never hit quota limits."*
+
+| Weight | Value | Rationale |
+|---|---|---|
+| β | 0.30 | Highest — quota headroom is the bottleneck |
+| α | 0.25 | Second — capacity matters but quota blocks first |
+| γ | 0.20 | Third — distribution is secondary |
+| δ | 0.12 | Reduced — DR is lower priority |
+| ε | 0.13 | Higher than baseline — zones matter more here |
+
+**Use this when:** You operate in regions where Microsoft quota increases take weeks, or you have
+frequent quota-limit blocks. Prioritize regions with abundant quota headroom.
+
+---
+
+**Scenario E: Balanced / All-Equal (Testing/Development)**
+
+*"Treat all factors equally for testing or when priorities are unclear."*
+
+| Weight | Value | Rationale |
+|---|---|---|
+| α | 0.20 | Equal weight |
+| β | 0.20 | Equal weight |
+| γ | 0.20 | Equal weight |
+| δ | 0.20 | Equal weight |
+| ε | 0.20 | Equal weight |
+
+**Use this when:** You're testing the engine, experimenting with scoring, or priorities are genuinely
+equal (rare in production).
+
+#### 3.8.4 The Pie-Rule: Every Increase Requires a Decrease
+
+Because weights must sum to 1.0, **every increase to one weight requires a decrease to one or more
+others**. Think of it as a fixed-size pie: making one slice bigger forces others to shrink.
+
+**Example: Increasing γ (distribution) from 0.25 to 0.40**
+
+You need to **remove 0.15** from other weights:
+
+```
+γ: 0.25 → 0.40  (+0.15)
+α: 0.30 → 0.20  (-0.10)
+δ: 0.15 → 0.12  (-0.03)
+ε: 0.10 → 0.08  (-0.02)
+β: 0.20 → 0.20  (unchanged)
+―――――――――――――――――――――――
+Sum: 1.0 → 1.0  ✓
+```
+
+**Questions to ask when tuning:**
+1. Which factor is **most critical** to your business right now?
+2. Which factor can you **afford to de-prioritize**?
+3. What are the **trade-offs** of the change?
+4. Can you **test** the new weights in a non-production scope first?
+
+#### 3.8.5 How to Change Weights
+
+Per the requirements baseline (C-2, ENV-005) and Technical Design Document (Section 8.2):
+
+1. **Update the `PlacementPolicy` configuration file** (not code)
+   - Weights are stored as tunable policy constants
+   - Changes apply per scope hierarchy: product/region/environment/SKU
+   - Defaults can be overridden per scope
+
+2. **Config/Scope-File Service validates the weight-sum at policy load time**
+   - Validation gate: `|sum - 1.0| < 0.001`
+   - If valid → policy is published
+   - If invalid → `PolicyValidationError` is raised; deployment blocked
+
+3. **Every placement decision records the `policy_version` used**
+   - Enables deterministic replay
+   - Provides audit trail of configuration state at decision time
+
+4. **Test matrix T-WV-01..T-WV-05** validates the weight-sum gate
+   - See Calculation Logic Reference (Section on Policy weight-sum validation rule)
+
+**No code deployment is required to change weights.** Only a policy configuration update.
+
+#### 3.8.6 Monitoring the Impact of Weight Changes
+
+After changing weights, monitor these metrics to validate the impact:
+
+| Metric | What to watch | Expected change |
+|---|---|---|
+| **Regional capacity utilization** | Average % full across regions | Higher if α decreased; lower if α increased |
+| **Customer concentration** | Max customers in any single region | Lower if γ increased; higher if γ decreased |
+| **Quota increase requests** | Frequency of quota requests to Microsoft | Higher if β decreased; lower if β increased |
+| **DR coverage ratio** | % of production covered by DR capacity | Higher if δ increased; lower if δ decreased |
+| **Zone spread** | % of deployments spanning 3 zones | Higher if ε increased; lower if ε decreased |
+| **Placement score distribution** | Histogram of region scores | Shape changes based on which weights dominate |
+
+**Best practice:** Change weights **incrementally** (e.g., ±0.05 at a time) and monitor for 1–2 weeks
+before making further adjustments.
+
+#### 3.8.7 Per-Environment Weight Customization
+
+Weights can be tuned **per environment type** if Prod, NonProd, and DR have different priorities:
+
+**Example: Prod prioritizes headroom, NonProd prioritizes distribution**
+
+```
+Prod weights:
+  α=0.35, β=0.20, γ=0.20, δ=0.15, ε=0.10  (headroom-first)
+
+NonProd weights:
+  γ=0.35, α=0.25, β=0.20, δ=0.12, ε=0.08  (distribution-first)
+
+DR weights:
+  δ=0.30, α=0.25, γ=0.20, β=0.15, ε=0.10  (DR-readiness-first)
+```
+
+This allows **different placement strategies per environment** while maintaining a single engine.
+
+#### 3.8.8 Summary: Weight Tuning Checklist
+
+Before changing weights, verify:
+
+- ✅ **Sum equals 1.0** (±0.001 tolerance)
+- ✅ **Business rationale documented** — why this change, what problem it solves
+- ✅ **Trade-offs understood** — what you're gaining and what you're giving up
+- ✅ **Test scope identified** — which product/region/environment will get the new weights first
+- ✅ **Monitoring plan in place** — how you'll measure impact
+- ✅ **Rollback plan defined** — how to revert if the change causes issues
+- ✅ **Policy version recorded** — audit trail for compliance
+
+**The five weights are the engine's "personality."** Tuning them changes **how** the engine makes
+decisions, but the decision **process** (hard constraints → scoring → ranking) remains the same.
 
 ---
 

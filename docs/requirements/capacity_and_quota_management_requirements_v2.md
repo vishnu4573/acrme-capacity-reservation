@@ -25,7 +25,7 @@
 |---|---|---|
 | 1.0 | 22–26 Aug 2026 | Initial capacity reservation design flow, region categorisation, DR reserve model (~30–40%). |
 | 2.0 | 27 Aug 2026 | Pivot to **minimal bootstrap + dynamic reconciliation**; separated capacity vs quota; distributed DR; region-selection seed-record model; production-region-first onboarding; cost-driven buffer policy; Middle East DR flag. |
-| 2.1 | 27 Aug 2026 | Added **reciprocal multi-source DR hosting** (DR-016), **non-concurrent max-sizing** (DR-017), **source→destination DR index** (DR-018), **standby activation** (DR-019), **CVAL/DR co-location** (PLC-010), corrected DR sizing formula (A.6), new **Distributed DR Reference Model** (§12A) and **Appendix D** on the sizing-formula correction. |
+| 2.1 | 27 Aug 2026 | Added **reciprocal multi-source DR hosting** (DR-016), **non-concurrent max-sizing** (DR-017), **source→destination DR index** (DR-018), **standby activation** (DR-019), **CVAL/DR co-location** (PLC-010), corrected DR sizing formula (A.6), new **Distributed DR Reference Model** (Section 12A) and **Appendix D** on the sizing-formula correction. |
 
 ---
 
