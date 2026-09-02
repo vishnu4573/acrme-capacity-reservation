@@ -379,6 +379,52 @@ flowchart TD
 ### 8.2 Scoring formulas (weights α=0.30/β=0.20/γ=0.25/δ=0.15/ε=0.10)
 All five weights are tunable `PlacementPolicy` constants summing to 1.0; every component is clamped `Clamp(x)=max(0,min(1,x))` before weighting. `[Assumed]`
 
+#### PlacementPolicy weight-sum validation gate `[Decided]`
+
+The weight-sum invariant (`α + β + γ + δ + ε = 1.0`) is a **mathematical requirement**, not a
+convention. Without it, placement scores fall outside [0, 1], rendering threshold gates and
+cross-version comparisons invalid regardless of which region `argmax` selects.
+
+**Responsibility: Config / Scope-File Service.** This service is the sole gatekeeper for
+`PlacementPolicy` versions. The validation gate runs at **policy version load time**, before the
+version is published to the Placement & Scoring Engine. The Placement Engine never receives a
+policy version that has not passed this gate.
+
+**Formal gate logic:**
+
+```
+weight_sum = policy.alpha + policy.beta + policy.gamma + policy.delta + policy.epsilon
+tolerance  = 0.001   # IEEE 754 floating-point rounding only; not a margin for operator error
+
+IF |weight_sum − 1.0| > tolerance:
+    REJECT version — do NOT publish
+    RAISE PolicyValidationError(code="WEIGHT_SUM_INVARIANT_VIOLATED", computed_sum=weight_sum)
+    WRITE AuditEvent(event_type="POLICY_VALIDATION_FAILED", severity="ERROR", policy_version=...)
+ELSE:
+    PUBLISH version to Placement Engine
+    WRITE AuditEvent(event_type="POLICY_VERSION_PUBLISHED", weight_sum=weight_sum)
+```
+
+**Consequences of a non-1.0 sum:**
+
+| Weights sum to | Scoring effect | Operational consequence |
+|---|---|---|
+| > 1.0 (e.g. 1.10) | Best possible score > 1.0 — scores inflated | Placement thresholds pass regions that should be blocked |
+| < 1.0 (e.g. 0.90) | Best possible score < 1.0 — scores compressed | Placement thresholds block regions that should pass; cross-version comparisons invalid |
+
+**Tuning constraint:** when any weight is increased, the remaining weights must decrease by the same
+total. The tuning produces a valid new sum before the updated policy version is submitted:
+
+```
+Valid:   α=0.40, β=0.15, γ=0.25, δ=0.10, ε=0.10  → sum = 1.00 ✓
+Invalid: α=0.40, β=0.20, γ=0.25, δ=0.15, ε=0.10  → sum = 1.10 ✗ — gate rejects
+```
+
+**Test catalogue entries (T-WV-01..T-WV-05):** see Calculation Logic Reference §
+"Policy weight-sum validation rule" for the full test matrix covering the valid case,
+both invalid-sum directions, IEEE 754 rounding tolerance, and the tolerance boundary.
+`[Decided]`
+
 ```text
 PS_Prod(r)    = 0.30·Clamp(nonprod.effective_free / prod.quantity)
               + 0.20·Clamp(prod.quota_headroom / prod.quota_limit)

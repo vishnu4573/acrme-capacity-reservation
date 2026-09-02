@@ -76,6 +76,82 @@ Clamp(x)  = max(0, min(1, x))       # every component clamped to [0,1] before we
 All five weights are tunable policy constants stored in `PlacementPolicy` (config-as-code, versioned).
 They sum to exactly 1.0 and apply across all three environment scoring formulas. `[Assumed]`
 
+### Policy weight-sum validation rule `[Decided]`
+
+The weight-sum invariant is a **mathematical requirement** for the scoring formulas to produce
+meaningful, comparable scores in the range [0, 1]. It must be enforced by a validation gate in
+the Config/Scope-File Service, not left to operator judgement.
+
+**Why 1.0 is required:**
+Every component is clamped to [0, 1]. When weights sum to exactly 1.0, the best possible
+score is 1.0 and the worst is 0.0. When weights sum to any other value:
+
+| Weights sum to | Effect |
+|---|---|
+| > 1.0 (e.g. 1.10) | Best possible score > 1.0 — scores inflated; placement thresholds miscalibrated |
+| < 1.0 (e.g. 0.90) | Best possible score < 1.0 — scores compressed; placement thresholds miscalibrated |
+| Either direction | `argmax` still selects a winner but absolute score values are no longer meaningful; cross-version score comparisons are invalid |
+
+**Formal validation rule:**
+
+```
+VALIDATION RULE: PlacementPolicy.WeightSumInvariant
+  Fires:  at policy version load time, before the version is published to the Placement Engine
+  Actor:  Config / Scope-File Service
+
+  weight_sum = policy.alpha + policy.beta + policy.gamma + policy.delta + policy.epsilon
+  tolerance  = 0.001   # absorbs IEEE 754 floating-point representation error only;
+                        # does NOT tolerate intentional deviations ≥ 0.01
+
+  IF |weight_sum − 1.0| > tolerance:
+      REJECT policy version (do not publish)
+      RAISE PolicyValidationError(
+          code     = "WEIGHT_SUM_INVARIANT_VIOLATED",
+          message  = f"PlacementPolicy weights must sum to 1.0 ± {tolerance}. "
+                     f"Actual sum: {weight_sum:.6f}. "
+                     f"Adjust alpha/beta/gamma/delta/epsilon before resubmitting.",
+          policy_version = policy.version,
+          computed_sum   = weight_sum
+      )
+      WRITE AuditEvent(
+          event_type     = "POLICY_VALIDATION_FAILED",
+          severity       = "ERROR",
+          policy_version = policy.version,
+          detail         = PolicyValidationError
+      )
+      RETURN  # placement engine never receives this policy version
+
+  ELSE:
+      PUBLISH policy version to Placement Engine
+      WRITE AuditEvent(
+          event_type     = "POLICY_VERSION_PUBLISHED",
+          policy_version = policy.version,
+          weight_sum     = weight_sum
+      )
+```
+
+**Tuning constraint — the pie rule:**
+When an operator adjusts any weight, the total reduction from other weights must equal the
+total increase. Example:
+
+```
+Valid:   α=0.40, β=0.15, γ=0.25, δ=0.10, ε=0.10  → sum = 1.00 ✓
+Invalid: α=0.40, β=0.20, γ=0.25, δ=0.15, ε=0.10  → sum = 1.10 ✗ (REJECTED)
+Invalid: α=0.20, β=0.20, γ=0.25, δ=0.15, ε=0.10  → sum = 0.90 ✗ (REJECTED)
+```
+
+**Required test cases:**
+
+| Test ID | Input | Expected outcome |
+|---|---|---|
+| T-WV-01 | α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10 (sum=1.00) | Policy published ✓ |
+| T-WV-02 | α=0.40, β=0.20, γ=0.25, δ=0.15, ε=0.10 (sum=1.10) | WEIGHT_SUM_INVARIANT_VIOLATED, policy rejected ✓ |
+| T-WV-03 | α=0.20, β=0.20, γ=0.25, δ=0.15, ε=0.10 (sum=0.90) | WEIGHT_SUM_INVARIANT_VIOLATED, policy rejected ✓ |
+| T-WV-04 | IEEE 754 rounding artefact (sum=1.0000001) | Within tolerance → policy published ✓ |
+| T-WV-05 | sum=1.01 | Outside tolerance → policy rejected ✓ |
+
+`[Decided]`
+
 ### Named regional-snapshot quantities `[Decided]`
 
 ```
