@@ -7,6 +7,11 @@
 
 > **v2.2 reconciliation note (2 Sep 2026).** Under Requirements Baseline v2.2 and ADR-002 v2.2 the **single governed quota pool** is the **primary** model: one pool per region/quota family covers Prod + NonProd/CVAL + DR, with Prod and DR protected by **logical earmarks** (`Prod_Reserved_Floor`, `DR_Earmark_vCPU`) rather than physical group separation. The **Two-Group Quota Architecture** referenced by HC-3 and HC-7 below is retained as the sanctioned **exception topology** (used only when Azure Quota Group limits or a mandatory Prod-isolation boundary make one pool impossible). The HC-3/HC-7 arithmetic is unchanged and remains correct; in the single-pool model the terms map as `Effective_NonProd_Ceiling → Allocatable_NonProd`, `NonProd_DR_Group_Limit → Pool_Limit`, and `DR_Floor_vCPU → DR_Earmark_vCPU` (max-not-sum, DR-017). Also: the EU cross-geo DR extension region is **Switzerland North** (REG-002). See ADR-002 v2.2, the Calculation Logic Reference v2.2 (Scenario 8/9), the FDD §4.2, and the TDD §8.3.
 
+> **⚠️ Middle East DR — current legal position is `DR_NOT_OFFERED` (DEC-001, under legal review).** Baseline v2.2 records that **Legal has taken ownership of the Middle East programme** and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements — so DR is currently NOT offered in the Middle East** (baseline §2 Strategic Drivers, §5.2 Out of Scope, §6 Region Strategy, **DR-014**). This is a **pending legal/business decision (DEC-001)**, listed among the programme's remaining major architectural risks (baseline §25). Consequences for placement below:
+> - **The current default for a Middle East geography is `dr_region = NOT_OFFERED`.** The engine records the seed with no DR region and **does not** auto-assign any cross-geo DR. Middle East **production may still exist** without DR (DR-014).
+> - **Switzerland North is a *pre-configured, conditional* cross-geo extension path only.** It is held in `PlacementPolicy` so that DR *can* be turned on quickly **if and only if Legal explicitly approves Middle East DR via DEC-001**. Until that approval is recorded, the extension path is **inactive** and the HC-10 canonical example below is a *conditional* design, not a live placement.
+> - The HC-10 Cross-Geo Extension mechanics and VR-6 below therefore describe the **approved-path behaviour that applies only after DEC-001 clears**; the **default legal state overrides them with `DR_NOT_OFFERED`**. See ADR-001, ADR-005, the FDD §4.4/§8, the TDD §2.2/§9, and the Calculation Logic Reference Scenario 4.
+
 ---
 
 ## Overview
@@ -225,7 +230,7 @@ Ensures non-correlated failure domains between Prod and DR regions. This constra
 | East US | Central US | MEDIUM | ❌ No |
 | East US | West Europe | HIGH | ✅ Yes (cross-geo) |
 | UAE North | Saudi Arabia Central | MEDIUM | ❌ No (same geography) |
-| UAE North | Switzerland North | HIGH | ✅ Yes (cross-geo extension) |
+| UAE North | Switzerland North | HIGH | ⚠️ Separation-eligible, but **inactive** — Middle East DR is `DR_NOT_OFFERED` pending DEC-001 (DR-014); usable only after legal approval |
 
 #### Implementation
 
@@ -479,7 +484,7 @@ def get_prod_candidates(geography):
 | Europe | West Europe, North Europe, UK South, ... | East US, Australia East, ... |
 | Middle East | UAE North, Saudi Arabia Central | East US, Switzerland North* |
 
-*Switzerland North becomes eligible only via **HC-10 Cross-Geo Extension Path** for DR, not for Prod.
+*Switzerland North becomes eligible only via **HC-10 Cross-Geo Extension Path** for DR, not for Prod — and that path is **inactive** for the Middle East while ME DR is `DR_NOT_OFFERED` (DR-014, pending DEC-001 legal approval).
 
 #### Evidence Tag
 
@@ -591,37 +596,62 @@ DR assignments to Standard Capacity Regions in a **different geography** are rej
 
 | Source Geography | Approved DR Geographies | Primary DR Region | Rationale |
 |---|---|---|---|
-| Middle East | Europe | Switzerland North | Middle East has only 2 regions (UAE North, Saudi Arabia); insufficient for 3-region model |
+| Middle East | Europe | Switzerland North **(inactive — gated by DEC-001)** | Middle East has only 2 regions (UAE North, Saudi Arabia); a 3-region model *would* need cross-geo DR, but ME DR is currently **`DR_NOT_OFFERED`** (data-sovereignty/residency, DR-014). Path stays inactive until Legal approves DR (DEC-001). |
 | Australia | Asia Pacific | Singapore | Regional pair fallback |
 | India | Asia Pacific | Singapore | Regional pair fallback |
 
-#### Middle East Three-Region Placement (Canonical Example)
+#### Middle East Three-Region Placement (Conditional Example — gated by DEC-001)
+
+> **This example applies ONLY if Legal approves Middle East DR (DEC-001).** As it stands, the current legal position is **`DR_NOT_OFFERED`** for the Middle East (data-sovereignty/residency; see the ⚠️ note at the top of this document and DR-014). Under the default legal state the placement is: **Prod** in-geo, **CVAL/NonProd** in-geo, and **`dr_region = NOT_OFFERED`** — steps 3 below are **not executed** and no cross-geo DR is assigned. The steps below describe the pre-configured behaviour that becomes live **only after** DEC-001 records an approval.
 
 **Inputs:**
 - Customer geography: Middle East
 - Available Middle East Standard regions: UAE North, Saudi Arabia Central (2 only)
+- **Middle East DR policy flag (DR-014):** default `DR_NOT_OFFERED = true` (pending DEC-001)
 
-**Placement:**
+**Default placement (current legal position — `DR_NOT_OFFERED`):**
 1. **Prod:** `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central} → e.g., UAE North
 2. **CVAL/NonProd:** Remaining Middle East region → Saudi Arabia Central
-3. **DR:** Cross-Geo Extension to **Switzerland North** (approved path)
+3. **DR:** **`NOT_OFFERED`** — seed records no DR region; engine does not assign Switzerland North or any other cross-geo region. Middle East production may still exist without DR.
 
-**Validation:**
+**Conditional placement (only if DEC-001 approves ME DR — sets `DR_NOT_OFFERED = false`):**
+1. **Prod:** `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central} → e.g., UAE North
+2. **CVAL/NonProd:** Remaining Middle East region → Saudi Arabia Central
+3. **DR:** Cross-Geo Extension to **Switzerland North** (pre-approved path, now activated)
+
+**Validation (conditional path only):**
 - Switzerland North must pass **HC-1 through HC-10** including DR coverage floor (HC-6)
 - If Switzerland North fails any HC, the placement is **rejected with an ops alert**
 - The engine does **not** silently select any alternative outside the approved extension paths
 
 #### Validation Rules (VR)
 
-- **VR-6:** For Middle East geography, DR region must be Switzerland North via approved Cross-Geo Extension path
-- **VR-11:** Cross-Geo Extension DR path must be explicitly approved in active `PlacementPolicy`
+- **VR-8 (default):** For a Middle East geography with `DR_NOT_OFFERED = true` (current legal position, DEC-001), the seed **must** record `dr_region = NOT_OFFERED`; the engine must **not** auto-assign Switzerland North or any cross-geo DR.
+- **VR-8a (conditional):** *Only if* DEC-001 approval has cleared the `DR_NOT_OFFERED` flag, the Middle East DR region must be Switzerland North via the approved Cross-Geo Extension path.
+- **VR-11:** Cross-Geo Extension DR path must be explicitly approved in active `PlacementPolicy` **and** (for the Middle East) gated by a recorded DEC-001 approval.
 
 #### Implementation
 
 ```python
+def resolve_dr_region(customer_geography, candidate_dr_region):
+    policy = get_active_placement_policy()
+
+    # DR-014 / DEC-001: honour the per-geography DR_NOT_OFFERED legal flag FIRST.
+    # For the Middle East this defaults to True (current legal position) until Legal
+    # records a DEC-001 approval that clears it.
+    if policy.dr_not_offered.get(customer_geography, False):
+        return "NOT_OFFERED"  # seed records no DR; no cross-geo substitution (VR-6)
+
+    return candidate_dr_region
+
+
 def validate_HC10_cross_geo_extension(customer_geography, dr_region):
     policy = get_active_placement_policy()
-    
+
+    # DR_NOT_OFFERED short-circuits HC-10: no DR region to validate.
+    if dr_region == "NOT_OFFERED":
+        return PASS  # legal no-DR outcome (DR-014, DEC-001)
+
     # Check if DR region is in same geography as customer
     if dr_region.geography == customer_geography:
         return PASS  # Same-geo DR, HC-10 does not apply
@@ -631,7 +661,12 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
     
     if dr_region not in approved_paths:
         return REJECT, f"HC-10 CROSS_GEO_EXTENSION_PATH_APPROVED: DR region {dr_region.name} not in approved extension paths for {customer_geography}"
-    
+
+    # DEC-001 gate for the Middle East: even a configured extension path stays
+    # inactive until a recorded legal approval clears DR_NOT_OFFERED.
+    if customer_geography == "Middle East" and policy.dr_not_offered.get("Middle East", True):
+        return REJECT, "HC-10 DEC-001 PENDING: Middle East DR is DR_NOT_OFFERED pending legal approval; Switzerland North extension is inactive"
+
     return PASS
 ```
 
@@ -640,10 +675,17 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
 ```json
 {
   "policy_version": "2026-08-Q3",
+  "dr_not_offered": {
+    "Middle East": true
+  },
+  "dr_not_offered_rationale": {
+    "Middle East": "Legal-owned programme (DEC-001, under review). Data-sovereignty/residency laws for a largely government/medical customer base mean cross-border DR cannot meet residency requirements; DR is currently NOT offered (baseline §2/§5.2/§6, DR-014). Production may still exist without DR. Set to false ONLY when Legal records a DEC-001 approval."
+  },
   "cross_geo_extension_paths": {
     "Middle East": {
       "approved_dr_regions": ["Switzerland North"],
-      "rationale": "Middle East has only 2 Standard regions; 3-region model requires cross-geo DR"
+      "activation_gated_by": "DEC-001 (dr_not_offered['Middle East'] must be false)",
+      "rationale": "Pre-configured, CONDITIONAL path. Middle East has only 2 Standard regions, so a 3-region model would need cross-geo DR — but this path is inactive while DR_NOT_OFFERED is true."
     },
     "Australia": {
       "approved_dr_regions": ["Singapore", "Japan East"],
@@ -764,8 +806,8 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 | **VR-5** | All automated placement paths must use Standard Capacity Regions only | HC-9 |
 | **VR-6** | CVAL and DR must not use Restricted Capacity Regions under any condition | HC-9 |
 | **VR-7** | Standard region passes HC-1 through HC-10 → if all excluded, exhaustion error | HC-1..10 |
-| **VR-8** | For Middle East geography, DR region must be Switzerland North via approved cross-geo path | HC-10 |
-| **VR-9** | If Switzerland North fails HC-1..HC-10, block placement with ops alert | HC-1..10 |
+| **VR-8** | For Middle East geography, DR defaults to `NOT_OFFERED` (DR-014, DEC-001 legal position); Switzerland North via approved cross-geo path applies **only after** a recorded DEC-001 approval clears `DR_NOT_OFFERED` | HC-10 |
+| **VR-9** | Only on the DEC-001-approved conditional path: if Switzerland North fails HC-1..HC-10, block placement with ops alert | HC-1..10 |
 | **VR-10** | Restricted region requested by customer → Scenario 2 exception path only | HC-9 |
 | **VR-11** | Cross-Geo Extension DR path must be explicitly approved in active PlacementPolicy | HC-10 |
 
@@ -783,7 +825,7 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 ### POC Test Coverage
 
 **POC-01 through POC-10:** Hard constraint validation (HC-1..HC-10)  
-**POC-11:** Middle East cross-geo DR (HC-10)  
+**POC-11:** Middle East cross-geo DR (HC-10) — **blocked pending DEC-001**; ME DR is `DR_NOT_OFFERED` today, so this POC runs only if/when Legal approves ME DR  
 **POC-30:** Quota Groups API integration (HC-3, HC-7)  
 **POC-31:** Quota pool release latency (HC-7 emergency transfer dependency)
 
@@ -845,8 +887,9 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 - [ ] Stage 2 hard constraint gate logic (HC-1..HC-7, HC-10) validated
 - [ ] RegionalSnapshot schema extended with HC-6 fields (nonprod_crg_effective_free, dr_crg_free_slots)
 - [ ] QuotaGroup integration (HC-3, HC-7) validated via POC-30
-- [ ] Cross-Geo Extension paths configured in PlacementPolicy
-- [ ] Middle East three-region placement validated (HC-10)
+- [ ] Cross-Geo Extension paths configured in PlacementPolicy (Middle East path present but **inactive** — `dr_not_offered["Middle East"] = true` pending DEC-001)
+- [ ] Middle East default placement validated: `dr_region = NOT_OFFERED` (DR-014, current legal position)
+- [ ] Middle East conditional three-region placement (Switzerland North, HC-10) validated **only after** DEC-001 legal approval
 - [ ] Exception deployment workflow (HC-9 Restricted region override) tested
 - [ ] HC rejection reasons logged to OperationRecord for audit
 - [ ] Validation Rules VR-1..VR-11 traced to HC enforcement points

@@ -28,7 +28,7 @@ Key forces:
 - Production protection is the primary objective. `[Decided]`
 - Region, zone, quota, and capacity are hard isolation boundaries; capacity is never counted across regions or zones. `[Documented]`
 - Region strategy is configuration-driven and currently focused on North America and Europe; APAC and Middle East entries are policy data, not automatic rollout commitments. `[Derived]`
-- Middle East DR may be unavailable because legal/data-sovereignty constraints can require a `DR_NOT_OFFERED` result instead of a cross-border DR placement. `[Derived]`
+- **Middle East DR is currently `DR_NOT_OFFERED` (DR-014, DEC-001 — under legal review).** As it stands, DR is **not offered** in the Middle East: Legal owns the programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline §2, §5.2, §6). Middle East placement therefore defaults to `dr_region = NOT_OFFERED`; production may still be placed in-geo without DR. Switzerland North is a **pre-configured, conditional** cross-geo extension that activates **only if** Legal clears DEC-001. `[Documented]`
 - Placement must return a fresh, machine-readable readiness state to AEP/provisioning and must fail safely on stale or incomplete state. `[Decided]`
 
 ## Decision
@@ -64,8 +64,8 @@ Adopt a **production-region-first, seeded placement architecture**:
 |---|---|
 | Standard region | Eligible for automated placement and scoring. |
 | Restricted region | Never recommended, scored, or auto-selected; usable only for explicit production-region exception. |
-| Cross-geo extension | Usable only when explicitly approved for the source geography. |
-| `DR_NOT_OFFERED` | Produces seed value `DR region = NOT_OFFERED`; ACRME must not silently substitute another geography. |
+| Cross-geo extension | Usable only when explicitly approved for the source geography. For the **Middle East**, the Switzerland North extension is pre-configured but **inactive** until DEC-001 legal approval clears `DR_NOT_OFFERED`. |
+| `DR_NOT_OFFERED` | Produces seed value `DR region = NOT_OFFERED`; ACRME must not silently substitute another geography. **Default `true` for the Middle East** (DR-014, current legal position pending DEC-001) — evaluated **before** any cross-geo extension so an inactive extension is never auto-applied. |
 | Policy version | Every change increments version and is recorded with approver, reason, effective date, and replay/audit metadata. |
 
 Three to four regions per geography is the normal design goal. A two-region geography cannot guarantee in-geo Prod + CVAL + DR separation; it requires either an approved cross-geo path or `DR_NOT_OFFERED`. `[Derived]`

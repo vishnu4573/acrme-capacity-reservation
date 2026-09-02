@@ -14,7 +14,7 @@
 
 > **Purpose.** This TDD describes **how** ACRME is built — components, runtime, topology, data, state, algorithms, interfaces, security, observability, NFRs, integration, and POC gating — traceable to Requirements Baseline v2.2 and to the companion FDD (which owns the *what*). This document is **self-contained**: all normative algorithms, formulas, schemas, enumerations, and constants are inlined, not referenced externally.
 
-> **Reconciliation note (v2.2).** This TDD implements the confirmed v2.2 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
+> **Reconciliation note (v2.2).** This TDD implements the confirmed v2.2 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002) — pre-configured but **conditional and currently inactive** for the Middle East, whose current legal position is `DR_NOT_OFFERED` pending DEC-001 (see §2.2 constraints); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
 
 ---
 
@@ -51,6 +51,7 @@ Every non-trivial design assertion carries an evidence tag consistent with the r
 6. **Fail-safe and idempotent.** Stale state blocks placement; all mutations are idempotent with operation handles and optimistic concurrency (NFR-002/007). `[Decided]`
 
 ### 2.2 Constraints (baseline §21)
+- **Middle East DR is `DR_NOT_OFFERED` (current legal position, DEC-001 pending).** The Middle East programme is legal-owned and serves government/medical customers under data-residency/sovereignty laws; cross-border DR cannot meet residency requirements, so **no DR is offered there today** (baseline §2, §6, DR-014, DEC-001). Middle East **production** may still be placed and governed; the placement/DR engine emits `dr_region = NOT_OFFERED` for those geographies and creates **no** `SourceDestinationDRIndex` entry, **no** DR earmark, and **no** cross-geo activation. The Switzerland North cross-geo path (REG-002/HC-10) is **pre-configured but inactive** for the Middle East; it activates **only** if Legal clears DEC-001, via a config flip (`dr_not_offered["Middle East"] = false`) with **no code change**. `DR_NOT_OFFERED` is evaluated **before** any cross-geo extension. `[Documented]`
 - **Azure Quota Group / `groupQuotas` maturity** gates single-pool enforcement (DEP-001); the two-group topology is the sanctioned fallback. `[Documented]`
 - **No native intra-pool sub-reservation** in Azure quota groups — the DR earmark and Prod floor are engine-enforced arithmetic, not platform primitives (Scenario 9). `[Documented]`
 - **ARM throttling budgets** bound reconciliation cadence and estate size (Compute RP: 250 reads / 5 min, 1,200 writes / hour per subscription). `[Documented]`
@@ -435,6 +436,8 @@ Overcommit_Ratio(d)          = SUM(Workload_Portion(s->d)) / MAX(Workload_Portio
 ```
 Single-failure assumption (DR-001): one production region fails at a time, so destination `d` needs standby for its **largest** protected source only; standby is shared/overcommitted across mutually exclusive events. `Usable_Destination_Capacity(d)` may include approved bootstrap headroom, available CRG reservations, releasable CVAL (after earmark check), and approved sharing/expansion. A per-scope **SUM override (C-11)** covers contractual simultaneous-failure protection with no code change. `[Decided]`
 
+> **`DR_NOT_OFFERED` geographies are excluded from this sizing (DR-014, DEC-001).** Sources in a geography flagged `DR_NOT_OFFERED` — the Middle East today — contribute **no** `Workload_Portion(s → d)` term, produce **no** `SourceDestinationDRIndex` entry, and reserve **no** `DR_Earmark_vCPU` at any destination. Their production is still sized and governed, but they carry no DR requirement, so they never enter `Destination_DR_Requirement`, `DR_Capacity_Gap`, or `Overcommit_Ratio`. Should Legal clear DEC-001 (config flip `dr_not_offered["Middle East"] = false`, no code change), the affected sources begin contributing their max-not-sum term at that point. `[Documented]`
+
 ### T12 — Max-not-sum sizing (overcommit ratio)
 
 ```mermaid
@@ -686,7 +689,7 @@ Production reliance on max-not-sum DR sizing and single-pool consumer-quota beha
 | NFR-001..010 | (cross-cutting) | throttle resilience; degraded mode; idempotency; simulation | `OperationRecord`; §14 |
 | OPS-001..005 | (runbooks) | DR declaration/activation/failback; quota allocation; sharing; override | `ActivationRecord`; §10, §16 |
 | POC-001..011 | (gating) | consumer quota; DR topology; bootstrap; overcommit safety | §16 |
-| DEC-001..003 / DEP-001 | Config/Scope-File, Quota-Pool Manager | Middle East DR policy; failback duration; geo-exception approver; groupQuotas maturity | `PlacementPolicy`; §2.2, §5.3 |
+| DEC-001..003 / DEP-001 | Config/Scope-File, Quota-Pool Manager | Middle East DR policy — **current position `DR_NOT_OFFERED`, pending legal review** (production allowed, no DR, Switzerland North path inactive until config flip); failback duration; geo-exception approver; groupQuotas maturity | `PlacementPolicy`; §2.2, §5.3 |
 
 *Every Baseline v2.2 requirement group resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD §9.*
 

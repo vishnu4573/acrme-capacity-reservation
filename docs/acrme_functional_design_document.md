@@ -13,7 +13,9 @@
 
 > **Purpose.** This FDD describes **what** ACRME does — its functional behaviour, flows, states, and rules — traceable to every requirement in Baseline v2.2. It is implementation-neutral; the **how** (components, data, algorithms, interfaces, security, NFRs) is in the companion TDD. This document is **self-contained**: all normative detail (readiness states, engine modes, formulas, classification tables, validation rules) is inlined, not referenced externally.
 
-> **Reconciliation note (v2.2).** This document reflects the confirmed v2.2 design decisions: **single governed quota pool** as the primary model (QUA-004); **Switzerland North** as the authoritative EU cross-geo DR extension region for Middle East (REG-002); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019).
+> **Reconciliation note (v2.2).** This document reflects the confirmed v2.2 design decisions: **single governed quota pool** as the primary model (QUA-004); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019); and **Switzerland North** as the pre-configured EU cross-geo DR extension for the Middle East (REG-002) — **conditional and currently inactive** because Middle East DR is `DR_NOT_OFFERED` pending legal review (DR-014, DEC-001; see §4.4/§8 below).
+
+> **⚠️ Middle East DR (DR-014, DEC-001) — currently NOT offered.** As it stands, DR is **not offered** in the Middle East. Legal owns the Middle East programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline §2, §5.2, §6). Middle East placement defaults to `dr_region = NOT_OFFERED`; **production may still exist without DR**. Switzerland North is a pre-configured cross-geo extension that becomes usable **only if/when Legal approves DEC-001**. This is a pending decision and a major architectural risk (baseline §25).
 
 ---
 
@@ -187,7 +189,7 @@ stateDiagram-v2
 - **CVAL/DR co-location double-count guard (PLC-010):** earmarked CVAL capacity counts toward DR headroom, never as both live CVAL and available DR. `[Decided]`
 - **Region catalogue (REG-001..003):** versioned, configuration-driven; three-region minimum per geography is normative; region examples come from authoritative config (REG-002 — "Belgium" was corrected to **Switzerland North**). `[Decided]`
 
-**Region classification (functional view):** Standard (auto-selectable/scored), Restricted (production-only by exception, never CVAL/DR), Cross-Geo Extension (DR-only, approved paths — Middle East → **Switzerland North**), and `DR_NOT_OFFERED` (no cross-border substitution). `[Decided]`
+**Region classification (functional view):** Standard (auto-selectable/scored), Restricted (production-only by exception, never CVAL/DR), Cross-Geo Extension (DR-only, approved paths — Middle East → **Switzerland North**, *pre-configured but inactive pending DEC-001*), and `DR_NOT_OFFERED` (no cross-border substitution; **default for the Middle East** per DR-014). The `DR_NOT_OFFERED` flag is evaluated **before** any cross-geo extension, so an inactive extension is never auto-applied. `[Decided]`
 
 ### F4 — Onboarding + placement flow
 
@@ -218,7 +220,7 @@ flowchart TD
 - **max-not-sum sizing (DR-017):** each destination sizes to the largest single non-concurrent protected source portion; a SUM override covers contractual simultaneous-failure needs. `[Decided]`
 - **Source→destination index (DR-018)** drives **source-specific standby activation in business-priority waves (DR-009, DR-019)** via staged acquisition (DR-006), reversible on failback (DR-013). `[Decided]`
 - **Staged capacity acquisition order (DR-006):** bootstrap → destination quota/capacity → approved CVAL release → approved sharing → pooled quota → Azure request with exposed deficit. Because all environments share one governed quota pool, the emergency DR draw needs **no cross-group transfer**. `[Decided]`
-- **`DR_NOT_OFFERED` (DR-014):** where sovereignty/contract forbids cross-border DR, the seed records no DR and ACRME never silently substitutes. `[Decided]`
+- **`DR_NOT_OFFERED` (DR-014):** where sovereignty/contract forbids cross-border DR, the seed records no DR and ACRME never silently substitutes. **This is the current position for the Middle East** (DEC-001, under legal review): ME defaults to `dr_region = NOT_OFFERED`, contributes no `SourceDestinationDRIndex` entries, consumes no DR earmark, and is never a DR source or destination; ME **production may still exist without DR**. The Switzerland North extension activates only if Legal clears DEC-001. `[Decided]`
 - **DR drills and role flip (DR-010..012):** annual drill/rotation validate the model without a real incident; destructive VM-association changes remain **blocked in Phase 1**. `[Decided]`
 
 ### F6 — Distributed DR reference model (§12A)
@@ -327,7 +329,7 @@ Entering `DR_EVENT_ACTIVE` does not auto-authorise service-impacting CVAL action
 | POC-001 | Consumer quota under shared reservation | Readiness must validate consumer quota until proven. |
 | POC-006/007 | DR topology & bootstrap sizing | Confirms distributed model and lean targets. |
 | POC-011 | max-not-sum overcommit safety | Sets overcommit safety ceiling / alert. |
-| DEC-001 | Middle East DR policy | Governs Switzerland North extension vs `DR_NOT_OFFERED`. |
+| DEC-001 | Middle East DR policy | **Current position: `DR_NOT_OFFERED` (DR is NOT offered in the Middle East)** due to data-sovereignty/residency; under legal review. Governs whether the pre-configured Switzerland North extension ever activates. Until legal approval, ME defaults to `dr_region = NOT_OFFERED`. |
 | DEC-002 | Failback duration | ~1-year run vs ~30-day failback. |
 | DEC-003 | Geography exception approver | Governs the PLC-002 exception path. |
 | DEP-001 | Quota Group / `groupType` maturity | Single-pool enforcement depends on feature maturity. |

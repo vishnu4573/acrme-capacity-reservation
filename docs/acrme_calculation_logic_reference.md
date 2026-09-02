@@ -40,7 +40,7 @@ evidence tag:
 | 1 | Prod region derivation — customer picks a **geography** (**exception path**; explicit approval + customer acknowledgement required) | `argmax(PS_Prod)` over Standard regions | Current |
 | 2 | Prod region validation — customer supplies the **exact region** (**default input**; ACRME validates, does not derive) | HC-1..HC-10 gate + `PS_Prod` post-validation | Current |
 | 3 | Restricted region request | Exception workflow (no scoring) | Current |
-| 4 | Middle East three-region deployment | `argmax(PS_Prod)` in-geo + **Switzerland North** cross-geo DR | **Updated** |
+| 4 | Middle East three-region deployment | `argmax(PS_Prod)` in-geo; **DR currently `NOT_OFFERED`** (DR-014, DEC-001 under legal review) — Switzerland North cross-geo DR is pre-configured but **inactive**, conditional on DEC-001 | **Updated** |
 | 5 | CVAL / NonProd region selection | `argmax(PS_NonProd)` | Current |
 | 6 | DR region selection | `argmax(PS_DR)` | Current |
 | 7 | Hard-constraint eligibility gate | HC-3, HC-6, HC-7 arithmetic | Current |
@@ -165,31 +165,48 @@ never enter the scoring pipeline. `[Decided]`
 
 ---
 
-## Scenario 4 — Middle East Three-Region Deployment (Updated — Switzerland North)
+## Scenario 4 — Middle East Three-Region Deployment (Current position: `DR_NOT_OFFERED`)
 
-**Trigger:** a Middle East deployment requiring three environments.
+**Trigger:** a Middle East deployment requiring Prod + CVAL (and, subject to legal, DR).
 
-**Logic:**
+> **⚠️ Current legal position — no DR is offered in the Middle East (DR-014, DEC-001).** The Middle East
+> programme is legal-owned and serves government/medical customers under data-residency/sovereignty
+> laws; cross-border DR cannot meet residency requirements. The geography is therefore flagged
+> **`DR_NOT_OFFERED = true` today**, and the DR offering is **under legal review (DEC-001, pending)**.
+> Middle East **production may still be placed and governed** — DR simply does not exist for it.
+> The Switzerland North cross-geo path below is **pre-configured but inactive**, and activates **only
+> if and when Legal clears DEC-001** (a config flip `dr_not_offered["Middle East"] = false`, no code change).
+
+**Logic — default (current position, `DR_NOT_OFFERED = true`):**
 
 ```
 1. Candidate in-geo Standard regions = { Saudi Arabia Central, UAE North }   (both Standard)
 2. Score both with PS_Prod.
 3. Prod  = argmax(PS_Prod) over the two.
 4. CVAL  = the remaining in-geo region (deterministic — only one candidate left).
-5. DR    = cross-geo extension region: Switzerland North (Europe)
+5. DR    = BYPASSED. Because DR_NOT_OFFERED = true for the geography, no DR region is derived;
+           the seed record records dr_region = NOT_OFFERED. No SourceDestinationDRIndex entry,
+           no DR earmark, and no cross-geo activation are created.
+```
+
+`DR_NOT_OFFERED` is evaluated **before** any cross-geo extension: the engine never reaches the
+Switzerland North path while the flag is `true`. `[Documented]`
+
+**Logic — conditional (only if Legal clears DEC-001, `DR_NOT_OFFERED = false`):**
+
+```
+5'. DR   = cross-geo extension region: Switzerland North (Europe)
            because no third in-geo Standard region exists to satisfy region separation.
 ```
 
-> **v2.2 correction (REG-002):** The cross-geo DR extension region was incorrectly cited as
-> "Belgium Central" in earlier material. The authoritative placement configuration specifies
-> **Switzerland North** as the cross-geo extension for Middle East. All references to Belgium Central
-> are superseded by Switzerland North.
+> **v2.2 correction (REG-002):** In the conditional path, the cross-geo DR extension region was
+> incorrectly cited as "Belgium Central" in earlier material. The authoritative placement configuration
+> specifies **Switzerland North** as the cross-geo extension for the Middle East. All references to
+> Belgium Central are superseded by Switzerland North. This correction concerns *which* region would be
+> used **if** DR is ever approved; it does **not** imply DR is currently offered.
 
-Middle East is subject to the `DR_NOT_OFFERED` policy flag (DR-014) where legal/data-sovereignty
-prevents an acceptable DR design. When `DR_NOT_OFFERED = true` for the geography, Step 5 above is
-bypassed and the seed record records `dr_region = NOT_OFFERED`. `[Decided]`
-
-Cross-geo extension constraints from ADR-001 apply to the DR region (Switzerland North). `[Decided]`
+Cross-geo extension constraints from ADR-001 apply to the DR region (Switzerland North) **when and if
+the conditional path is activated**. `[Decided]`
 
 ---
 
@@ -233,7 +250,8 @@ live CVAL headroom and available DR headroom. The `CVALEarmarkRecord` tracks thi
 ## Scenario 6 — DR Region Selection
 
 **Trigger:** final sequential step. Selects `argmax(PS_DR)` over eligible Standard regions (or the
-cross-geo region for Middle East).
+cross-geo region for the Middle East **only if** its `DR_NOT_OFFERED` flag is `false` — see Scenario 4;
+while the flag is `true` (current legal position, DEC-001) this step is skipped and `dr_region = NOT_OFFERED`).
 
 ### `PS_DR(r)` `[Decided]`
 
@@ -897,7 +915,7 @@ IF seed change requested:
 | DR bootstrap target | Configurable per product/workload — no fixed % | 17 | **Replaces ratio** |
 | Max-not-sum default | `MAX(source portions)` | 17 | Current |
 | SUM override (C-11) | `SUM(source portions)` — per-scope opt-in | 17 | Current |
-| EU cross-geo DR extension region | **Switzerland North** | 4 | **Updated (was Belgium Central)** |
+| EU cross-geo DR extension region (Middle East) | **Switzerland North** — pre-configured but **inactive**; conditional on DEC-001 (current position `DR_NOT_OFFERED`) | 4 | **Updated (was Belgium Central; now gated by DEC-001)** |
 
 ---
 

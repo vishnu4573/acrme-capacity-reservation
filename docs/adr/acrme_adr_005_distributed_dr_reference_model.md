@@ -46,7 +46,25 @@ Adopt the **distributed, reciprocal DR reference model** with the following norm
 
 8. **Activation is source-specific and wave-ordered.** A declared source-region failure activates only that source's mapped standby set, in business-priority waves, via the ADR-003 staged acquisition sequence, and is reversible on failback. `[Decided]`
 
+9. **`DR_NOT_OFFERED` geographies are excluded from the reciprocal model (DR-014, DEC-001).** Where legal/data-sovereignty prevents an acceptable DR design, the geography is flagged `DR_NOT_OFFERED` and **does not participate** in the distributed, reciprocal, max-not-sum model at all: its customers get `dr_region = NOT_OFFERED` in the seed, contribute **no** entries to the `SourceDestinationDRIndex`, and are **never** sized, earmarked, or activated as a source or destination. The **current legal position for the Middle East is `DR_NOT_OFFERED`** (see the carve-out below). `[Decided]`
+
+## Middle East DR Carve-Out (DR-014, DEC-001) — currently `DR_NOT_OFFERED`
+
+> **As it stands, DR is NOT offered in the Middle East.** Baseline v2.2 records that Legal has taken ownership of the Middle East programme and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements** (baseline §2 Strategic Drivers, §5.2 Out of Scope "Final Middle East DR offering (pending legal/business direction)", §6 "Middle East is legal-owned with no DR", and **DR-014**). This is an open **legal/business decision, DEC-001**, and one of the programme's remaining major architectural risks (baseline §25).
+
+Normative consequences for this reference model:
+
+1. **No reciprocal DR topology in the Middle East.** The many-to-many Prod/CVAL/DR reciprocal roles (Decision 2) and max-not-sum sizing (Decision 5) **do not apply** to Middle East regions (Saudi Arabia Central, UAE North) while `DR_NOT_OFFERED = true`. Middle East regions carry Prod (and may carry CVAL) but hold **no DR standby** and are **not** DR destinations for any source. `[Decided]`
+
+2. **No index entries, no earmark, no activation.** Middle East customers produce `dr_region = NOT_OFFERED` seeds (ADR-001), so they add **no** `source → destination` rows, consume **no** `DR_Earmark_vCPU`, and are **never** included in a standby activation set. Middle East **production may still exist** without any DR obligation (DR-014). `[Decided]`
+
+3. **Switzerland North is a pre-configured, conditional extension only.** Switzerland North is held in `PlacementPolicy` as the Middle East's cross-geo DR extension so DR *can* be enabled quickly **if and only if** Legal records a DEC-001 approval that clears `DR_NOT_OFFERED`. Until then the path is **inactive** and the engine must **not** auto-assign it. If DEC-001 later approves ME DR, the Switzerland North destination joins the reciprocal/max-not-sum model under the standard cross-geo constraints (sovereignty/zone alignment, HC-10). `[Decided]`
+
+4. **DEC-001 is the single switch.** Turning ME DR on is a configuration change to `dr_not_offered["Middle East"] = false`, gated by a recorded legal approval; no code change is required (FIN-002, C-8). Reversible if the legal position changes. `[Decided]`
+
 ## Reference Topology
+
+> **Scope note.** The three-region reciprocal footprint below is illustrative of a **DR-offered geography** (e.g., North America or Europe under the current NA+Europe focus). It is **not** the Middle East: per the carve-out above, Middle East regions are excluded from this reciprocal model while `DR_NOT_OFFERED` holds.
 
 The reference footprint used in the §12A worked example spans three regions (R1, R2, R3). Each region carries its own production and CVAL workloads and hosts distributed DR standby for the *other* regions' production. The `src Rn` tag on each standby cell identifies the source region whose production that standby protects.
 
@@ -156,7 +174,7 @@ The distributed model is auditable only if the following are exposed:
 - Under-protects genuinely concurrent multi-source failures unless SUM override or extra earmark is configured. `[Derived]`
 - Requires the `SourceDestinationDRIndex` to be kept fresh and consistent with seeds. `[Decided]`
 - Overcommit visibility and safety ceilings depend on POC-011 evidence. `[Assumed]`
-- Cross-geo cases (e.g., Middle East → Switzerland North) add sovereignty/zone-alignment constraints to the mapping. `[Derived]`
+- Cross-geo cases add sovereignty/zone-alignment constraints to the mapping — and where sovereignty forbids DR entirely (the **Middle East, currently `DR_NOT_OFFERED` pending DEC-001**), the geography is excluded from the model altogether (see the Middle East DR Carve-Out above); the Switzerland North extension is pre-configured but inactive until legal approval. `[Derived]`
 
 ## Alternatives Considered
 
