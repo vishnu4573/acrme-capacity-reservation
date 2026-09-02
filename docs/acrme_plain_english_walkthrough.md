@@ -810,16 +810,96 @@ reservation. **Deficit** tells the operator how far short the reservation is of 
 A deficit of zero means the CRG is at or above the floor. A positive deficit means the CRG is
 undersized and needs to grow.
 
-### 5.4 The Auto-Increase Trigger — When ACRME Raises a Capacity Request
+### 5.4 Auto-Increase Thresholds — Configurable Trigger Points
+
+Before explaining when ACRME raises capacity requests, it's important to understand that the trigger
+points are **configurable policy values**, not hardcoded constants.
+
+#### 5.4.1 The Three Auto-Increase Threshold Parameters
+
+ACRME uses three configurable thresholds stored in `PlacementPolicy`:
+
+| Parameter Name | Default Value | What it measures |
+|---|---|---|
+| `prod_autoincrease_threshold` | **0.20** (20%) | Remaining headroom % — triggers when Prod capacity has only 20% free slots left (80% utilized) |
+| `nonprod_autoincrease_threshold` | **0.20** (20%) | Remaining headroom % — triggers when NonProd capacity has only 20% free slots left (80% utilized) |
+| `dr_autoincrease_threshold` | **0.35** (35%) | Remaining headroom % — triggers when DR capacity has only 35% free slots left (65% utilized) |
+
+**Key point:** These represent **remaining headroom**, not consumption. A threshold of 0.20 means
+"trigger when only 20% headroom remains," which is the same as "trigger when 80% is consumed."
+
+**Why they're configurable:**
+- **Workload-specific risk tolerance** — high-growth products may want a 0.30 threshold for earlier warning
+- **Cost vs risk trade-off** — lower thresholds (e.g., 0.10) run fuller but increase capacity exhaustion risk
+- **Per-environment tuning** — DR can tolerate tighter thresholds because it's a bootstrap model
+- **Regional variation** — regions with slow Azure provisioning times may warrant higher thresholds
+
+**Configurability scope:** Like all PlacementPolicy parameters, these can be overridden per
+product/region/environment/SKU without code changes.
+
+#### 5.4.2 How Auto-Increase Thresholds Relate to Reconciliation Logic
+
+The capacity reconciliation engine operates on a **continuous watch loop**:
+
+```
+Every reconciliation_interval_seconds (configurable):
+  1. Read current state (allocated VMs, reserved capacity)
+  2. Calculate headroom: free_slots = reserved - allocated
+  3. Calculate headroom ratio: headroom_ratio = free_slots / reserved
+  4. Check threshold: if headroom_ratio < threshold, trigger auto-increase
+  5. Apply debounce: if triggered, wait 30 min cooldown before next trigger
+```
+
+**Example: Prod CRG with 100 reserved slots**
+
+```
+Allocated VMs: 78
+Free slots: 100 - 78 = 22
+Headroom ratio: 22 / 100 = 0.22 (22%)
+
+Threshold check:
+  prod_autoincrease_threshold = 0.20
+  0.22 > 0.20 → No trigger (still 2% above threshold)
+
+Next cycle, allocated grows to 82:
+  Free slots: 100 - 82 = 18
+  Headroom ratio: 18 / 100 = 0.18 (18%)
+  0.18 < 0.20 → TRIGGER auto-increase request
+
+Debounce: Next trigger for this (region + Prod CRG) cannot fire for 30 min
+```
+
+**Interaction with the reconciliation floor (Section 5.2):**
+- The **reconciliation floor** (`Allocated + Buffer`) is the **minimum** the CRG must always reserve
+- The **auto-increase threshold** is the **early warning** that triggers proactive expansion
+- Both work together: the floor prevents deficits, the threshold prevents getting close to deficits
+
+**Why DR has a higher threshold (0.35 vs 0.20):**
+
+DR reservations are intentionally sized lean under the minimal-bootstrap model (ENV-005). A higher
+threshold (35% remaining = 65% utilized) allows DR to run fuller before triggering an increase. This
+trades slightly higher risk for lower steady-state cost, which is acceptable because:
+- DR capacity is **standby/inactive** until a declared event
+- During a DR event, staged acquisition (DR-006) allocates available capacity + CVAL sacrifice + pooled quota
+- The 35% headroom is sufficient for control-plane bootstrap and initial recovery orchestration
+
+**Tuning guidance:**
+- **Increase threshold (e.g., 0.20 → 0.30)** if you want **earlier warnings** and more safety margin
+- **Decrease threshold (e.g., 0.20 → 0.15)** if you want to **run fuller** and tolerate tighter headroom
+- **Monitor** the frequency of auto-increase triggers — too frequent = threshold too low; never triggering = threshold too high
+
+See Section 8 for the complete Configurable Parameters Reference.
+
+### 5.5 The Auto-Increase Trigger — When ACRME Raises a Capacity Request
 
 ACRME does not wait for a deficit to appear before acting. It watches utilisation in real time and
-triggers a capacity increase request when utilisation hits a threshold:
+triggers a capacity increase request when utilisation hits the configured thresholds (Section 5.4.1):
 
-| Environment | Utilisation threshold | Meaning |
+| Environment | Default threshold | Meaning |
 |---|---|---|
-| Prod | 20% | Trigger when 20% of reserved Prod capacity is consumed |
-| NonProd | 20% | Trigger when 20% of reserved NonProd capacity is consumed |
-| DR | 35% | Trigger when 35% of reserved DR capacity is consumed (DR bootstrap can run leaner) |
+| Prod | 20% headroom remaining | Trigger when only 20% of reserved Prod capacity is free (80% utilized) |
+| NonProd | 20% headroom remaining | Trigger when only 20% of reserved NonProd capacity is free (80% utilized) |
+| DR | 35% headroom remaining | Trigger when only 35% of reserved DR capacity is free (65% utilized) |
 
 **Debounce cooldown:** after any trigger fires, the engine waits 30 minutes before it can fire again
 for the same region + CRG type. This prevents repeated requests from a transient spike.
@@ -828,7 +908,7 @@ for the same region + CRG type. This prevents repeated requests from a transient
 min-bootstrap model means DR starts small and scales on demand. A higher threshold accepts more risk
 in exchange for lower cost during steady state.
 
-### 5.5 The Forecast Formula — Proactive Growth
+### 5.6 The Forecast Formula — Proactive Growth
 
 Alongside the continuous reconciliation floor, ACRME uses an advisory forecast for longer-horizon
 sizing:
@@ -848,7 +928,7 @@ buffer values are stored in PlacementPolicy, not hard-coded.
 days, the engine emits `ForecastApproachingQuotaLimit`. This gives the platform team 14 days to
 request a quota increase from Microsoft before the deployment pipeline hits a wall.
 
-### 5.6 DR Sizing — Why Max, Not Sum (Scenario 17)
+### 5.7 DR Sizing — Why Max, Not Sum (Scenario 17)
 
 This is the biggest cost-driver decision in ACRME. Before v2.1, DR standby was sized as a
 **percentage of production capacity** (30–40%). This was found to over-provision by $1.5M–$5M/year
@@ -886,7 +966,7 @@ risk sign-off that gates production reliance on max-not-sum.
 A **SUM override (C-11)** is available per-scope in PlacementPolicy for customers or geographies
 that contractually require protection against concurrent regional failures.
 
-### 5.7 Happy Path — Steady-State Capacity Management
+### 5.8 Happy Path — Steady-State Capacity Management
 
 All conditions normal for West US 3, Prod CRG, E16ads\_v5:
 
@@ -920,7 +1000,7 @@ Threshold   = 20%  → trigger fires → CapacityIncreaseRequest raised
 The request is raised, debounce cooldown starts (30 min), operator approval obtained (Phase 1),
 new CRG quantity updated.
 
-### 5.8 Sad Path — Azure Cannot Supply the Requested Capacity
+### 5.9 Sad Path — Azure Cannot Supply the Requested Capacity
 
 After ACRME raises a capacity increase request and submits it to Azure, Azure responds that it
 cannot supply the requested SKU/zone at this time:
@@ -939,7 +1019,7 @@ ACRME action:
 The deployment readiness gate (Scenario 19) returns `CAPACITY_UNAVAILABLE` for any new deployment
 request that depends on this CRG until the situation resolves.
 
-### 5.9 Standby Activation During DR (Scenario 18)
+### 5.10 Standby Activation During DR (Scenario 18)
 
 When a DR event is declared and the engine enters `DR_EVENT_ACTIVE`:
 
@@ -1069,6 +1149,107 @@ deployment to proceed.
 
 ## 8. Quick Reference — Key Numbers
 
+### 8.1 Configurable Parameters Reference
+
+ACRME is designed to be **configuration-driven**. Most key values are **policy defaults stored in
+`PlacementPolicy`**, not hardcoded constants. This table lists all tunable parameters, their
+baseline defaults, and how they're configured.
+
+#### Region Selection — Scoring Weights
+
+| Parameter | Baseline Default | Configurable? | Scope | Validation |
+|---|---|---|---|---|
+| `alpha` (α) — Capacity headroom | 0.30 | ✅ Yes | Per product/region/env/SKU | Must sum to 1.0 (±0.001) |
+| `beta` (β) — Quota headroom | 0.20 | ✅ Yes | Per product/region/env/SKU | Must sum to 1.0 (±0.001) |
+| `gamma` (γ) — Distribution fairness | 0.25 | ✅ Yes | Per product/region/env/SKU | Must sum to 1.0 (±0.001) |
+| `delta` (δ) — DR readiness | 0.15 | ✅ Yes | Per product/region/env/SKU | Must sum to 1.0 (±0.001) |
+| `epsilon` (ε) — Zone diversity | 0.10 | ✅ Yes | Per product/region/env/SKU | Must sum to 1.0 (±0.001) |
+| **Weight sum** | **1.00** | ❌ No (invariant) | — | Enforced at policy load |
+| Weight sum tolerance | 0.001 | ❌ No (fixed) | — | IEEE 754 rounding allowance |
+
+**How to change:** Update `PlacementPolicy` config file → Config/Scope-File Service validates at load time → if valid, policy is published. See Section 3.8 for tuning guidance.
+
+#### Quota Management — Growth Buffers & Headroom Floors
+
+| Parameter | Baseline Default | Configurable? | Scope | What it controls |
+|---|---|---|---|---|
+| `prod_growth_buffer` | 0.20 (20%) | ✅ Yes | Per product/region/SKU | Quota headroom above current Prod usage |
+| `nonprod_growth_buffer` | 0.20 (20%) | ✅ Yes | Per product/region/SKU | Quota headroom above current NonProd usage |
+| `emergency_transfer_pct` | 0.30 (30%) | ✅ Yes | Per product/region | % of potential DR demand held as emergency transfer headroom |
+| `min_prod_quota_headroom_vcpu` | 20 vCPU | ✅ Yes | Per product/region/SKU | Minimum absolute quota headroom floor for Prod |
+| `min_nonprod_quota_headroom_vcpu` | 20 vCPU | ✅ Yes | Per product/region/SKU | Minimum absolute quota headroom floor for NonProd |
+| `min_dr_headroom_vcpu` | 16 vCPU | ✅ Yes | Per product/region/SKU | Minimum absolute quota headroom floor for DR |
+
+**How to change:** Update `PlacementPolicy` config file → no validation gate required (arbitrary values permitted). Changes take effect on next policy load.
+
+#### Capacity Management — Auto-Increase Thresholds & Reconciliation
+
+| Parameter | Baseline Default | Configurable? | Scope | What it controls |
+|---|---|---|---|---|
+| `prod_autoincrease_threshold` | 0.20 (20%) | ✅ Yes | Per product/region/SKU | Trigger capacity increase when Prod headroom drops below 20% (80% utilized) |
+| `nonprod_autoincrease_threshold` | 0.20 (20%) | ✅ Yes | Per product/region/SKU | Trigger capacity increase when NonProd headroom drops below 20% |
+| `dr_autoincrease_threshold` | 0.35 (35%) | ✅ Yes | Per product/region/SKU | Trigger capacity increase when DR headroom drops below 35% (65% utilized) |
+| `autoincrease_debounce_cooldown` | 30 min | ✅ Yes | Per region + CRG type | Minimum time between auto-increase triggers for same region + CRG |
+| `reconciliation_interval_seconds` | 360 sec (6 min) | ✅ Yes | Global | How often the engine checks allocated vs reserved capacity |
+| `configured_buffer` (Prod) | TBD (e.g., 1 slot) | ✅ Yes | Per product/region/env/SKU | Reconciliation floor buffer above allocated VMs |
+| `configured_buffer` (NonProd) | TBD | ✅ Yes | Per product/region/env/SKU | Reconciliation floor buffer above allocated VMs |
+| `configured_buffer` (DR) | TBD | ✅ Yes | Per product/region/env/SKU | Reconciliation floor buffer above allocated VMs |
+
+**How to change:** Update `PlacementPolicy` config file → no validation gate required. Changes take effect on next policy load. See Section 5.4 for auto-increase threshold tuning guidance.
+
+#### Capacity Management — Forecast & Alerts
+
+| Parameter | Baseline Default | Configurable? | Scope | What it controls |
+|---|---|---|---|---|
+| `forecast_horizon` | {30, 60, 90} days | ✅ Yes | Per forecast request | Prediction window for peak VM demand |
+| `forecast_quota_alert_threshold` | 0.80 (80%) | ✅ Yes | Global | Quota utilization % that triggers ForecastApproachingQuotaLimit alert |
+| `forecast_quota_alert_lead_time` | 14 days | ✅ Yes | Global | Minimum lead time for quota alert before predicted breach |
+
+**How to change:** Update `PlacementPolicy` config file or forecast service config → changes take effect on next policy load or forecast run.
+
+#### DR Management — Bootstrap Targets
+
+| Parameter | Baseline Default | Configurable? | Scope | What it controls |
+|---|---|---|---|---|
+| `dr_bootstrap_target` (per workload) | TBD (lean, ~5–20%) | ✅ Yes | Per workload/product/region/zone/VM family/subscription | Minimum DR capacity to pre-stage (ENV-005) |
+| `dr_ratio_target` (coverage ratio) | TBD (varies per customer SLA) | ✅ Yes | Per customer/product | Target DR coverage ratio for scoring δ component |
+
+**How to change:** Update `PlacementPolicy` config file → no validation gate required. DR bootstrap cannot be implicitly zero (ENV-006) — zero requires explicit approved policy exception.
+
+#### Fixed / System Constants (Not Configurable)
+
+| Parameter | Value | Why it's fixed |
+|---|---|---|
+| Weight sum invariant | 1.00 | Mathematical requirement for score normalization |
+| Weight sum tolerance | 0.001 | IEEE 754 floating-point precision allowance |
+| Component clamp range | [0, 1] | Normalization requirement for weighted scoring |
+| Placement score range | [0.0, 1.0] | Direct consequence of weight sum = 1.0 and clamp [0, 1] |
+| Debounce cooldown minimum | 30 min | Operational safety to prevent request thrashing |
+
+#### Configuration Change Process
+
+**All configurable parameters follow the same update process:**
+
+1. **Update the `PlacementPolicy` configuration file** (JSON/YAML, stored in version control)
+2. **Config/Scope-File Service validates** (for weight-sum gate only; other params have no validation)
+3. **If valid, policy version is published** to the Placement Engine
+4. **Engine records `policy_version`** in every placement decision (audit trail)
+5. **Changes take effect** on the next placement/reconciliation/forecast cycle
+
+**No code deployment is required** to change any configurable parameter. Only a policy configuration
+file update and service restart/reload.
+
+**Monitoring after change:**
+- Track the metrics in Section 3.8.6 (weight changes) or Section 5.4.1 (threshold changes)
+- Compare placement/capacity decisions before and after the change
+- Monitor auto-increase trigger frequency, capacity utilization, quota request rates
+
+**Rollback:** Revert the `PlacementPolicy` config file to the previous version and republish.
+
+### 8.2 Quick Reference — All Key Numbers
+
+This table combines all key values (configurable and fixed) for quick lookup:
+
 | Parameter | Value | Domain |
 |---|---|---|
 | α (headroom/capacity weight) | 0.30 | Region Selection |
@@ -1084,13 +1265,13 @@ deployment to proceed.
 | Min Prod quota headroom | 20 vCPU | Quota Management |
 | Min NonProd quota headroom | 20 vCPU | Quota Management |
 | Min DR headroom | 16 vCPU | Quota Management |
-| Prod auto-increase threshold | 20% utilisation | Capacity Management |
-| NonProd auto-increase threshold | 20% utilisation | Capacity Management |
-| DR auto-increase threshold | 35% utilisation | Capacity Management |
+| Prod auto-increase threshold | 20% headroom remaining | Capacity Management |
+| NonProd auto-increase threshold | 20% headroom remaining | Capacity Management |
+| DR auto-increase threshold | 35% headroom remaining | Capacity Management |
 | Auto-increase debounce cooldown | 30 min per region + CRG type | Capacity Management |
 | Forecast horizons | 30 / 60 / 90 days | Capacity Management |
 | Quota alert lead time | 14 days at 80% of limit | Capacity Management |
-| Reconciliation loop target | 6 minutes (configurable) | Capacity Management |
+| Reconciliation loop interval | 6 minutes (configurable) | Capacity Management |
 | US Standard Capacity Regions | West US 3 · Central US · Canada Central | All domains |
 | EU Standard Capacity Regions | Switzerland North · Sweden Central | All domains |
 | Middle East Standard Capacity Regions | UAE North · Saudi Arabia Central | All domains |
