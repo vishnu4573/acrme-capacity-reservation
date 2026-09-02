@@ -5,12 +5,12 @@
 **Date:** August 2026  
 **Status:** Production Ready
 
-> **v2.2 reconciliation note (2 Sep 2026).** Under Requirements Baseline v2.2 and ADR-002 v2.2 the **single governed quota pool** is the **primary** model: one pool per region/quota family covers Prod + NonProd/CVAL + DR, with Prod and DR protected by **logical earmarks** (`Prod_Reserved_Floor`, `DR_Earmark_vCPU`) rather than physical group separation. The **Two-Group Quota Architecture** referenced by HC-3 and HC-7 below is retained as the sanctioned **exception topology** (used only when Azure Quota Group limits or a mandatory Prod-isolation boundary make one pool impossible). The HC-3/HC-7 arithmetic is unchanged and remains correct; in the single-pool model the terms map as `Effective_NonProd_Ceiling → Allocatable_NonProd`, `NonProd_DR_Group_Limit → Pool_Limit`, and `DR_Floor_vCPU → DR_Earmark_vCPU` (max-not-sum, DR-017). Also: the EU cross-geo DR extension region is **Switzerland North** (REG-002). See ADR-002 v2.2, the Calculation Logic Reference v2.2 (Scenario 8/9), the FDD §4.2, and the TDD §8.3.
+> **v2.2 reconciliation note (2 Sep 2026).** Under Requirements Baseline v2.2 and ADR-002 v2.2 the **single governed quota pool** is the **primary** model: one pool per region/quota family covers Prod + NonProd/CVAL + DR, with Prod and DR protected by **logical earmarks** (`Prod_Reserved_Floor`, `DR_Earmark_vCPU`) rather than physical group separation. The **Two-Group Quota Architecture** referenced by HC-3 and HC-7 below is retained as the sanctioned **exception topology** (used only when Azure Quota Group limits or a mandatory Prod-isolation boundary make one pool impossible). The HC-3/HC-7 arithmetic is unchanged and remains correct; in the single-pool model the terms map as `Effective_NonProd_Ceiling → Allocatable_NonProd`, `NonProd_DR_Group_Limit → Pool_Limit`, and `DR_Floor_vCPU → DR_Earmark_vCPU` (max-not-sum, DR-017). Also: the EU cross-geo DR extension region is **Switzerland North** (REG-002). See ADR-002 v2.2, the Calculation Logic Reference v2.2 (Scenario 8/9), the FDD Section 4.2, and the TDD Section 8.3.
 
-> **⚠️ Middle East DR — current legal position is `DR_NOT_OFFERED` (DEC-001, under legal review).** Baseline v2.2 records that **Legal has taken ownership of the Middle East programme** and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements — so DR is currently NOT offered in the Middle East** (baseline §2 Strategic Drivers, §5.2 Out of Scope, §6 Region Strategy, **DR-014**). This is a **pending legal/business decision (DEC-001)**, listed among the programme's remaining major architectural risks (baseline §25). Consequences for placement below:
+> **⚠️ Middle East DR — current legal position is `DR_NOT_OFFERED` (DEC-001, under legal review).** Baseline v2.2 records that **Legal has taken ownership of the Middle East programme** and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements — so DR is currently NOT offered in the Middle East** (baseline Section 2 Strategic Drivers, Section 5.2 Out of Scope, Section 6 Region Strategy, **DR-014**). This is a **pending legal/business decision (DEC-001)**, listed among the programme's remaining major architectural risks (baseline Section 25). Consequences for placement below:
 > - **The current default for a Middle East geography is `dr_region = NOT_OFFERED`.** The engine records the seed with no DR region and **does not** auto-assign any cross-geo DR. Middle East **production may still exist** without DR (DR-014).
 > - **Switzerland North is a *pre-configured, conditional* cross-geo extension path only.** It is held in `PlacementPolicy` so that DR *can* be turned on quickly **if and only if Legal explicitly approves Middle East DR via DEC-001**. Until that approval is recorded, the extension path is **inactive** and the HC-10 canonical example below is a *conditional* design, not a live placement.
-> - The HC-10 Cross-Geo Extension mechanics and VR-6 below therefore describe the **approved-path behaviour that applies only after DEC-001 clears**; the **default legal state overrides them with `DR_NOT_OFFERED`**. See ADR-001, ADR-005, the FDD §4.4/§8, the TDD §2.2/§9, and the Calculation Logic Reference Scenario 4.
+> - The HC-10 Cross-Geo Extension mechanics and VR-6 below therefore describe the **approved-path behaviour that applies only after DEC-001 clears**; the **default legal state overrides them with `DR_NOT_OFFERED`**. See ADR-001, ADR-005, the FDD Section 4.4/Section 8, the TDD Section 2.2/Section 9, and the Calculation Logic Reference Scenario 4.
 
 ---
 
@@ -40,8 +40,8 @@ Regions surviving both stages enter the **scoring pipeline** where soft objectiv
 
 ### Source Documents
 
-- **HC-1 through HC-7:** `multi_region_placement_design.md` §27 (Hard Constraints)
-- **HC-8, HC-9, HC-10:** `acrme_production_readiness_review_and_architecture.md` §27 (Production-Ready Region Selection)
+- **HC-1 through HC-7:** `multi_region_placement_design.md` Section 27 (Hard Constraints)
+- **HC-8, HC-9, HC-10:** `acrme_production_readiness_review_and_architecture.md` Section 27 (Production-Ready Region Selection)
 - **Design rationale:** `design_change_summary.md` (Decisions D1–D9)
 
 ---
@@ -51,7 +51,7 @@ Regions surviving both stages enter the **scoring pipeline** where soft objectiv
 ### HC-1: REGION_SEPARATION [UPDATED]
 
 **Category:** Isolation  
-**Source:** Multi-Region Placement Design §27; Decision D8  
+**Source:** Multi-Region Placement Design Section 27; Decision D8  
 **Status:** Updated in Pass 2 — NonProd/DR co-location now permitted
 
 #### Definition
@@ -95,7 +95,7 @@ Prod eliminates 1; NonProd selects from 3; DR may share with NonProd or use the 
 ### HC-2: CAPACITY_FLOOR
 
 **Category:** Capacity  
-**Source:** Multi-Region Placement Design §27  
+**Source:** Multi-Region Placement Design Section 27  
 **Status:** Stable
 
 #### Definition
@@ -134,7 +134,7 @@ Ensures sufficient capacity buffer exists in the region before placement. The **
 ### HC-3: QUOTA_FLOOR [UPDATED]
 
 **Category:** Quota  
-**Source:** Multi-Region Placement Design §27; Design Change Summary QG-3  
+**Source:** Multi-Region Placement Design Section 27; Design Change Summary QG-3  
 **Status:** Updated in Pass 2 — now reads from Quota Groups, not per-subscription QuotaRecord
 
 #### Definition
@@ -209,7 +209,7 @@ where:
 ### HC-4: DR_SEPARATION_CLASS
 
 **Category:** Resilience  
-**Source:** Multi-Region Placement Design §27  
+**Source:** Multi-Region Placement Design Section 27  
 **Status:** Stable (non-paired regions only)
 
 #### Definition
@@ -247,7 +247,7 @@ Ensures non-correlated failure domains between Prod and DR regions. This constra
 ### HC-5: ZONE_AVAILABILITY
 
 **Category:** Resilience  
-**Source:** Multi-Region Placement Design §27  
+**Source:** Multi-Region Placement Design Section 27  
 **Status:** Stable
 
 #### Definition
@@ -286,7 +286,7 @@ Single-zone regions are excluded for all non-dev environments. Multi-zone deploy
 ### HC-6: DR_COVERAGE_FLOOR [NEW]
 
 **Category:** DR Capacity  
-**Source:** Multi-Region Placement Design §27; Design Change Summary CR/CRG-1; Decision D8  
+**Source:** Multi-Region Placement Design Section 27; Design Change Summary CR/CRG-1; Decision D8  
 **Status:** New in Pass 2 — operationalises NonProd/DR co-location
 
 #### Definition
@@ -350,7 +350,7 @@ def validate_HC6_DR_coverage_floor(region, customer_prod_vm_count):
 ### HC-7: DR_FLOOR_INTEGRITY [NEW]
 
 **Category:** Quota Protection  
-**Source:** Multi-Region Placement Design §27; Design Change Summary QG-4  
+**Source:** Multi-Region Placement Design Section 27; Design Change Summary QG-4  
 **Status:** New in Pass 2 — enforces DR floor within Two-Group Quota Architecture
 
 #### Definition
@@ -436,7 +436,7 @@ If nonprod_quota_used = 100 vCPU:
 ### HC-8: GEOGRAPHY_CONTAINMENT [IMPLIED]
 
 **Category:** Geography  
-**Source:** Production Readiness Review §27  
+**Source:** Production Readiness Review Section 27  
 **Status:** Implied constraint (no standalone definition block)
 
 #### Definition
@@ -495,7 +495,7 @@ def get_prod_candidates(geography):
 ### HC-9: STANDARD_REGION_ONLY [NEW]
 
 **Category:** Region Class  
-**Source:** Production Readiness Review §27  
+**Source:** Production Readiness Review Section 27  
 **Status:** New gate for production-ready region classification
 
 #### Definition
@@ -574,7 +574,7 @@ def get_eligible_regions_stage1(geography, customer_request):
 ### HC-10: CROSS_GEO_EXTENSION_PATH_APPROVED [NEW]
 
 **Category:** Cross-Geo DR  
-**Source:** Production Readiness Review §27  
+**Source:** Production Readiness Review Section 27  
 **Status:** New governance control for cross-geography DR assignments
 
 #### Definition
@@ -679,7 +679,7 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
     "Middle East": true
   },
   "dr_not_offered_rationale": {
-    "Middle East": "Legal-owned programme (DEC-001, under review). Data-sovereignty/residency laws for a largely government/medical customer base mean cross-border DR cannot meet residency requirements; DR is currently NOT offered (baseline §2/§5.2/§6, DR-014). Production may still exist without DR. Set to false ONLY when Legal records a DEC-001 approval."
+    "Middle East": "Legal-owned programme (DEC-001, under review). Data-sovereignty/residency laws for a largely government/medical customer base mean cross-border DR cannot meet residency requirements; DR is currently NOT offered (baseline Section 2/Section 5.2/Section 6, DR-014). Production may still exist without DR. Set to false ONLY when Legal records a DEC-001 approval."
   },
   "cross_geo_extension_paths": {
     "Middle East": {
@@ -713,8 +713,8 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
 | **HC-6** | DR_COVERAGE_FLOOR | DR Capacity | Stage 2 | Combined DR+NonProd capacity must absorb DR demand | Pass 2 (D8) |
 | **HC-7** | DR_FLOOR_INTEGRITY | Quota Protection | Stage 2 | NonProd placement cannot encroach on DR quota floor | Pass 2 (QG-4) |
 | **HC-8** | GEOGRAPHY_CONTAINMENT | Geography | Stage 1 | Prod region must be within customer's chosen geography (Scenario 1) | Implied |
-| **HC-9** | STANDARD_REGION_ONLY | Region Class | Stage 1 | Only Standard Capacity Regions eligible for automated placement | PRR §27 |
-| **HC-10** | CROSS_GEO_EXTENSION_PATH_APPROVED | Cross-Geo DR | Stage 2 | Cross-geography DR requires explicit approval path | PRR §27 |
+| **HC-9** | STANDARD_REGION_ONLY | Region Class | Stage 1 | Only Standard Capacity Regions eligible for automated placement | PRR Section 27 |
+| **HC-10** | CROSS_GEO_EXTENSION_PATH_APPROVED | Cross-Geo DR | Stage 2 | Cross-geography DR requires explicit approval path | PRR Section 27 |
 
 ---
 

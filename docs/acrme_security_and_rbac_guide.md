@@ -18,7 +18,7 @@ This guide defines the complete authorization model for ACRME. It maps **every o
 
 **Design principle — least privilege by construction.** ACRME never runs as Owner, Contributor, or User Access Administrator. Each function runs under a dedicated identity holding a purpose-built custom role scoped to the narrowest resource container that still lets the function complete. Role assignment (a privileged operation) is isolated from capacity and VM mutation, and no engine identity may broaden its own rights.
 
-**What this guide does not cover.** Data-plane secrets for Cosmos DB / Redis (handled by managed identity + Azure RBAC data roles, out of scope here beyond §12), network security groups, and Azure Policy authoring. Those are referenced where they intersect authorization.
+**What this guide does not cover.** Data-plane secrets for Cosmos DB / Redis (handled by managed identity + Azure RBAC data roles, out of scope here beyond Section 12), network security groups, and Azure Policy authoring. Those are referenced where they intersect authorization.
 
 ---
 
@@ -53,7 +53,7 @@ The five identities above are **Azure control-plane** identities. On top of them
 | **Policy Admin** | Version and activate placement/transfer policy | Execute DR operations |
 | **Auditor** | Read audit trail and evidence | Any mutation |
 
-Separation is deliberate: a DR Operator can *drive* the engine but cannot grant themselves or the engine new Azure rights; a Policy Admin shapes behavior but cannot execute it; an Auditor sees everything and changes nothing. See §10 (separation of duties).
+Separation is deliberate: a DR Operator can *drive* the engine but cannot grant themselves or the engine new Azure rights; a Policy Admin shapes behavior but cannot execute it; an Auditor sees everything and changes nothing. See Section 10 (separation of duties).
 
 ---
 
@@ -124,18 +124,18 @@ The Quota Operator holds **no compute write and no VM write** — it can only qu
 | Deallocate / restart VM (Path A fallback) | VMDisassociationService | `Microsoft.Compute/virtualMachines/deallocate/action`, `Microsoft.Compute/virtualMachines/start/action` | Only when in-place update is unsupported |
 | Read-back converged state | VMDisassociationService | `Microsoft.Compute/virtualMachines/read` | |
 
-Three `NotActions` fence this role hard: `virtualMachines/delete`, `virtualMachineScaleSets/write`, and `virtualMachineScaleSets/delete`. The engine can move a VM off a reservation but can **never delete a customer VM or touch scale sets**. Scope is restricted to **explicitly enumerated consumer resource groups** — never a subscription. See §11 for the full G-14 consent and revocation model.
+Three `NotActions` fence this role hard: `virtualMachines/delete`, `virtualMachineScaleSets/write`, and `virtualMachineScaleSets/delete`. The engine can move a VM off a reservation but can **never delete a customer VM or touch scale sets**. Scope is restricted to **explicitly enumerated consumer resource groups** — never a subscription. See Section 11 for the full G-14 consent and revocation model.
 
 ### 3.6 Cross-cutting operations
 
 | Operation | Identity | Required actions | Notes |
 |---|---|---|---|
-| Reconciliation (drift detect) | Reader | read actions in §3.1 | Detection is read-only |
-| Reconciliation (drift remediate) | Capacity / Consumer Compute | corresponding write action in §3.2 / §3.5 | Remediation reuses the mutation identity, still least-privilege |
+| Reconciliation (drift detect) | Reader | read actions in Section 3.1 | Detection is read-only |
+| Reconciliation (drift remediate) | Capacity / Consumer Compute | corresponding write action in Section 3.2 / Section 3.5 | Remediation reuses the mutation identity, still least-privilege |
 | Emergency capacity transfer (Tier 1/2) | Capacity Operator | `capacityReservations/write` | Tier boundaries enforced in app layer, not Azure RBAC |
 | DR failover / failback | Capacity Operator (+ Reader) | `capacityReservations/write`, reads | Orchestrated by app-role DR Operator |
 | `engine_mode` transition | (no Azure action) | — | State in Cosmos DB; gated by Policy Admin app role |
-| Audit event write | (data plane) | Cosmos DB data-role, not ARM | See §12 |
+| Audit event write | (data plane) | Cosmos DB data-role, not ARM | See Section 12 |
 
 ---
 
@@ -155,7 +155,7 @@ Design notes:
 
 - **No wildcards on write.** Read roles may use narrow wildcards for convenience; every write/delete/action is explicitly enumerated so the role cannot silently acquire new mutation rights when Azure adds resource types.
 - **`NotActions` as guardrails, not just least-privilege.** They encode invariants (Capacity can't share; Sharing can't change reservations; Consumer Compute can't delete VMs) that survive future edits to the `Actions` list.
-- **`assignableScopes`** are set to the narrowest management-group/subscription that must host the role definition; assignment scope is narrowed further at assignment time (§5).
+- **`assignableScopes`** are set to the narrowest management-group/subscription that must host the role definition; assignment scope is narrowed further at assignment time (Section 5).
 
 ---
 
@@ -263,7 +263,7 @@ No single identity can both **grant rights** and **change capacity/VMs**. The on
 
 ## 13. Mapping to the production-readiness RBAC matrix
 
-This guide operationalizes the RBAC matrix in the Production Readiness Review (§36). The five UAMIs here correspond 1:1 to the "ACRME * UAMI" rows; the four app roles correspond to the DR Operator / Emergency Operator / Policy Admin / Auditor rows. The G-14 closure model here is the concrete realization of that document's "customer-consented UAMI with resource-group-scoped custom rights" guidance.
+This guide operationalizes the RBAC matrix in the Production Readiness Review (Section 36). The five UAMIs here correspond 1:1 to the "ACRME * UAMI" rows; the four app roles correspond to the DR Operator / Emergency Operator / Policy Admin / Auditor rows. The G-14 closure model here is the concrete realization of that document's "customer-consented UAMI with resource-group-scoped custom rights" guidance.
 
 ---
 

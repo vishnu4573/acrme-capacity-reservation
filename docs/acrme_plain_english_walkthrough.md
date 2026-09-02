@@ -74,7 +74,7 @@ Each domain section follows the same pattern:
 - **Sad path** — what happens when something is wrong.
 
 Geography-specific examples use the authoritative Standard Capacity region sets (Requirements Baseline
-v2.2 §6, ADR-001):
+v2.2 Section 6, ADR-001):
 
 | Geography | Standard Capacity Regions (engine-selectable) | Restricted Regions (exception only) |
 |---|---|---|
@@ -158,7 +158,7 @@ using the analogy of placing desks in office buildings:
 | **ε = 0.10** (smallest) | Zone diversity | Are the desks spread across different floors of the building? If one floor has a power cut, other floors keep running. Nice-to-have, not critical. |
 
 **All five add to exactly 1.0 (100%).** They are **policy defaults stored in config** — not
-hardcoded. The team can adjust them if priorities change (see §6 for the weight-sum validation
+hardcoded. The team can adjust them if priorities change (see Section 6 for the weight-sum validation
 requirement).
 
 #### Component α (weight 0.30) — Headroom or Capacity Signal
@@ -763,7 +763,7 @@ version is loaded. This validation must occur **before** the policy version is p
 placement engine. A policy that fails this check must be rejected with a recorded configuration
 error; the placement engine must never receive a policy with an invalid weight sum.
 
-See §6 of the Calculation Logic Reference and §8.2 of the Technical Design Document for the
+See Section 6 of the Calculation Logic Reference and Section 8.2 of the Technical Design Document for the
 formal validation rule specification.
 
 ---

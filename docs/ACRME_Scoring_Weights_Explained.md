@@ -77,7 +77,7 @@ However, **α** and **δ** have **different semantic meanings** per environment 
 
 **Why γ = 0.25:** Equal to capacity in importance. As a region accumulates customers its γ score drops, redirecting future placements away from it until all regions reach roughly equal count (steady-state expected count per region per env type = `total_customers / 3`). Increase γ toward 0.35 if score convergence results in uneven loading; decrease toward 0.15 if capacity constraints should dominate fairness.
 
-**Note:** The PRR (§28) updates Distribution to use **demand units** rather than customer count: `1 - (Region_Assigned_Demand / Total_Assigned_Demand)`.
+**Note:** The PRR (Section 28) updates Distribution to use **demand units** rather than customer count: `1 - (Region_Assigned_Demand / Total_Assigned_Demand)`.
 
 ---
 
@@ -97,7 +97,7 @@ However, **α** and **δ** have **different semantic meanings** per environment 
 
 **Why δ = 0.15:** Lower than α/β/γ because it's a forward-looking health signal rather than an immediate placement blocker. Increase δ toward 0.20 if DR buffer violations appear; decrease if capacity/distribution should dominate.
 
-**Trade-off (PS_NonProd):** δ duplicates α intentionally — this was flagged in the PRR (§28) as double-counting. The corrected pilot formula proposes revised NonProd weights: `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones` to reduce the duplication.
+**Trade-off (PS_NonProd):** δ duplicates α intentionally — this was flagged in the PRR (Section 28) as double-counting. The corrected pilot formula proposes revised NonProd weights: `PS_NonProd = 0.35·Capacity + 0.25·Quota + 0.25·Distribution + 0.05·DR_Overflow_Integrity + 0.10·Zones` to reduce the duplication.
 
 ---
 
@@ -243,14 +243,14 @@ A uniform jitter of ±0.01 is added as a tiebreaker.
 
 - **Multi-Region Placement Design** (`docs/research/multi_region_placement_design.md`) — lines 449–531, full formula definitions + weight table
 - **Design Change Summary** (`docs/research/design_change_summary.md`) — CR/CRG-7, lines 153–193, formula rationale
-- **Production Readiness Review** (`docs/acrme_production_readiness_review_and_architecture.md`) — §28 lines 1095–1160, corrected scoring model
+- **Production Readiness Review** (`docs/acrme_production_readiness_review_and_architecture.md`) — Section 28 lines 1095–1160, corrected scoring model
 - **ADR-001 Region Selection** (`docs/adr/acrme_adr_001_region_selection.md`) — corrected scoring model section
 
 ---
 
 ## Evidence Tags
 
-- `[Documented]` — Defined in Multi-Region Placement Design and PRR §28
+- `[Documented]` — Defined in Multi-Region Placement Design and PRR Section 28
 - `[Decided]` — Decision Log D9 (env-type-specific formulas)
 - `[Assumed]` — Default weights retained for pilot comparison; revised weights proposed but not empirically validated
 

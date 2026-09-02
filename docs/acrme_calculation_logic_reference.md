@@ -25,7 +25,7 @@ evidence tag:
 - `[Assumed]` — a policy default or working hypothesis, tunable and not yet empirically validated.
 
 **Sources:** Requirements Baseline v2.1/v2.2 (Appendix A–D); ADR-001 through ADR-004 v1.2;
-`acrme_production_readiness_review_and_architecture.md` (PRR §26–§32).
+`acrme_production_readiness_review_and_architecture.md` (PRR Section 26–Section 32).
 
 > **Convention.** `vCPU` = `vCPU_per_instance` for the SKU family. `CVAL` (Customer Validation) and
 > `NonProd` are interchangeable; scoring identifiers keep the `NonProd` spelling for engineering
@@ -167,7 +167,7 @@ potential_dr_demand(region)= Σ prod_allocated  for all customers whose dr_regio
 | `Target Reserved Capacity = Allocated + Buffer` | Continuous reconciliation floor (Scenario 16) | CAP-003 |
 | `Forecast_Quantity = ceil(Peak × (1+Growth) + DR_Buffer)` | Proactive growth ahead of demand (Scenario 11) | ADR-004 |
 | `Destination DR Requirement(d) = MAX(source portions)` | DR standby sizing (Scenario 17) | A.6 / DR-017 |
-| `dr_ratio_*` constants | Superseded (Scenario 15) — configuration reference only | PRR §32 |
+| `dr_ratio_*` constants | Superseded (Scenario 15) — configuration reference only | PRR Section 32 |
 
 ---
 

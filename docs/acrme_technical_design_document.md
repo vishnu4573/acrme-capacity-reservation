@@ -14,7 +14,7 @@
 
 > **Purpose.** This TDD describes **how** ACRME is built — components, runtime, topology, data, state, algorithms, interfaces, security, observability, NFRs, integration, and POC gating — traceable to Requirements Baseline v2.2 and to the companion FDD (which owns the *what*). This document is **self-contained**: all normative algorithms, formulas, schemas, enumerations, and constants are inlined, not referenced externally.
 
-> **Reconciliation note (v2.2).** This TDD implements the confirmed v2.2 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002) — pre-configured but **conditional and currently inactive** for the Middle East, whose current legal position is `DR_NOT_OFFERED` pending DEC-001 (see §2.2 constraints); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
+> **Reconciliation note (v2.2).** This TDD implements the confirmed v2.2 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002) — pre-configured but **conditional and currently inactive** for the Middle East, whose current legal position is `DR_NOT_OFFERED` pending DEC-001 (see Section 2.2 constraints); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
 
 ---
 
@@ -24,7 +24,7 @@
 This document specifies the technical design of ACRME: the control engine that guarantees every managed Azure deployment has **both** reserved physical capacity and deployable VM-family quota — in the correct region/zone/SKU — before it proceeds, while minimising idle cost through lean distributed DR and continuous reconciliation. It covers component architecture, runtime and deployment, data and state, the placement/scoring/DR algorithms, the API surface, security, observability, non-functional behaviour, integration, and the POC dependencies that gate production reliance.
 
 ### 1.2 Relationship to the FDD
-The FDD (`acrme_functional_design_document.md`) defines **what** ACRME does — capabilities, flows, states, and rules — traceable to Baseline v2.2. This TDD defines **how** those capabilities are realised. Where the FDD names a behaviour (e.g. "single governed pool", "max-not-sum DR", "readiness states"), this TDD gives the component, schema, algorithm, and interface that implements it. Section references to the FDD use the form *(FDD §4.x)*.
+The FDD (`acrme_functional_design_document.md`) defines **what** ACRME does — capabilities, flows, states, and rules — traceable to Baseline v2.2. This TDD defines **how** those capabilities are realised. Where the FDD names a behaviour (e.g. "single governed pool", "max-not-sum DR", "readiness states"), this TDD gives the component, schema, algorithm, and interface that implements it. Section references to the FDD use the form *(FDD Section 4.x)*.
 
 ### 1.3 Decision records referenced
 | ADR | Title | Key technical mandate used here |
@@ -33,7 +33,7 @@ The FDD (`acrme_functional_design_document.md`) defines **what** ACRME does — 
 | ADR-002 | Quota & capacity management | **Single governed pool (primary)**; logical earmarks; exception two-group topology |
 | ADR-003 | Capacity management during DR | Five-state engine machine; three-tier emergency transfer; quota-neutral Tier 2 |
 | ADR-004 | Forecast & increase of capacity/quota | Reservation floor vs forecast growth; auto-increase triggers; 10-step lifecycle |
-| ADR-005 | Distributed DR reference model | `SourceDestinationDRIndex`; max-not-sum; overcommit ratio/gap; §12A worked model |
+| ADR-005 | Distributed DR reference model | `SourceDestinationDRIndex`; max-not-sum; overcommit ratio/gap; Section 12A worked model |
 
 ### 1.4 Evidence tags
 Every non-trivial design assertion carries an evidence tag consistent with the requirements corpus: `[Documented]` (Microsoft Learn / Azure platform), `[Decided]` (approved ADR decision), `[Derived]` (logical consequence; POC where noted), `[Assumed]` (tunable policy default, not yet empirically validated).
@@ -42,7 +42,7 @@ Every non-trivial design assertion carries an evidence tag consistent with the r
 
 ## 2. Architecture Overview
 
-### 2.1 Design principles (baseline §20)
+### 2.1 Design principles (baseline Section 20)
 1. **Readiness is capacity ∧ quota ∧ freshness.** No deployment is "ready" on a reservation alone; deployable consumer quota and non-stale state are equally required (RDY-003, NFR-002). `[Decided]`
 2. **Continuous reconciliation of desired vs actual.** A reservation floor (`Allocated + Buffer`, CAP-003) is enforced every cycle; forecast growth is a separate proactive path (ADR-004). `[Decided]`
 3. **Lean, distributed, reciprocal DR.** No dedicated DR regions; each region hosts Prod + CVAL + DR standby for other regions; standby is sized max-not-sum and shared across mutually exclusive failures (DR-016/017, ADR-005). `[Decided]`
@@ -50,8 +50,8 @@ Every non-trivial design assertion carries an evidence tag consistent with the r
 5. **Config-as-code, deterministic, replayable.** All policy (weights, buffers, thresholds, catalogue) is versioned; every decision records inputs, policy version, and snapshot ref for deterministic replay. `[Decided]`
 6. **Fail-safe and idempotent.** Stale state blocks placement; all mutations are idempotent with operation handles and optimistic concurrency (NFR-002/007). `[Decided]`
 
-### 2.2 Constraints (baseline §21)
-- **Middle East DR is `DR_NOT_OFFERED` (current legal position, DEC-001 pending).** The Middle East programme is legal-owned and serves government/medical customers under data-residency/sovereignty laws; cross-border DR cannot meet residency requirements, so **no DR is offered there today** (baseline §2, §6, DR-014, DEC-001). Middle East **production** may still be placed and governed; the placement/DR engine emits `dr_region = NOT_OFFERED` for those geographies and creates **no** `SourceDestinationDRIndex` entry, **no** DR earmark, and **no** cross-geo activation. The Switzerland North cross-geo path (REG-002/HC-10) is **pre-configured but inactive** for the Middle East; it activates **only** if Legal clears DEC-001, via a config flip (`dr_not_offered["Middle East"] = false`) with **no code change**. `DR_NOT_OFFERED` is evaluated **before** any cross-geo extension. `[Documented]`
+### 2.2 Constraints (baseline Section 21)
+- **Middle East DR is `DR_NOT_OFFERED` (current legal position, DEC-001 pending).** The Middle East programme is legal-owned and serves government/medical customers under data-residency/sovereignty laws; cross-border DR cannot meet residency requirements, so **no DR is offered there today** (baseline Section 2, Section 6, DR-014, DEC-001). Middle East **production** may still be placed and governed; the placement/DR engine emits `dr_region = NOT_OFFERED` for those geographies and creates **no** `SourceDestinationDRIndex` entry, **no** DR earmark, and **no** cross-geo activation. The Switzerland North cross-geo path (REG-002/HC-10) is **pre-configured but inactive** for the Middle East; it activates **only** if Legal clears DEC-001, via a config flip (`dr_not_offered["Middle East"] = false`) with **no code change**. `DR_NOT_OFFERED` is evaluated **before** any cross-geo extension. `[Documented]`
 - **Azure Quota Group / `groupQuotas` maturity** gates single-pool enforcement (DEP-001); the two-group topology is the sanctioned fallback. `[Documented]`
 - **No native intra-pool sub-reservation** in Azure quota groups — the DR earmark and Prod floor are engine-enforced arithmetic, not platform primitives (Scenario 9). `[Documented]`
 - **ARM throttling budgets** bound reconciliation cadence and estate size (Compute RP: 250 reads / 5 min, 1,200 writes / hour per subscription). `[Documented]`
@@ -60,7 +60,7 @@ Every non-trivial design assertion carries an evidence tag consistent with the r
 
 ---
 
-## 3. Logical Component Architecture (§23)
+## 3. Logical Component Architecture (Section 23)
 
 ACRME is a set of cooperating services around a versioned state store and a policy (config-as-code) service. Components are deployable as modules of a single control application; boundaries are drawn for testability and independent scaling.
 
@@ -75,7 +75,7 @@ ACRME is a set of cooperating services around a versioned state store and a poli
 | **State Store** | Versioned, optimistic-concurrency document store for entities, snapshots, operation/audit records. | DAT-001..006, NFR-007 |
 | **Config / Scope-File Service** | Versioned `PlacementPolicy`, region catalogue, scope files; decision-traceable. | GOV-003, DAT-005, REG-001 |
 | **Forecast & Increase Service** | Advisory `Forecast_Quantity`; auto-increase triggers; operator-gated capacity/quota increase. | CAP-005, ADR-004 |
-| **Emergency Transfer Service** | Tier 1/2/3 escalation during `DR_EVENT_ACTIVE`; quota-neutral Tier 2; Tier 3 blocked in Phase 1. | ADR-003, §13 baseline |
+| **Emergency Transfer Service** | Tier 1/2/3 escalation during `DR_EVENT_ACTIVE`; quota-neutral Tier 2; Tier 3 blocked in Phase 1. | ADR-003, Section 13 baseline |
 | **Observability Emitter** | Metrics, alerts, dashboards incl. per-destination max-source coverage & source↔destination map. | OBS-001..005 |
 | **Governance & Audit** | RBAC, managed identity, approval gates, break-glass, immutable audit with before/after + correlation IDs. | GOV-001..009 |
 
@@ -125,14 +125,14 @@ flowchart TB
 
 ---
 
-## 4. Runtime & Deployment (§23, CAP-006, PLC-009)
+## 4. Runtime & Deployment (Section 23, CAP-006, PLC-009)
 
 ### 4.1 Execution model
 - **Reconciliation job (container app):** a long-running scheduler executes the reconciliation loop on a **6-minute target interval (configurable, CAP-006)**; targeted/critical reconciles run out-of-band. It drives the Inventory Collector → State Reconciler → Quota-Pool Manager cycle and emits snapshots. `[Decided]`
 - **Placement flow (function/event path, PLC-009):** onboarding and AEP readiness requests are handled synchronously against the latest snapshot; on stale state the request triggers a synchronous refresh or returns `STALE_STATE`. `[Decided]`
 - **DR path:** DR declaration flips `engine_mode` to `DR_EVENT_ACTIVE`; the DR Orchestrator drives priority-wave activation out of the steady-state cadence. `[Decided]`
 
-### 4.2 Cadence, SLOs and drift (§38, NFR)
+### 4.2 Cadence, SLOs and drift (Section 38, NFR)
 ```text
 Reconciliation loop target        = 6 min (configurable; production interval TBD)   [Assumed]
 Critical targeted reconcile  P95  < 2 min                                           [Assumed]
@@ -141,7 +141,7 @@ Drift detection                   ≤ 2 reconciliation cycles                   
 Snapshot max age (staleness gate) = max_snapshot_age_seconds (config, RDY-004)      [Decided]
 ```
 
-### 4.3 API surface (summary; detail in §11)
+### 4.3 API surface (summary; detail in Section 11)
 A readiness/placement API (query + idempotent mutations), an operations/approval API (increase approval, DR declaration, override, sharing activation), and a read-only audit/observability API. All mutating operations are idempotent and versioned (INT-004..006). `[Decided]`
 
 ### T2 — Management group / subscription topology
@@ -162,12 +162,12 @@ flowchart TB
 
 ---
 
-## 5. Topology — Subscriptions, CRGs and Quota Groups (§24, §25, §26)
+## 5. Topology — Subscriptions, CRGs and Quota Groups (Section 24, Section 25, Section 26)
 
-### 5.1 Management group / subscription model (§24)
+### 5.1 Management group / subscription model (Section 24)
 ACRME runs from a platform control subscription with cross-subscription managed-identity access (least-privilege RBAC) to the Prod, NonProd/CVAL, and DR-hosting subscriptions (see T2). All mutations are attributed to the control identity and audited (GOV-002). `[Decided]`
 
-### 5.2 CRG hierarchy and cross-subscription sharing (§25, FC-06)
+### 5.2 CRG hierarchy and cross-subscription sharing (Section 25, FC-06)
 - **Three-CRG model per region:** exactly one Prod, one NonProd/CVAL, and one DR-standby CRG target per region per scope (CAP-001). `[Decided]`
 - **Zone alignment (FC-06):** cross-subscription CRG sharing requires a validated `ZoneMappingRecord` — logical zones differ across subscriptions, so sharing is only valid when physical zones align (CAP-014..019). `[Decided]`
 - **Sharing limits:** provider→consumer sharing validated for SKU/region/zone/authorisation; a per-provider consumer ceiling applies. `[Decided]`
@@ -191,12 +191,12 @@ flowchart TB
     classDef n fill:#fff3cd,stroke:#e0a800;
 ```
 
-### 5.3 Quota-group architecture — single-pool decision (§26, QUA-004)
+### 5.3 Quota-group architecture — single-pool decision (Section 26, QUA-004)
 **Primary model:** one governed quota group per region and quota family, covering Prod + NonProd/CVAL + DR together. All eligible default per-region quota is collected into the pool (QUA-003) and allocated on demand. Prod and DR are protected inside the shared pool by **logical earmarks** enforced by the Quota-Pool Manager at allocation/reclamation time — not by physical group separation. Because all three environments share one pool, an emergency DR draw needs **no cross-group transfer**. `[Decided]`
 
 **Exception topology:** two (or more) groups per region, used **only** when Azure Quota Group limits or a mandatory Prod-isolation governance boundary make one pool impossible; each case is recorded in the Decision Log and reverts to one pool when the constraint lifts (DEP-001). `[Decided]`
 
-The pool arithmetic (`Pool_Limit`, `Prod_Reserved_Floor`, `DR_Earmark_vCPU`, `Allocatable_NonProd`, `Pool_Headroom`) is specified in §8.3. See T4.
+The pool arithmetic (`Pool_Limit`, `Prod_Reserved_Floor`, `DR_Earmark_vCPU`, `Allocatable_NonProd`, `Pool_Headroom`) is specified in Section 8.3. See T4.
 
 ### T4 — Quota-group / pool architecture (single-pool model)
 
@@ -216,7 +216,7 @@ flowchart TB
 
 ---
 
-## 6. Data Architecture (§34, DAT-001..006)
+## 6. Data Architecture (Section 34, DAT-001..006)
 
 ### 6.1 Store characteristics
 A versioned document store with per-document optimistic concurrency (`policy_version` / `_etag`-style guards), freshness metadata on every snapshot, and append-only operation/audit records (DAT-001..006, NFR-007). Every decision-driving read carries a `capacity_snapshot_ref` for deterministic replay. `[Decided]`
@@ -262,7 +262,7 @@ CVALEarmarkRecord {                        # PLC-010 — prevents DR/CVAL double
 }
 ```
 
-Supporting entities: `RegionalSnapshot` (freshness-stamped capacity/quota/usage/zone data), `PlacementPolicy` (weights, buffers, thresholds, catalogue — versioned), `ReservationState`/`QuotaPoolState`, `OperationRecord` (saga + compensation), `AuditEvent` (append-only), `ActivationRecord` (DR-019, §9.3), `ZoneMappingRecord` (FC-06), `SharingRelationship`, `DRDistributionPlan`.
+Supporting entities: `RegionalSnapshot` (freshness-stamped capacity/quota/usage/zone data), `PlacementPolicy` (weights, buffers, thresholds, catalogue — versioned), `ReservationState`/`QuotaPoolState`, `OperationRecord` (saga + compensation), `AuditEvent` (append-only), `ActivationRecord` (DR-019, Section 9.3), `ZoneMappingRecord` (FC-06), `SharingRelationship`, `DRDistributionPlan`.
 
 ### T5 — Data model / ERD (incl. seed record, SourceDestinationDRIndex, CVAL earmark)
 
@@ -313,7 +313,7 @@ Every snapshot carries `collected_at`; the readiness gate compares `now() - coll
 
 ---
 
-## 7. State Model & Concurrency (§29, NFR-002/007)
+## 7. State Model & Concurrency (Section 29, NFR-002/007)
 
 ### 7.1 Engine mode machine (five states)
 ```text
@@ -344,7 +344,7 @@ stateDiagram-v2
 
 ---
 
-## 8. Placement Scoring & Forecasting (§28)
+## 8. Placement Scoring & Forecasting (Section 28)
 
 ### 8.1 Input modes and pipeline
 The default input is an **exact production region** which ACRME **validates** (it does not derive). A **geography** input is an **exception path** requiring approval + customer acknowledgement, after which the derived region becomes the fixed seed (ADR-001, PLC-001/002). Restricted regions never enter scoring — they route to the exception workflow.
@@ -420,7 +420,7 @@ Valid:   α=0.40, β=0.15, γ=0.25, δ=0.10, ε=0.10  → sum = 1.00 ✓
 Invalid: α=0.40, β=0.20, γ=0.25, δ=0.15, ε=0.10  → sum = 1.10 ✗ — gate rejects
 ```
 
-**Test catalogue entries (T-WV-01..T-WV-05):** see Calculation Logic Reference §
+**Test catalogue entries (T-WV-01..T-WV-05):** see Calculation Logic Reference Section 
 "Policy weight-sum validation rule" for the full test matrix covering the valid case,
 both invalid-sum directions, IEEE 754 rounding tolerance, and the tolerance boundary.
 `[Decided]`
@@ -447,7 +447,7 @@ PS_DR(r)      = 0.30·Clamp(dr.free_slots / dr.quantity)
 
 `PS_Prod` is dual-purpose (derive on exception; validate/audit otherwise). Every candidate score + policy version + snapshot ref is written to the `OperationRecord` for deterministic replay. A reviewer-recommended pilot `PS_NonProd` variant (removing the α/δ duplication) is recorded in the Calculation Logic Reference; the formula above is the approved design-of-record. Scoring runs in shadow/recommendation mode until empirically validated. `[Decided]`
 
-### 8.3 Quota-pool arithmetic (single-pool, §26/QUA-004)
+### 8.3 Quota-pool arithmetic (single-pool, Section 26/QUA-004)
 ```text
 Pool_Limit(region) = Prod_CRG_qty·vCPU·(1+prod_growth_buffer)
                    + NonProd_CRG_qty·vCPU·(1+nonprod_growth_buffer)
@@ -471,7 +471,7 @@ The reconciliation floor is enforced every cycle; the forecast is advisory (hori
 
 ---
 
-## 9. DR Sizing & Activation Algorithms (§31, App. A.6/A.7/A.8, App. D)
+## 9. DR Sizing & Activation Algorithms (Section 31, App. A.6/A.7/A.8, App. D)
 
 ### 9.1 Max-not-sum sizing (DR-017, ADR-005)
 ```text
@@ -549,7 +549,7 @@ sequenceDiagram
     DRO->>DRO: ACTIVE -> FAILBACK_PENDING -> STANDBY (reverse order)
 ```
 
-### 9.4 Tier escalation (§32) — see §13 baseline
+### 9.4 Tier escalation (Section 32) — see Section 13 baseline
 Emergency capacity during `DR_EVENT_ACTIVE` escalates Tier 1 (direct expansion) → Tier 2 (quota-neutral transfer within the shared pool) → Tier 3 (destructive, dual-approval, **blocked in Phase 1**). In the single-pool model Tier 2 is intrinsically quota-neutral (draw and release hit the same pool). `[Decided]`
 
 ### T10 — Three-tier emergency transfer escalation
@@ -565,12 +565,12 @@ flowchart TD
     T3 -->|Later phase: dual-approval| A3[DestructiveTransfer - changes VM associations]
 ```
 
-### T13 — Distributed DR reference model (§12A)
-Reused reference diagram (ADR-005 §12A): `adr/diagrams/acrme_three_region_capacity_model.png` — each region concurrently hosts Prod + CVAL + DR standby tagged with its `src Rn` source; each destination is sized by max-not-sum against its largest single protected source.
+### T13 — Distributed DR reference model (Section 12A)
+Reused reference diagram (ADR-005 Section 12A): `adr/diagrams/acrme_three_region_capacity_model.png` — each region concurrently hosts Prod + CVAL + DR standby tagged with its `src Rn` source; each destination is sized by max-not-sum against its largest single protected source.
 
 ---
 
-## 10. Steady-State Capacity Lifecycle (§30)
+## 10. Steady-State Capacity Lifecycle (Section 30)
 
 The normative 10-step sequence runs only in `STEADY_STATE`:
 ```text
@@ -611,7 +611,7 @@ sequenceDiagram
 
 ---
 
-## 11. API Architecture (§35, INT-001..007)
+## 11. API Architecture (Section 35, INT-001..007)
 
 ### 11.1 Contracts
 ```text
@@ -655,7 +655,7 @@ Available_Quota = Assigned_Regional_VM_Family_Quota - Current_Regional_VM_Family
 
 ---
 
-## 12. Security (§36, GOV-001..009)
+## 12. Security (Section 36, GOV-001..009)
 
 - **RBAC & managed identity:** the control identity holds least-privilege, scoped roles per target subscription; no standing user credentials for mutations (GOV-001/002). `[Decided]`
 - **Approval gates:** capacity/quota increase, DR declaration, CVAL release, Tier 2 transfer, seed change, and overrides are policy-gated with recorded approver identity (GOV-005..007). `[Decided]`
@@ -665,7 +665,7 @@ Available_Quota = Assigned_Regional_VM_Family_Quota - Current_Regional_VM_Family
 
 ---
 
-## 13. Observability Implementation (§37, OBS-001..005)
+## 13. Observability Implementation (Section 37, OBS-001..005)
 
 | Signal | Metric / alert | Requirement |
 |---|---|---|
@@ -683,9 +683,9 @@ All metrics carry region/environment/scope dimensions and policy version for rep
 
 ---
 
-## 14. NFRs & Resilience (§38, NFR-001..010)
+## 14. NFRs & Resilience (Section 38, NFR-001..010)
 
-- **Throttling resilience:** adaptive throttle manager initialises with ARM baselines (250 reads/5 min, 1,200 writes/hour per subscription) and adapts to observed `429/Retry-After`; reconciliation cadence and estate size are bounded accordingly (§14 calc). `[Documented]`
+- **Throttling resilience:** adaptive throttle manager initialises with ARM baselines (250 reads/5 min, 1,200 writes/hour per subscription) and adapts to observed `429/Retry-After`; reconciliation cadence and estate size are bounded accordingly (Section 14 calc). `[Documented]`
 - **Estate sizing:** `CRG_total = R·Eclass·Z·SKUset·IsolationFactor`; `Requests_per_cycle` summed across read classes / 300 s cycle to stay within budget. `[Derived]`
 - **Degraded mode:** on untrusted/stale inputs the engine enters `INCIDENT_HOLD` / returns `STALE_STATE` and fails safe rather than driving placement from stale data (NFR-002). `[Decided]`
 - **Simulation / dry-run:** placement, reconciliation, and **DR failover** can run in dry-run/simulation, producing the would-be decisions and readiness states without mutating Azure (NFR-006). `[Decided]`
@@ -693,24 +693,24 @@ All metrics carry region/environment/scope dimensions and policy version for rep
 
 ---
 
-## 15. Integration (§33, §6 review)
+## 15. Integration (Section 33, Section 6 review)
 
 - **AKS / VMSS:** reservations back node pools / scale sets; ACRME readiness gates their capacity before scale-out; associations are tracked for reconciliation. `[Decided]`
-- **AEP:** the sole provisioning consumer of readiness; interacts only through the idempotent readiness/placement contract (§11) and polls operation handles. `[Decided]`
+- **AEP:** the sole provisioning consumer of readiness; interacts only through the idempotent readiness/placement contract (Section 11) and polls operation handles. `[Decided]`
 - **Azure control planes:** Compute (CRGs/reservations), Reservations, and **groupQuotas** (single-pool). Single-pool enforcement depends on `groupQuotas` / `groupType` maturity (DEP-001). `[Documented]`
 
 ---
 
-## 16. POC & Validation Dependencies (§42)
+## 16. POC & Validation Dependencies (Section 42)
 
 | POC | Question | Gates | Status |
 |---|---|---|---|
 | **POC-001** | Does provider quota under a shared reservation guarantee consumer deployability? | Readiness gate step 7; INT-007 | **Top unknown** |
-| POC-006 | Distributed DR topology behaves as modelled | ADR-005 §12A; DR-016 | Required |
+| POC-006 | Distributed DR topology behaves as modelled | ADR-005 Section 12A; DR-016 | Required |
 | POC-007 | Lean bootstrap sizing is sufficient to initiate recovery | DR-007 bootstrap targets | Required |
 | **POC-011** | max-not-sum overcommit is safe at platform scale | DR-017 sizing; overcommit safety ceiling; FIN-006..008 | Required before production dependency |
 | POC-005 | VM state semantics (associated/allocated/deallocated) | DR-019 activation staging | Dependency |
-| POC-031/032 | Tier 2 quota-neutral transfer within a group/pool | §13 baseline Tier 2 | Required |
+| POC-031/032 | Tier 2 quota-neutral transfer within a group/pool | Section 13 baseline Tier 2 | Required |
 
 Production reliance on max-not-sum DR sizing and single-pool consumer-quota behaviour is **gated** on POC-011 and POC-001 respectively; until then, readiness validates consumer quota explicitly and DR sizing carries the SUM-override safety option. `[Decided]`
 
@@ -723,21 +723,21 @@ Production reliance on max-not-sum DR sizing and single-pool consumer-quota beha
 | REG-001..003 | Config/Scope-File, Placement Engine | catalogue validation; input modes | `PlacementPolicy`; T8 |
 | ENV-001..007 | Placement Engine, DR Orchestrator | env separation; role flip | `CustomerSeedRecord`; T7 |
 | CAP-001..019 | Inventory Collector, State Reconciler | `Allocated+Buffer` floor; zero-not-delete; over-alloc | `ReservationState`; T9, F5 |
-| QUA-001..014 | Quota-Pool Manager | §8.3 pool arithmetic; earmarks; quota-as-governor | `QuotaPoolState`; T4 |
-| RDY-001..004 | Readiness API | §11.3 gate logic; staleness; quota deficit | readiness states; T6 |
+| QUA-001..014 | Quota-Pool Manager | Section 8.3 pool arithmetic; earmarks; quota-as-governor | `QuotaPoolState`; T4 |
+| RDY-001..004 | Readiness API | Section 11.3 gate logic; staleness; quota deficit | readiness states; T6 |
 | PLC-001..010 | Placement & Scoring Engine | `PS_Prod/NonProd/DR`; seed reuse; co-location guard | `CustomerSeedRecord`, `CVALEarmarkRecord`; T7, T8 |
 | DR-001..019 | DR Orchestrator, Emergency Transfer | max-not-sum; gap; overcommit; activation waves; staged acquisition; tiers | `SourceDestinationDRIndex`, `ActivationRecord`; T11, T12, T13, T10 |
 | FIN-001..008 | Observability Emitter, Forecast Service | idle cost; overcommit ratio; cost-before-expansion | metrics; T12 |
 | INT-001..007 | Readiness API | idempotency keys; expected-version; polling | `OperationRecord`; T1 |
 | DAT-001..006 | State Store, Config Service | freshness metadata; versioning; audit | all entities; T5 |
-| OBS-001..005 | Observability Emitter | max-source coverage; source↔dest map; activation progress | dashboards; §13 |
-| GOV-001..009 | Governance & Audit | RBAC; approval gates; break-glass; immutable audit | `AuditEvent`; §12 |
-| NFR-001..010 | (cross-cutting) | throttle resilience; degraded mode; idempotency; simulation | `OperationRecord`; §14 |
-| OPS-001..005 | (runbooks) | DR declaration/activation/failback; quota allocation; sharing; override | `ActivationRecord`; §10, §16 |
-| POC-001..011 | (gating) | consumer quota; DR topology; bootstrap; overcommit safety | §16 |
-| DEC-001..003 / DEP-001 | Config/Scope-File, Quota-Pool Manager | Middle East DR policy — **current position `DR_NOT_OFFERED`, pending legal review** (production allowed, no DR, Switzerland North path inactive until config flip); failback duration; geo-exception approver; groupQuotas maturity | `PlacementPolicy`; §2.2, §5.3 |
+| OBS-001..005 | Observability Emitter | max-source coverage; source↔dest map; activation progress | dashboards; Section 13 |
+| GOV-001..009 | Governance & Audit | RBAC; approval gates; break-glass; immutable audit | `AuditEvent`; Section 12 |
+| NFR-001..010 | (cross-cutting) | throttle resilience; degraded mode; idempotency; simulation | `OperationRecord`; Section 14 |
+| OPS-001..005 | (runbooks) | DR declaration/activation/failback; quota allocation; sharing; override | `ActivationRecord`; Section 10, Section 16 |
+| POC-001..011 | (gating) | consumer quota; DR topology; bootstrap; overcommit safety | Section 16 |
+| DEC-001..003 / DEP-001 | Config/Scope-File, Quota-Pool Manager | Middle East DR policy — **current position `DR_NOT_OFFERED`, pending legal review** (production allowed, no DR, Switzerland North path inactive until config flip); failback duration; geo-exception approver; groupQuotas maturity | `PlacementPolicy`; Section 2.2, Section 5.3 |
 
-*Every Baseline v2.2 requirement group resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD §9.*
+*Every Baseline v2.2 requirement group resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD Section 9.*
 
 ---
 

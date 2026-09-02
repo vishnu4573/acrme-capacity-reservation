@@ -42,7 +42,7 @@ This document presents **four comprehensive UML diagram sets** for the Azure Cap
 
 ✅ **Three-CRG model per region** — `CustomerRegionAssignment` targets exactly 3 CRGs: Prod, NonProd, DR  
 ✅ **Single governed quota pool per region/quota family (v2.2, QUA-004)** — `QuotaPoolState` covers Prod + NonProd/CVAL + DR together; Prod and DR protected by **logical earmarks** (`prod_reserved_floor`, `dr_earmark_vcpu`), not physical group separation. The earlier `QuotaGroupType.PROD` + `QuotaGroupType.NONPROD_DR_SHARED` **two-group** model is retained only as a narrow Azure-limit / Prod-isolation **exception topology** (ADR-002 v2.2).  
-✅ **v2.2 domain entities added** — `CustomerSeedRecord` (PLC-003, first-placement authority), `SourceDestinationDRIndex` (DR-018, reverse-of-seed driving max-not-sum sizing and standby activation), `CVALEarmarkRecord` (PLC-010, prevents CVAL/DR double-count). See the FDD §6 and TDD §6/§18 (diagram T5, T14) for full schemas.  
+✅ **v2.2 domain entities added** — `CustomerSeedRecord` (PLC-003, first-placement authority), `SourceDestinationDRIndex` (DR-018, reverse-of-seed driving max-not-sum sizing and standby activation), `CVALEarmarkRecord` (PLC-010, prevents CVAL/DR double-count). See the FDD Section 6 and TDD Section 6/Section 18 (diagram T5, T14) for full schemas.  
 ✅ **Placement scoring** — `PlacementPolicy` contains weights (alpha, beta, gamma, delta, epsilon) for deterministic placement  
 ✅ **Regional snapshot caching** — `RegionalSnapshot` with 5-min TTL, cached in Redis, persisted to Cosmos  
 ✅ **Sharing relationships** — `SharingRelationship` tracks provider-consumer pairs; 100-consumer hard limit  

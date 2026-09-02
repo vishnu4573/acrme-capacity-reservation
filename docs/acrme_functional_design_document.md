@@ -13,9 +13,9 @@
 
 > **Purpose.** This FDD describes **what** ACRME does — its functional behaviour, flows, states, and rules — traceable to every requirement in Baseline v2.2. It is implementation-neutral; the **how** (components, data, algorithms, interfaces, security, NFRs) is in the companion TDD. This document is **self-contained**: all normative detail (readiness states, engine modes, formulas, classification tables, validation rules) is inlined, not referenced externally.
 
-> **Reconciliation note (v2.2).** This document reflects the confirmed v2.2 design decisions: **single governed quota pool** as the primary model (QUA-004); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019); and **Switzerland North** as the pre-configured EU cross-geo DR extension for the Middle East (REG-002) — **conditional and currently inactive** because Middle East DR is `DR_NOT_OFFERED` pending legal review (DR-014, DEC-001; see §4.4/§8 below).
+> **Reconciliation note (v2.2).** This document reflects the confirmed v2.2 design decisions: **single governed quota pool** as the primary model (QUA-004); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019); and **Switzerland North** as the pre-configured EU cross-geo DR extension for the Middle East (REG-002) — **conditional and currently inactive** because Middle East DR is `DR_NOT_OFFERED` pending legal review (DR-014, DEC-001; see Section 4.4/Section 8 below).
 
-> **⚠️ Middle East DR (DR-014, DEC-001) — currently NOT offered.** As it stands, DR is **not offered** in the Middle East. Legal owns the Middle East programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline §2, §5.2, §6). Middle East placement defaults to `dr_region = NOT_OFFERED`; **production may still exist without DR**. Switzerland North is a pre-configured cross-geo extension that becomes usable **only if/when Legal approves DEC-001**. This is a pending decision and a major architectural risk (baseline §25).
+> **⚠️ Middle East DR (DR-014, DEC-001) — currently NOT offered.** As it stands, DR is **not offered** in the Middle East. Legal owns the Middle East programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline Section 2, Section 5.2, Section 6). Middle East placement defaults to `dr_region = NOT_OFFERED`; **production may still exist without DR**. Switzerland North is a pre-configured cross-geo extension that becomes usable **only if/when Legal approves DEC-001**. This is a pending decision and a major architectural risk (baseline Section 25).
 
 ---
 
@@ -24,9 +24,9 @@
 ### 1.1 Purpose and scope
 ACRME governs Azure capacity reservations and VM-family quota across a managed fleet so that every managed deployment has **both** reserved physical capacity and deployable quota, in the right region/zone/SKU, before it is allowed to proceed — while keeping idle cost low through lean DR and dynamic reconciliation.
 
-**In scope (baseline §5):** capacity reservation lifecycle (CAP), quota governance and pooling (QUA), combined deployment readiness (RDY), region selection and customer placement (PLC/REG), disaster recovery (DR), cost/FinOps signals (FIN), AEP/provisioning integration (INT), data/state (DAT), observability (OBS), governance (GOV), operations (OPS), and non-functional behaviour (NFR).
+**In scope (baseline Section 5):** capacity reservation lifecycle (CAP), quota governance and pooling (QUA), combined deployment readiness (RDY), region selection and customer placement (PLC/REG), disaster recovery (DR), cost/FinOps signals (FIN), AEP/provisioning integration (INT), data/state (DAT), observability (OBS), governance (GOV), operations (OPS), and non-functional behaviour (NFR).
 
-**Out of scope:** the actual provisioning of customer workloads (owned by AEP), Azure control-plane implementation, and any automation not gated by policy in Phase 1 (destructive VM-association changes remain blocked — see §4.5).
+**Out of scope:** the actual provisioning of customer workloads (owned by AEP), Azure control-plane implementation, and any automation not gated by policy in Phase 1 (destructive VM-association changes remain blocked — see Section 4.5).
 
 ### 1.2 Definitions
 | Term | Meaning |
@@ -42,7 +42,7 @@ ACRME governs Azure capacity reservations and VM-family quota across a managed f
 | **Readiness state** | Machine-readable deployment-readiness verdict returned to AEP (RDY-002). |
 
 ### 1.3 Traceability approach
-Every functional capability in §4 cites the requirement IDs it satisfies. §9 is a full matrix mapping **every** Baseline v2.2 ID (REG/ENV/CAP/QUA/RDY/PLC/DR/FIN/INT/DAT/OBS/GOV/NFR/OPS + POC/DEC/DEP dependencies) to an FDD section.
+Every functional capability in Section 4 cites the requirement IDs it satisfies. Section 9 is a full matrix mapping **every** Baseline v2.2 ID (REG/ENV/CAP/QUA/RDY/PLC/DR/FIN/INT/DAT/OBS/GOV/NFR/OPS + POC/DEC/DEP dependencies) to an FDD section.
 
 ---
 
@@ -54,16 +54,16 @@ ACRME is a policy-driven control engine sitting between the customer/onboarding 
 
 | Capability | Requirement group | FDD section |
 |---|---|---|
-| Capacity reservation management | CAP | §4.1 |
-| Quota governance & single-pool management | QUA | §4.2 |
-| Combined deployment readiness | RDY | §4.3 |
-| Region selection & customer placement (seed) | PLC, REG | §4.4 |
-| Disaster recovery (distributed, max-not-sum) | DR, ENV | §4.5 |
-| Cost & FinOps | FIN | §4.6 |
-| Provisioning & AEP integration | INT | §4.7 |
-| Observability & governance & operations | OBS, GOV, OPS | §4.8 |
-| Data & state (functional view) | DAT | §6 |
-| Non-functional behaviour | NFR | §4 (each), §6 |
+| Capacity reservation management | CAP | Section 4.1 |
+| Quota governance & single-pool management | QUA | Section 4.2 |
+| Combined deployment readiness | RDY | Section 4.3 |
+| Region selection & customer placement (seed) | PLC, REG | Section 4.4 |
+| Disaster recovery (distributed, max-not-sum) | DR, ENV | Section 4.5 |
+| Cost & FinOps | FIN | Section 4.6 |
+| Provisioning & AEP integration | INT | Section 4.7 |
+| Observability & governance & operations | OBS, GOV, OPS | Section 4.8 |
+| Data & state (functional view) | DAT | Section 6 |
+| Non-functional behaviour | NFR | Section 4 (each), Section 6 |
 
 ### F1 — System context
 
@@ -223,7 +223,7 @@ flowchart TD
 - **`DR_NOT_OFFERED` (DR-014):** where sovereignty/contract forbids cross-border DR, the seed records no DR and ACRME never silently substitutes. **This is the current position for the Middle East** (DEC-001, under legal review): ME defaults to `dr_region = NOT_OFFERED`, contributes no `SourceDestinationDRIndex` entries, consumes no DR earmark, and is never a DR source or destination; ME **production may still exist without DR**. The Switzerland North extension activates only if Legal clears DEC-001. `[Decided]`
 - **DR drills and role flip (DR-010..012):** annual drill/rotation validate the model without a real incident; destructive VM-association changes remain **blocked in Phase 1**. `[Decided]`
 
-### F6 — Distributed DR reference model (§12A)
+### F6 — Distributed DR reference model (Section 12A)
 See the rendered reference diagram (reused): `adr/diagrams/acrme_three_region_capacity_model.png` — each region hosts Prod + CVAL + DR standby tagged with its `src Rn` source region; each destination sizes by max-not-sum.
 
 ### F7 — DR event → standby activation waves
@@ -305,24 +305,24 @@ STEADY_STATE → DR_DECLARATION_PENDING → DR_EVENT_ACTIVE → FAILBACK_PENDING
 
 Entering `DR_EVENT_ACTIVE` does not auto-authorise service-impacting CVAL action; each action keeps its own policy gate.
 
-**Functional data entities (DAT-001..006):** `CustomerSeedRecord` (PLC-003), `SourceDestinationDRIndex` (DR-018), `CVALEarmarkRecord` (PLC-010), `PlacementPolicy` (versioned catalogue), reservation/quota snapshots with freshness metadata, and the immutable decision/audit log. Full technical schema is in the TDD §6.
+**Functional data entities (DAT-001..006):** `CustomerSeedRecord` (PLC-003), `SourceDestinationDRIndex` (DR-018), `CVALEarmarkRecord` (PLC-010), `PlacementPolicy` (versioned catalogue), reservation/quota snapshots with freshness metadata, and the immutable decision/audit log. Full technical schema is in the TDD Section 6.
 
 ---
 
-## 7. Acceptance Criteria Mapping (baseline §20)
+## 7. Acceptance Criteria Mapping (baseline Section 20)
 
 | Acceptance theme | Functional evidence | Section |
 |---|---|---|
-| Deployment allowed only when capacity+quota+freshness pass | Readiness states, fail-safe on stale | §4.3, F8 |
-| Exact-region-first onboarding, seed reuse | Placement flow, seed record | §4.4, F4 |
-| Lean, distributed, max-not-sum DR with source-specific activation | DR capabilities, activation waves | §4.5, F6, F7 |
-| Single governed quota pool with Prod protection | Quota capability, earmarks | §4.2 |
-| No silent deletion / no cross-border DR substitution | Zero-capacity, `DR_NOT_OFFERED` | §4.1, §4.5 |
-| Full auditability of decisions and mutations | Governance | §4.8 |
+| Deployment allowed only when capacity+quota+freshness pass | Readiness states, fail-safe on stale | Section 4.3, F8 |
+| Exact-region-first onboarding, seed reuse | Placement flow, seed record | Section 4.4, F4 |
+| Lean, distributed, max-not-sum DR with source-specific activation | DR capabilities, activation waves | Section 4.5, F6, F7 |
+| Single governed quota pool with Prod protection | Quota capability, earmarks | Section 4.2 |
+| No silent deletion / no cross-border DR substitution | Zero-capacity, `DR_NOT_OFFERED` | Section 4.1, Section 4.5 |
+| Full auditability of decisions and mutations | Governance | Section 4.8 |
 
 ---
 
-## 8. Assumptions, Decisions, POC Dependencies (baseline §22–§24)
+## 8. Assumptions, Decisions, POC Dependencies (baseline Section 22–Section 24)
 
 | Ref | Item | Functional impact |
 |---|---|---|
@@ -340,23 +340,23 @@ Entering `DR_EVENT_ACTIVE` does not auto-authorise service-impacting CVAL action
 
 | Requirement group (IDs) | FDD section(s) |
 |---|---|
-| REG-001..003 | §4.4 (catalogue, three-region min, Switzerland North) |
-| ENV-001..007 | §4.4 (env separation), §4.5 (roles) |
-| CAP-001..019 | §4.1, §5(2), F5 |
-| QUA-001..014 | §4.2 |
-| RDY-001..004 | §4.3, F8 |
-| PLC-001..010 | §4.4, F4 |
-| DR-001..019 | §4.5, F6, F7, §6 |
-| FIN-001..008 | §4.6 |
-| INT-001..007 | §4.7, F1 |
-| DAT-001..006 | §6 |
-| OBS-001..005 | §4.8 |
-| GOV-001..009 | §4.8, §7 |
-| NFR-001..010 | §4.3 (fail-safe), §4.7 (idempotency), §5, §6 |
-| OPS-001..005 | §4.8, §5 |
-| POC-001..011 / DEC-001..003 / DEP-001 | §8 |
+| REG-001..003 | Section 4.4 (catalogue, three-region min, Switzerland North) |
+| ENV-001..007 | Section 4.4 (env separation), Section 4.5 (roles) |
+| CAP-001..019 | Section 4.1, Section 5(2), F5 |
+| QUA-001..014 | Section 4.2 |
+| RDY-001..004 | Section 4.3, F8 |
+| PLC-001..010 | Section 4.4, F4 |
+| DR-001..019 | Section 4.5, F6, F7, Section 6 |
+| FIN-001..008 | Section 4.6 |
+| INT-001..007 | Section 4.7, F1 |
+| DAT-001..006 | Section 6 |
+| OBS-001..005 | Section 4.8 |
+| GOV-001..009 | Section 4.8, Section 7 |
+| NFR-001..010 | Section 4.3 (fail-safe), Section 4.7 (idempotency), Section 5, Section 6 |
+| OPS-001..005 | Section 4.8, Section 5 |
+| POC-001..011 / DEC-001..003 / DEP-001 | Section 8 |
 
-*Every Baseline v2.2 requirement ID resolves to at least one FDD section above. Detailed component/algorithm-level traceability is completed in the TDD §17.*
+*Every Baseline v2.2 requirement ID resolves to at least one FDD section above. Detailed component/algorithm-level traceability is completed in the TDD Section 17.*
 
 ---
 

@@ -6,7 +6,7 @@ organized by category with evidence of coverage and design maturity.
 
 **Sources:**
 - `azure_cr_management_engine_design.md` (FR-1..8, NFR-1..7)
-- `acrme_production_readiness_review_and_architecture.md` (§22 Must/Should/Could; cross-references to PRR)
+- `acrme_production_readiness_review_and_architecture.md` (Section 22 Must/Should/Could; cross-references to PRR)
 - `acrme_requirements_traceability_review.md` (coverage matrix + blockers)
 - `multi_region_placement_design.md` (Placement Requirements R1..R8, NFR-R1..R3)
 
@@ -268,7 +268,7 @@ Supports sovereign clouds, data residency, and Azure Policy integration.
 
 ### Regional Placement Requirements (R1–R8)
 
-Derived from multi_region_placement_design.md §27–28.
+Derived from multi_region_placement_design.md Section 27–28.
 
 | ID | Requirement | Coverage |
 |---|---|---|

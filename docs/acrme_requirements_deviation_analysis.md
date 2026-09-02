@@ -20,7 +20,7 @@ Requirements v2.1 represents a significant pivot from the earlier design baselin
 | **Moderate** | 6 | Double-count guard, Reservation formula, Zero-capacity/no-delete, Readiness states, DR_NOT_OFFERED flag, Quota-as-governor |
 | **Minor** | 3 | Reconciliation mechanics, Three-region minimum, Configurable region catalogue |
 
-**Recommended action:** Update ADR-001, ADR-002, ADR-003, and ADR-004 to reflect the v2.1 direction. A new ADR-005 (Distributed DR Reference Model) is warranted for the §12A topology. The two-group quota model deviation has a documented design justification — confirm whether QUA-004's preference overrides it before resolving.
+**Recommended action:** Update ADR-001, ADR-002, ADR-003, and ADR-004 to reflect the v2.1 direction. A new ADR-005 (Distributed DR Reference Model) is warranted for the Section 12A topology. The two-group quota model deviation has a documented design justification — confirm whether QUA-004's preference overrides it before resolving.
 
 ### Reconciliation status after the v2.1 production-readiness update
 
@@ -46,7 +46,7 @@ The requirements explicitly pivot away from the 30–40% static reserve model:
 
 > "DR must NOT default to a fixed 30–40% copy of production. Support a configurable bootstrap target. Discussed 30–40% → 10–20% → ~5% → used-is-free. DR starts lean." (ENV-005, DR-007, C-1)
 
-ADR-003 hardcodes `dr_ratio_min=0.30`, `dr_ratio_max=0.40`, `dr_ratio_target=0.35` as normative constants and uses `dr_ratio_max` to size the DR floor. This is the exact v1 model the v2.0 pivot discards. Cost modelling shows this approach runs to **$1.5M–$5M/year** at platform scale — the primary reason leadership required the pivot (§13, Appendix B).
+ADR-003 hardcodes `dr_ratio_min=0.30`, `dr_ratio_max=0.40`, `dr_ratio_target=0.35` as normative constants and uses `dr_ratio_max` to size the DR floor. This is the exact v1 model the v2.0 pivot discards. Cost modelling shows this approach runs to **$1.5M–$5M/year** at platform scale — the primary reason leadership required the pivot (Section 13, Appendix B).
 
 **Required ADR update:**
 - Replace fixed `dr_ratio_*` constants with a **configurable bootstrap target** per product/workload/SKU.
@@ -119,7 +119,7 @@ and selects the two-group model.
 ### DEV-004 — Reciprocal Multi-Source DR Hosting (DR-016): Absent from ADRs
 
 **Severity:** 🟠 Significant  
-**Requirement:** DR-016, §12A (Distributed DR Reference Model)  
+**Requirement:** DR-016, Section 12A (Distributed DR Reference Model)  
 **Current ADR:** ADR-003 describes NonProd/DR co-location and the state machine, but not the many-to-many topology.
 
 **Gap:**
@@ -128,21 +128,21 @@ Requirements v2.1 formalise that every region simultaneously performs three role
 
 > "Every region may concurrently perform three roles: (a) Production for its own customers, (b) CVAL host for customers whose production is elsewhere, and (c) standby DR host for customers originating in multiple different source regions." (DR-016)
 
-The worked example in §12A confirms Region 1 simultaneously holds:
+The worked example in Section 12A confirms Region 1 simultaneously holds:
 - Prod: Cust1, Cust3, Cust5
 - CVAL: Cust2, Cust7
 - DR standby: Cust2 (source R2), Cust7 (source R3)
 
 ADR-003 only describes the NonProd/DR co-location for a single customer's perspective. It does not model the **bidirectional many-to-many topology** where one destination serves DR for multiple independent source regions concurrently. This is architecturally distinct from the current ADR scope and has major implications for capacity planning (max-not-sum sizing) and state modelling (the DR index, DEV-005).
 
-**Required action:** New ADR-005 or a §12A section in ADR-003 formalising the distributed DR reference topology. Must cover: three-role region model, bidirectional mapping structure, relationship to max-not-sum sizing, and the constraint that single-failure assumption (DR-001) is what permits the overcommitted standby model.
+**Required action:** New ADR-005 or a Section 12A section in ADR-003 formalising the distributed DR reference topology. Must cover: three-role region model, bidirectional mapping structure, relationship to max-not-sum sizing, and the constraint that single-failure assumption (DR-001) is what permits the overcommitted standby model.
 
 ---
 
 ### DEV-005 — Source→Destination DR Index (DR-018): Not in ADRs or Data Model
 
 **Severity:** 🟠 Significant  
-**Requirement:** DR-018, DAT-002, OBS-004, §12A.1  
+**Requirement:** DR-018, DAT-002, OBS-004, Section 12A.1  
 **Current ADR:** No mention of a DR index entity.
 
 **Gap:**
@@ -340,7 +340,7 @@ This flag must appear in the region catalogue (`REG-001`), the customer seed rec
 ### DEV-014 — Quota-as-Governor Strategy (QUA-005): Not Explicitly in ADRs
 
 **Severity:** 🟡 Moderate  
-**Requirement:** QUA-005, §2 Strategic Drivers  
+**Requirement:** QUA-005, Section 2 Strategic Drivers  
 **Current ADR:** ADR-002 governs quota groups and accounting. The strategic framing is absent.
 
 **Gap:**
@@ -436,7 +436,7 @@ These areas in the requirements are well-covered by the current ADRs:
 | **ADR-002** | (1) Add quota-as-governor strategic framing. (2) Add explicit cross-reference resolving the QUA-004 vs two-group tension. (3) Update `DR_Floor_vCPU` formula to align with max-not-sum distributed portions rather than fixed ratio. |
 | **ADR-003** | (1) Replace `dr_ratio_*` constants with configurable bootstrap target. (2) Replace DR sizing formula with Appendix A.6 max-not-sum. (3) Add per-customer activation workflow (DR-019): associated→allocated transition, priority waves, DR-006 staged acquisition, failback reversal. (4) Add `CVALEarmarkRecord` / double-count guard (PLC-010). (5) Add zero-capacity and no-auto-delete policy (CAP-009/010). (6) Add reciprocal multi-source DR topology (DR-016) and reference to DR index. (7) Add POC-011 as a required validation gate. |
 | **ADR-004** | (1) Add `Target = Allocated + Buffer` floor formula alongside forecast formula; clarify allocated/associated distinction. (2) Add reconciliation engine normative spec (frequency, inputs, raise/lower logic, scale-down guards). |
-| **ADR-005 (new)** | Distributed DR Reference Model — formalise §12A topology: three-role region model, `SourceDestinationDRIndex` entity definition, bidirectional mapping, max-not-sum relationship, single-failure assumption boundary, observability requirements. |
+| **ADR-005 (new)** | Distributed DR Reference Model — formalise Section 12A topology: three-role region model, `SourceDestinationDRIndex` entity definition, bidirectional mapping, max-not-sum relationship, single-failure assumption boundary, observability requirements. |
 
 ---
 
