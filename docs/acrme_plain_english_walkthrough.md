@@ -144,6 +144,23 @@ depending on the environment type.
 Every component value is **clamped to the range [0, 1]** before being multiplied by its weight. This
 means a component can never go below 0 or above 1, regardless of the raw numbers.
 
+#### Why These Specific Weights? The Building Analogy
+
+Before diving into the technical formulas, here is the plain-English intuition behind each weight,
+using the analogy of placing desks in office buildings:
+
+| Weight | Value | Plain English reason (building/office analogy) |
+|---|---|---|
+| **α = 0.30** (largest) | Headroom/capacity signal | **The single most important factor.** If a building is nearly full, we cannot grow — and growing is inevitable. Deserves the highest priority. |
+| **γ = 0.25** | Distribution fairness | We never want all customers in the same building. If one building catches fire (fails), we want as few customers affected as possible. **Second highest.** |
+| **β = 0.20** | Quota headroom | The building permit (quota) must have room approved by the authority (Microsoft). Without it, no new desks can be added even if the floor is empty. |
+| **δ = 0.15** | DR readiness | Is the backup office already covering enough customers? A well-covered DR region is a better destination. Lower priority because DR coverage depends on the customer mix, not just space. |
+| **ε = 0.10** (smallest) | Zone diversity | Are the desks spread across different floors of the building? If one floor has a power cut, other floors keep running. Nice-to-have, not critical. |
+
+**All five add to exactly 1.0 (100%).** They are **policy defaults stored in config** — not
+hardcoded. The team can adjust them if priorities change (see §6 for the weight-sum validation
+requirement).
+
 #### Component α (weight 0.30) — Headroom or Capacity Signal
 
 This is the single biggest factor. It answers: *"How much free capacity does this region have?"*
