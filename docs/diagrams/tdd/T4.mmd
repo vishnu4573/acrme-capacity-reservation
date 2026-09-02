@@ -1,0 +1,11 @@
+flowchart TB
+    subgraph Pool [Single governed quota pool per region/quota family]
+        direction TB
+        PF[Prod_Reserved_Floor<br/>= Prod_Used + Prod_Growth_Buffer<br/>never allocatable to NonProd]
+        DE[DR_Earmark_vCPU<br/>= Destination_DR_Requirement x vCPU max-not-sum<br/>never allocatable to NonProd]
+        AN[Allocatable_NonProd<br/>= Pool_Limit - Prod_Reserved_Floor - DR_Earmark - NonProd_Used]
+        PH[Pool_Headroom = Pool_Limit - Pool_Used]
+    end
+    Pool -->|emergency DR draw: pool headroom first,<br/>then reclaimable NonProd - no cross-group transfer| DR[DR activation]
+    Exc[Exception topology only:<br/>Prod group + NonProd+DR group<br/>when Azure limit / Prod-isolation boundary]:::e
+    classDef e fill:#f8d7da,stroke:#dc3545;

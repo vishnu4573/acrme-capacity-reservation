@@ -9,6 +9,10 @@
 > - **Four new scenarios added**: DR destination requirement (max-not-sum), standby activation,
 >   deployment readiness gate, and customer seed record.
 > - **EU cross-geo DR region corrected**: Belgium Central → **Switzerland North** throughout.
+> - **Quota grouping model updated (QUA-004)**: **single governed pool** per region/quota family
+>   (Prod + NonProd/CVAL + DR together) is now the **primary model**; Prod/DR protected by logical
+>   earmarks. The two-group topology is retained only as a narrow governance/Azure-limit exception
+>   (Scenario 8/9 updated accordingly).
 > - **Scenario 15** (fixed DR ratio parameters) retained for reference but marked **superseded**.
 
 This document consolidates **every calculation logic** used by the Azure Capacity Reservation
@@ -288,26 +292,57 @@ min_dr_headroom_vcpu            = 16
 
 ## Scenario 8 — Quota Group Sizing (per Region)
 
-Every managed region has exactly two Azure Quota Groups. `[Decided]`
+**Primary model (QUA-004): one governed quota pool per region and quota family**, covering Prod,
+NonProd/CVAL, and DR together. Prod and DR are protected inside the shared pool by logical earmarks,
+not by physical group separation. `[Decided]`
 
 ```
-Prod_Group_Limit(region) =
-    Prod_CRG_quantity × vCPU × (1 + prod_growth_buffer)
-    prod_growth_buffer = 0.20
-
-NonProd_DR_Group_Limit(region) =
-      NonProd_CRG_quantity × vCPU × (1 + nonprod_growth_buffer)
-    + DR_CRG_quantity      × vCPU
+Pool_Limit(region) =
+      Prod_CRG_quantity     × vCPU × (1 + prod_growth_buffer)
+    + NonProd_CRG_quantity  × vCPU × (1 + nonprod_growth_buffer)
+    + DR_Earmark_vCPU(region)
     + emergency_transfer_headroom_vcpu
 
-nonprod_growth_buffer          = 0.20
+prod_growth_buffer               = 0.20
+nonprod_growth_buffer            = 0.20
+DR_Earmark_vCPU(region)          = Destination_DR_Requirement(region) × vCPU   [max-not-sum, Scenario 17]
 emergency_transfer_headroom_vcpu = max_emergency_transfer_qty × vCPU
 max_emergency_transfer_qty       = potential_dr_demand × emergency_transfer_pct
 emergency_transfer_pct           = 0.30
 ```
 
-The `emergency_transfer_headroom_vcpu` term is what makes Tier 2 DR expansion quota-neutral within the
-shared group. `[Decided]`
+Because Prod, NonProd/CVAL, and DR share one pool, an emergency DR draw needs **no cross-group transfer**:
+the DR orchestrator consumes `Pool_Headroom` first, then reclaimable NonProd above committed demand.
+This is the manipulation-flexibility gain that motivates the single-pool model (avoids fragmenting quota
+and cuts quota-increase requests to Microsoft). `[Decided]`
+
+**Prod protection inside the shared pool** (logical earmarks, enforced at allocation/reclamation time):
+
+```
+Prod_Reserved_Floor  = Prod_Used_vCPU + Prod_Growth_Buffer_vCPU
+Allocatable_NonProd  = Pool_Limit - Prod_Reserved_Floor - DR_Earmark_vCPU - NonProd_Used_vCPU
+Pool_Headroom        = Pool_Limit - Pool_Used
+```
+
+`Prod_Reserved_Floor` and `DR_Earmark_vCPU` are never allocatable to NonProd; NonProd allocation
+fail-safes when `Allocatable_NonProd` reaches zero. `[Decided]`
+
+**Exception topology (only when Azure Quota Group limits or a mandatory Prod-isolation governance
+boundary make one pool impossible)** — two groups per region, recorded in the Decision Log:
+
+```
+Prod_Group_Limit(region) =
+    Prod_CRG_quantity × vCPU × (1 + prod_growth_buffer)
+
+NonProd_DR_Group_Limit(region) =
+      NonProd_CRG_quantity × vCPU × (1 + nonprod_growth_buffer)
+    + DR_CRG_quantity      × vCPU
+    + emergency_transfer_headroom_vcpu
+```
+
+In the exception topology the `emergency_transfer_headroom_vcpu` term is what makes Tier 2 DR expansion
+quota-neutral within the shared NonProd+DR group. In the single-pool model this term is subsumed by the
+shared `Pool_Headroom`. `[Decided]`
 
 **Quota-as-governor principle (QUA-005):** quota allocation caps deployable capacity per product,
 environment, subscription, region, and VM family. Teams must justify quota increases — unallocated pooled
@@ -317,8 +352,8 @@ quota is not automatically distributed. `[Decided]`
 
 ## Scenario 9 — DR Floor Accounting (Engine-Enforced Sub-Limit) — Updated
 
-Azure Quota Groups have no native intra-group sub-reservation; the engine enforces the DR floor by
-arithmetic. `[Decided]`
+Azure quota pools/groups have no native intra-pool sub-reservation; the engine enforces the DR floor by
+arithmetic (logical earmark) in both the single-pool and exception two-group topologies. `[Decided]`
 
 ### Accounting formulas `[Decided]`
 
@@ -327,9 +362,16 @@ DR_Floor_vCPU(region)     = Destination_DR_Requirement(region) × vCPU
                             [v2.2: uses max-not-sum formula from Scenario 17]
                             [v1: was potential_dr_demand × vCPU × dr_ratio_max — superseded]
 
+# Single governed pool (primary model, QUA-004):
+DR_Earmark_vCPU(region)   = DR_Floor_vCPU(region)      # never allocatable to NonProd
+Allocatable_NonProd       = Pool_Limit - Prod_Reserved_Floor - DR_Earmark_vCPU - NonProd_Used_vCPU
+Pool_Headroom             = Pool_Limit - Pool_Used
+
+# Exception two-group topology only:
 Effective_NonProd_Ceiling = NonProd_DR_Group_Limit - DR_Floor_vCPU
 NonProd_Headroom          = Effective_NonProd_Ceiling - NonProd_Used_vCPU
 Group_Headroom            = Group_Limit - Group_Used
+
 dr_crg.coverage_ratio     = dr_crg.quantity / Destination_DR_Requirement(region)
 ```
 

@@ -1,0 +1,39 @@
+erDiagram
+    CustomerSeedRecord ||--o{ SourceDestinationDRIndex : "reverse view"
+    CustomerSeedRecord ||--o{ CVALEarmarkRecord : "co-location"
+    CustomerSeedRecord }o--|| PlacementPolicy : "policy_version"
+    RegionalSnapshot ||--o{ QuotaPoolState : "captures"
+    QuotaPoolState ||--o{ ReservationState : "governs"
+    SourceDestinationDRIndex ||--o{ ActivationRecord : "activates"
+    DRDistributionPlan ||--o{ SourceDestinationDRIndex : "aggregates"
+    OperationRecord ||--o{ AuditEvent : "emits"
+    CustomerSeedRecord {
+        string customer_realm_id PK
+        string geography PK
+        string production_region
+        string cval_region
+        string dr_region
+        string input_mode
+        string policy_version
+    }
+    SourceDestinationDRIndex {
+        string source_region PK
+        string destination_region PK
+        string customer_realm_id PK
+        int quantity_vcpu
+        string activation_state
+    }
+    CVALEarmarkRecord {
+        string customer_realm_id PK
+        string region PK
+        int cval_capacity_vcpu
+        int dr_earmarked_vcpu
+        bool co_located
+    }
+    QuotaPoolState {
+        string region PK
+        int pool_limit
+        int prod_reserved_floor
+        int dr_earmark_vcpu
+        int allocatable_nonprod
+    }

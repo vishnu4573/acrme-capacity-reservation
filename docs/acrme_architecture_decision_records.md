@@ -1,5 +1,8 @@
 # ACRME Architecture Decision Records (ADRs)
 
+> ## ⚠️ ARCHIVED — SUPERSEDED by the split, v2.2 ADRs (2 Sep 2026)
+> This **consolidated** ADR document is **archived**. The authoritative decision records are the individual, v2.2-aligned ADRs in `docs/adr/`: **ADR-001** (region selection), **ADR-002** (quota & capacity — **single governed pool**), **ADR-003** (capacity during DR), **ADR-004** (forecast & increase), and **ADR-005** (distributed DR reference model). See `docs/adr/README.md` for the index. This consolidated file has had its region references corrected (Belgium → **Switzerland North**) but does **not** carry the full single-pool (QUA-004) and max-not-sum (DR-017) reconciliation — use the split ADRs and the FDD/TDD for current decisions.
+
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect — Architecture Governance  
 **Version:** 1.2  
@@ -61,7 +64,7 @@ Adopt a **staged, constraint-then-score placement pipeline** driven by environme
 
 4. **Selection order is sequential — Prod → NonProd → DR** — not joint optimization. With 3–4 regions the greedy sequential result equals the joint-optimal result in nearly all practical cases, while remaining transparent and auditable. `[Decided]`
 
-5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Belgium Central** via the only approved Cross-Geo Extension paths (Saudi Arabia → Belgium Central, UAE North → Belgium Central). Belgium Central must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided]`
+5. **Middle East special handling.** Prod and NonProd are chosen in-geo via `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central}; DR is assigned to **Switzerland North** via the only approved Cross-Geo Extension paths (Saudi Arabia → Switzerland North, UAE North → Switzerland North). Switzerland North must itself pass HC-1..HC-10; if it fails, the placement is rejected with an ops alert — the engine never silently substitutes another region. `[Decided]`
 
 6. **Determinism & audit.** All candidate sets, sub-scores, the winning score, and the active `PlacementPolicy` version are written to the `OperationRecord` for replay (VR-8, VR-9). Even the 3-region edge case (single eligible candidate) runs the full scoring path so the score is logged as a capacity-health signal. `[Decided]`
 
@@ -75,9 +78,9 @@ Every Azure region carries exactly one classification tier, stored in `Placement
 
 | Tier | Eligibility | Regions |
 |---|---|---|
-| **Standard Capacity Region** | Eligible for dynamic selection, scoring, and all env assignments (Prod/CVAL/DR) — the only regions that enter the pipeline | NA: West US 3, Central US, Canada Central · EU: Sweden Central, Belgium Central · ME: Saudi Arabia, UAE North · APAC: Japan East, Southeast Asia, Australia East |
+| **Standard Capacity Region** | Eligible for dynamic selection, scoring, and all env assignments (Prod/CVAL/DR) — the only regions that enter the pipeline | NA: West US 3, Central US, Canada Central · EU: Sweden Central, Switzerland North · ME: Saudi Arabia, UAE North · APAC: Japan East, Southeast Asia, Australia East |
 | **Restricted Capacity Region** | Exception-only (Scenario 2 + Prod + approval); never scored, ranked, or recommended | East US 2, North Europe, West Europe, East Asia, Australia Southeast (all: Azure physical capacity constraint) |
-| **Cross-Geo Extension Region** | DR-only, for geographies that cannot meet the 3-region minimum in-geo | Saudi Arabia → Belgium Central; UAE North → Belgium Central (Middle East only) |
+| **Cross-Geo Extension Region** | DR-only, for geographies that cannot meet the 3-region minimum in-geo | Saudi Arabia → Switzerland North; UAE North → Switzerland North (Middle East only) |
 
 Restricted regions are excluded by a **pre-filter ahead of all hard constraints** (HC-9), never as a scoring penalty.
 
@@ -112,7 +115,7 @@ On success the region becomes the **Exception Prod Anchor**, the placement is ma
 | VR-3 | Scenario 2 Restricted: EC-1..EC-4 all met | Reject at first failing condition |
 | VR-4 | Scenario 1 derived Prod in-geo Standard | Geography-scoped exhaustion error |
 | VR-5 | Standard region passes HC-1..HC-10 | Exclude; exhaustion error if all excluded |
-| VR-6 | Middle East DR = Belgium Central via approved path | Block with ops alert if Belgium Central fails HC-1..HC-10 |
+| VR-6 | Middle East DR = Switzerland North via approved path | Block with ops alert if Switzerland North fails HC-1..HC-10 |
 | VR-7 | Exception approval ID persisted before commit | Block commit if absent |
 | VR-8 | Capacity-constraint warning emitted | Block commit if suppressed |
 | VR-9 | Snapshot age within policy limit | Trigger targeted ARM refresh |
@@ -135,7 +138,7 @@ Before returning a committed assignment the engine creates a **capacity hold** k
 - The classification list lives in `PlacementPolicy`; any change requires a policy-version increment, a Decision Log entry, and **replay of the prior 30 days of placements** against the new classification before activation. `[Documented]`
 - Exception approval records are revocable engine artefacts; a revoked approval blocks future exception deployments for the customer–region pair with no code change.
 - Every classification change is audited with approver identity, timestamp, previous/new classification, and affected geography.
-- Belgium Central's regional capacity-planning targets must include potential Middle East DR demand on top of in-geo Europe demand.
+- Switzerland North's regional capacity-planning targets must include potential Middle East DR demand on top of in-geo Europe demand.
 
 ### Consequences
 

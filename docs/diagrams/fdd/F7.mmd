@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant DRC as DR coordinator
+    participant ENG as ACRME engine
+    participant IDX as SourceDestinationDRIndex
+    participant POOL as Single governed quota pool
+    participant AZ as Azure
+    DRC->>ENG: Declare source-region failure (authorised)
+    ENG->>ENG: engine_mode = DR_EVENT_ACTIVE
+    ENG->>IDX: Read standby sets for failed source
+    IDX-->>ENG: Customers + priority waves
+    loop each priority wave
+        ENG->>POOL: Draw pool headroom then reclaimable NonProd
+        POOL-->>ENG: Capacity earmark released
+        ENG->>AZ: Acquire deficit if any (exposed)
+        ENG->>ENG: standby -> allocated/active
+        ENG->>DRC: Wave complete + audit checkpoint
+    end
+    DRC->>ENG: Failback authorised
+    ENG->>ENG: FAILBACK_PENDING -> STEADY_STATE (reversible)

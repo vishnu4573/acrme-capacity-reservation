@@ -1,0 +1,15 @@
+stateDiagram-v2
+    [*] --> Evaluating
+    Evaluating --> READY: capacity+quota ok & fresh
+    Evaluating --> READY_WITH_RISK: reserved>deployable quota (policy)
+    Evaluating --> QUOTA_DEFICIT: consumer quota short
+    Evaluating --> RESERVATION_DEFICIT: reserved < required
+    Evaluating --> CAPACITY_UNAVAILABLE: Azure cannot supply
+    Evaluating --> STALE_STATE: snapshot too old & refresh failed
+    Evaluating --> POLICY_BLOCKED: policy/exception required
+    Evaluating --> VALIDATION_REQUIRED: unknown/preview behaviour
+    READY --> [*]
+    READY_WITH_RISK --> [*]
+    QUOTA_DEFICIT --> Evaluating: quota allocated
+    RESERVATION_DEFICIT --> Evaluating: capacity added
+    STALE_STATE --> Evaluating: refresh succeeds

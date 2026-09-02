@@ -1,11 +1,11 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 2.1  
+**Version:** 2.2  
 **Date:** 27 August 2026  
 **Status:** Accepted - supersedes ADR-003 v1.2 fixed-ratio DR model  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements v2.1.
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.1 ADR updates disaster-recovery capacity management to the lean bootstrap and distributed DR model. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.2 ADR updates disaster-recovery capacity management to the lean bootstrap and distributed DR model. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 

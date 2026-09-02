@@ -5,6 +5,8 @@
 **Status:** Design-first tool (70% complete) — identifies gaps for focused design sessions  
 **Purpose:** Visual domain model, operation tracking, service architecture, and state machines
 
+> **v2.2 reconciliation note (2 Sep 2026).** This summary is reconciled to Requirements Baseline v2.2 and the updated ADRs: the quota model is a **single governed pool** with logical earmarks (two-group only as an exception topology, QUA-004/ADR-002); three domain entities are added — `CustomerSeedRecord`, `SourceDestinationDRIndex`, `CVALEarmarkRecord`; the readiness verdict is the machine-readable enum `READY | READY_WITH_RISK | QUOTA_DEFICIT | RESERVATION_DEFICIT | CAPACITY_UNAVAILABLE | STALE_STATE | POLICY_BLOCKED | VALIDATION_REQUIRED` (RDY-002); the engine mode machine is five-state (`STEADY_STATE → DR_DECLARATION_PENDING → DR_EVENT_ACTIVE → FAILBACK_PENDING → STEADY_STATE`, with `INCIDENT_HOLD`). Authoritative schemas live in the FDD (`acrme_functional_design_document.md`) and TDD (`acrme_technical_design_document.md`).
+
 ---
 
 ## Executive Summary
@@ -39,7 +41,8 @@ This document presents **four comprehensive UML diagram sets** for the Azure Cap
 ### From Diagram 1 (Core Domain Model):
 
 ✅ **Three-CRG model per region** — `CustomerRegionAssignment` targets exactly 3 CRGs: Prod, NonProd, DR  
-✅ **Two quota groups per region** — `QuotaGroupType.PROD` and `QuotaGroupType.NONPROD_DR_SHARED`  
+✅ **Single governed quota pool per region/quota family (v2.2, QUA-004)** — `QuotaPoolState` covers Prod + NonProd/CVAL + DR together; Prod and DR protected by **logical earmarks** (`prod_reserved_floor`, `dr_earmark_vcpu`), not physical group separation. The earlier `QuotaGroupType.PROD` + `QuotaGroupType.NONPROD_DR_SHARED` **two-group** model is retained only as a narrow Azure-limit / Prod-isolation **exception topology** (ADR-002 v2.2).  
+✅ **v2.2 domain entities added** — `CustomerSeedRecord` (PLC-003, first-placement authority), `SourceDestinationDRIndex` (DR-018, reverse-of-seed driving max-not-sum sizing and standby activation), `CVALEarmarkRecord` (PLC-010, prevents CVAL/DR double-count). See the FDD §6 and TDD §6/§18 (diagram T5, T14) for full schemas.  
 ✅ **Placement scoring** — `PlacementPolicy` contains weights (alpha, beta, gamma, delta, epsilon) for deterministic placement  
 ✅ **Regional snapshot caching** — `RegionalSnapshot` with 5-min TTL, cached in Redis, persisted to Cosmos  
 ✅ **Sharing relationships** — `SharingRelationship` tracks provider-consumer pairs; 100-consumer hard limit  

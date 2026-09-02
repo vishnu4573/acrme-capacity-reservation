@@ -1,0 +1,39 @@
+flowchart TB
+    subgraph External
+        AEP[AEP / Provisioning]
+        OPS[Operators / DR coordinator]
+        AZ[Azure control planes:<br/>Compute / Reservations / groupQuotas]
+        OBS[Observability platform]
+    end
+    subgraph ACRME
+        API[Readiness API]
+        PE[Placement & Scoring Engine]
+        REC[State Reconciler]
+        QPM[Quota-Pool Manager]
+        DRO[DR Orchestrator]
+        FIS[Forecast & Increase Service]
+        ETS[Emergency Transfer Service]
+        INV[Inventory Collector]
+        CFG[Config / Scope-File Service]
+        GOV[Governance & Audit]
+        OE[Observability Emitter]
+        STORE[(State Store<br/>versioned + optimistic concurrency)]
+    end
+    AEP -->|readiness query / mutations| API
+    OPS -->|approvals, DR declaration| API
+    API --> PE & QPM & DRO & REC
+    PE --> STORE
+    QPM --> STORE
+    DRO --> STORE
+    REC --> STORE
+    FIS --> STORE
+    ETS --> STORE
+    INV -->|snapshots| STORE
+    INV <--> AZ
+    QPM <--> AZ
+    REC <--> AZ
+    DRO <--> AZ
+    CFG --> PE & QPM & DRO & REC & FIS
+    GOV -.enforces.-> API
+    OE --> OBS
+    STORE --> OE

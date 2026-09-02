@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant DRC as DR coordinator
+    participant DRO as DR Orchestrator
+    participant IDX as SourceDestinationDRIndex
+    participant QPM as Quota-Pool Manager
+    participant AZ as Azure
+    DRC->>DRO: Declare source-region failure (authorised)
+    DRO->>DRO: engine_mode = DR_EVENT_ACTIVE
+    DRO->>IDX: Query standby sets for failed source
+    IDX-->>DRO: Customers + priority waves
+    loop each priority wave (P0 -> P-1 -> P-N)
+        DRO->>QPM: Stage1-2 draw pool headroom + reservation
+        QPM-->>DRO: Earmark released (no cross-group transfer)
+        alt deficit remains
+            DRO->>QPM: Stage3 CVAL release / Stage4 share / Stage5 pooled quota
+            DRO->>AZ: Stage6 request additional capacity/quota
+            AZ-->>DRO: Granted or deficit
+        end
+        DRO->>DRO: associated -> allocated (ActivationRecord)
+        DRO->>DRC: Wave complete + audit checkpoint
+    end
+    DRC->>DRO: Failback authorised
+    DRO->>DRO: ACTIVE -> FAILBACK_PENDING -> STANDBY (reverse order)

@@ -1,0 +1,8 @@
+flowchart TD
+    Ev[DR event active] --> T1{Tier 1 headroom available?}
+    T1 -->|Yes| A1[DirectExpansion - automated additive]
+    T1 -->|No| T2{Tier 2 approved?}
+    T2 -->|Yes| A2[QuotaNeutralTransfer - reduce NonProd, expand DR in same pool]
+    T2 -->|No| T3{Tier 3 allowed?}
+    T3 -->|Phase 1: BLOCKED| M[Manual escalation]
+    T3 -->|Later phase: dual-approval| A3[DestructiveTransfer - changes VM associations]

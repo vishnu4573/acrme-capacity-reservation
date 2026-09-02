@@ -1,0 +1,10 @@
+flowchart LR
+    In[Placement request] --> HC[Hard constraints HC-1..HC-10]
+    HC -->|fail| Rej[Reason state / exception]
+    HC -->|pass| Sel{Input mode}
+    Sel -->|exact region default| Val[Validate & accept]
+    Sel -->|geography exception| Score[Score Standard regions PS_Prod]
+    Score --> Pick[argmax -> fixed seed]
+    Val --> Seq[Sequential CVAL then DR selection]
+    Pick --> Seq
+    Seq --> Seed[Write seed + DR index]

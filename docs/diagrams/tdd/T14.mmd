@@ -1,0 +1,55 @@
+classDiagram
+    class CustomerSeedRecord {
+        +string customer_realm_id
+        +string geography
+        +string production_region
+        +string cval_region
+        +string dr_region
+        +string input_mode
+        +string policy_version
+    }
+    class SourceDestinationDRIndex {
+        +string source_region
+        +string destination_region
+        +string customer_realm_id
+        +int quantity_vcpu
+        +ActivationState activation_state
+    }
+    class CVALEarmarkRecord {
+        +int cval_capacity_vcpu
+        +int dr_earmarked_vcpu
+        +bool co_located
+    }
+    class QuotaPoolState {
+        +int pool_limit
+        +int prod_reserved_floor
+        +int dr_earmark_vcpu
+        +int allocatable_nonprod
+        +int pool_headroom
+    }
+    class PlacementPolicy {
+        +float alpha_beta_gamma_delta_epsilon
+        +float prod_growth_buffer
+        +float nonprod_growth_buffer
+        +string version
+    }
+    class ActivationRecord {
+        +int priority_wave
+        +int stage_reached
+        +int capacity_gap_vcpu
+        +ActivationState state
+    }
+    class ReservationState {
+        +int reserved_quantity
+        +int allocated_count
+    }
+    class OperationRecord {
+        +string operation_handle
+        +string expected_version
+    }
+    CustomerSeedRecord "1" --> "0..*" SourceDestinationDRIndex : reverse view
+    CustomerSeedRecord "1" --> "0..*" CVALEarmarkRecord
+    CustomerSeedRecord --> PlacementPolicy : policy_version
+    SourceDestinationDRIndex "1" --> "0..*" ActivationRecord
+    QuotaPoolState "1" --> "0..*" ReservationState
+    OperationRecord --> ReservationState : mutates

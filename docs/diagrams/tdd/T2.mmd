@@ -1,0 +1,11 @@
+flowchart TB
+    MG[Management Group root] --> MGPlat[Platform MG]
+    MG --> MGWork[Workload MGs]
+    MGPlat --> SubCtl[ACRME control subscription<br/>engine, state store, config]
+    MGPlat --> SubObs[Observability subscription]
+    MGWork --> SubProd[Prod subscriptions<br/>Prod CRGs + pool]
+    MGWork --> SubNonProd[NonProd/CVAL subscriptions<br/>NonProd CRGs]
+    MGWork --> SubDR[DR-hosting subscriptions<br/>DR standby CRGs]
+    SubCtl -. managed identity + RBAC .-> SubProd
+    SubCtl -. managed identity + RBAC .-> SubNonProd
+    SubCtl -. managed identity + RBAC .-> SubDR

@@ -1,0 +1,12 @@
+flowchart TB
+    Onboard[Onboarding / Product teams] -->|exact prod region, customer intent| ACRME
+    AEP[AEP / Provisioning] -->|readiness query| ACRME
+    ACRME -->|DeploymentReadinessResult| AEP
+    Ops[Platform operators / DR coordinator] -->|approvals, overrides, DR declaration| ACRME
+    FinOps[FinOps] -->|cost policy, buffer policy| ACRME
+    Audit[Auditors] -->|read audit trail| ACRME
+    ACRME -->|reservations, CRGs| AzCap[Azure Capacity Control Plane]
+    ACRME -->|quota pool ops| AzQuota[Azure Quota / groupQuotas]
+    ACRME -->|metrics, alerts| Obs[Observability platform]
+    AzCap --> ACRME
+    AzQuota --> ACRME

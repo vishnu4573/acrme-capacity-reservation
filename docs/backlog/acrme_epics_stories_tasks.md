@@ -589,7 +589,7 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 | ACRME-S0703 | Scenario 1 — geography-based Prod region derivation | Highest | 8 | P1 | ACRME-S0702, ACRME-S0801 |
 | ACRME-S0704 | Scenario 2 — specific region input validation | Highest | 5 | P1 | ACRME-S0702 |
 | ACRME-S0705 | Sequential CVAL then DR selection from Prod anchor | Highest | 5 | P1 | ACRME-S0703, ACRME-S0704 |
-| ACRME-S0706 | Middle East cross-geo extension (Saudi Arabia/UAE North → Belgium Central) | High | 5 | P1 | ACRME-S0705 |
+| ACRME-S0706 | Middle East cross-geo extension (Saudi Arabia/UAE North → Switzerland North) | High | 5 | P1 | ACRME-S0705 |
 | ACRME-S0707 | Exception-based placement workflow for Restricted regions (EC-1..EC-4) | High | 5 | P1 | ACRME-S0704 |
 | ACRME-S0708 | Validation Rule Framework (VR-1..VR-11) and governance controls | Medium | 5 | P1 | ACRME-S0701 |
 
@@ -693,9 +693,9 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 - [ ] `ACRME-T070501` Implement sequential CVAL selection (PS_NonProd)
 - [ ] `ACRME-T070502` Implement sequential DR selection (PS_DR)
 
-#### ACRME-S0706 — Middle East cross-geo extension (Saudi Arabia/UAE North → Belgium Central)
+#### ACRME-S0706 — Middle East cross-geo extension (Saudi Arabia/UAE North → Switzerland North)
 
-> **As a** placement owner, **I want** Middle East DR to use the approved Belgium Central extension path, **so that** the three-region minimum is met where only two in-geo regions exist.
+> **As a** placement owner, **I want** Middle East DR to use the approved Switzerland North extension path, **so that** the three-region minimum is met where only two in-geo regions exist.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
 - **PRR refs:** §27 Middle East, HC-10, R-12
@@ -704,13 +704,13 @@ _Generated 2026-08-22 from the Production-Readiness Review & Final Architecture 
 **Acceptance criteria**
 
 - Prod = argmax(PS_Prod) over Saudi Arabia/UAE North; CVAL = the other in-geo region.
-- DR = Belgium Central via the only approved extension path; validated against HC-1..HC-10 incl. DR floor.
-- If Belgium Central fails, placement is blocked with an ops alert (no silent substitution).
+- DR = Switzerland North via the only approved extension path; validated against HC-1..HC-10 incl. DR floor.
+- If Switzerland North fails, placement is blocked with an ops alert (no silent substitution).
 
 **Tasks**
 
 - [ ] `ACRME-T070601` Implement Middle East Prod/CVAL in-geo assignment
-- [ ] `ACRME-T070602` Implement Belgium Central cross-geo DR with HC validation
+- [ ] `ACRME-T070602` Implement Switzerland North cross-geo DR with HC validation
 - [ ] `ACRME-T070603` Block + alert on degraded extension path (no substitution)
 
 #### ACRME-S0707 — Exception-based placement workflow for Restricted regions (EC-1..EC-4)

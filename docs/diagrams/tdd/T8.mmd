@@ -1,0 +1,7 @@
+flowchart TD
+    R[Region input] --> Q{Exact region or geography?}
+    Q -->|Exact Standard| V[Validate HC-1..HC-10 -> accept, no argmax]
+    Q -->|Exact Restricted| X[Exception Deployment Workflow]
+    Q -->|Geography| E{Exception approved + acknowledged?}
+    E -->|No| B[POLICY_BLOCKED]
+    E -->|Yes| D[argmax PS_Prod over Standard regions -> fixed seed]

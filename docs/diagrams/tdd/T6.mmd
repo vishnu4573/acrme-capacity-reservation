@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> STEADY_STATE
+    STEADY_STATE --> DR_DECLARATION_PENDING: DR declared (authorised)
+    DR_DECLARATION_PENDING --> DR_EVENT_ACTIVE: activation approved
+    DR_DECLARATION_PENDING --> STEADY_STATE: declaration withdrawn
+    DR_EVENT_ACTIVE --> FAILBACK_PENDING: failback authorised
+    FAILBACK_PENDING --> STEADY_STATE: failback complete (reversible)
+    STEADY_STATE --> INCIDENT_HOLD: inputs untrusted / stale
+    DR_EVENT_ACTIVE --> INCIDENT_HOLD: safety trip
+    INCIDENT_HOLD --> STEADY_STATE: inputs restored

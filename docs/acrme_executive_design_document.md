@@ -1,5 +1,8 @@
 **INTERNAL — RESTRICTED**
 
+> ## ⚠️ ARCHIVED — SUPERSEDED (2 Sep 2026)
+> This Executive Design Document is **archived**. Its functional design of record is superseded by the net-new **Functional Design Document** (`acrme_functional_design_document.md`, v1.0) and, for engineering detail, the **Technical Design Document** (`acrme_technical_design_document.md`, v1.0), both reconciled to Requirements Baseline **v2.2**. Key v2.2 changes not reflected below: **single governed quota pool** (QUA-004), **Switzerland North** as EU cross-geo DR extension (REG-002, was "Belgium"), **max-not-sum** DR sizing (DR-017), and the governed **seed record** / **source→destination DR index** entities. Retained for historical reference only — do not use for new decisions.
+
 # Azure Capacity Reservation Management Engine (ACRME)
 
 **Executive Design Document — Prepared for Leadership Review**
@@ -194,7 +197,7 @@ Not all Azure regions are treated equally. The engine divides all managed region
 | Geography | Standard Capacity Regions |
 |---|---|
 | North America | West US 3, Central US, Canada Central |
-| Europe | Sweden Central, Belgium Central |
+| Europe | Sweden Central, Switzerland North |
 | Middle East | Saudi Arabia, UAE North |
 | Asia Pacific | Japan East, Southeast Asia, Australia East |
 
@@ -232,15 +235,15 @@ Weights are versioned and recorded with every decision so results can be replaye
 
 ### Middle East Special Handling
 
-Middle East has only two Standard Capacity Regions: Saudi Arabia and UAE North. A three-region deployment (production, non-production, disaster recovery) cannot fit in two regions. The engine solves this using a **Cross-Geo Extension** rule: disaster recovery for Middle East production workloads goes to Belgium Central in Europe.
+Middle East has only two Standard Capacity Regions: Saudi Arabia and UAE North. A three-region deployment (production, non-production, disaster recovery) cannot fit in two regions. The engine solves this using a **Cross-Geo Extension** rule: disaster recovery for Middle East production workloads goes to Switzerland North in Europe.
 
 | Environment | Middle East region assignment |
 |---|---|
 | Production | Whichever of the two in-geography regions scores higher (Saudi Arabia or UAE North) |
 | Non-production | The other in-geography region (deterministic — only one candidate remains) |
-| Disaster recovery | Belgium Central (Europe) — the only approved cross-geography disaster recovery path |
+| Disaster recovery | Switzerland North (Europe) — the only approved cross-geography disaster recovery path |
 
-Belgium Central must still pass capacity and quota health checks before being assigned. If it fails, the deployment is blocked with an operations alert — the engine does not silently substitute another region. Belgium Central remains available for normal Europe deployments; its cross-geography role for Middle East is additive, not exclusive.
+Switzerland North must still pass capacity and quota health checks before being assigned. If it fails, the deployment is blocked with an operations alert — the engine does not silently substitute another region. Switzerland North remains available for normal Europe deployments; its cross-geography role for Middle East is additive, not exclusive.
 
 The cross-geography extension is the only currently approved exception to the "disaster recovery must be in the same geography" rule. Any additional cross-geography paths require governance approval and a formal policy update before the engine uses them.
 

@@ -1,0 +1,7 @@
+flowchart TB
+    S1[Source R1 -> R2: 120 cores]
+    S3[Source R3 -> R2: 80 cores]
+    S1 --> R2
+    S3 --> R2
+    R2[Destination R2 standby<br/>SUM = 200 cores over-provisions<br/>MAX = 120 cores sized<br/>saving = 80 cores 40%<br/>Overcommit_Ratio = 200/120 ≈ 1.67]:::d
+    classDef d fill:#d4edda,stroke:#28a745;

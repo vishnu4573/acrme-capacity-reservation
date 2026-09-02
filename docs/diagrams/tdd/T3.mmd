@@ -1,0 +1,14 @@
+flowchart TB
+    subgraph RegionR [Region R]
+        ProdCRG[Prod CRG]
+        NonProdCRG[NonProd/CVAL CRG]
+        DRCRG[DR-standby CRG]
+    end
+    ProdCRG -->|reserves| ZmapP{{Zone map: logical->physical}}
+    NonProdCRG --> ZmapN{{Zone map}}
+    DRCRG --> ZmapD{{Zone map}}
+    ZmapP --> ShareA[Consumer subscription A<br/>zone-aligned share]
+    ZmapN --> ShareB[Consumer subscription B]
+    ZmapD --> ShareC[DR consumer subscription]
+    note1[FC-06: share valid only when physical zones align<br/>ZoneMappingRecord required]:::n
+    classDef n fill:#fff3cd,stroke:#e0a800;

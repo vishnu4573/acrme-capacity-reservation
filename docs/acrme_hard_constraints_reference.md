@@ -5,6 +5,8 @@
 **Date:** August 2026  
 **Status:** Production Ready
 
+> **v2.2 reconciliation note (2 Sep 2026).** Under Requirements Baseline v2.2 and ADR-002 v2.2 the **single governed quota pool** is the **primary** model: one pool per region/quota family covers Prod + NonProd/CVAL + DR, with Prod and DR protected by **logical earmarks** (`Prod_Reserved_Floor`, `DR_Earmark_vCPU`) rather than physical group separation. The **Two-Group Quota Architecture** referenced by HC-3 and HC-7 below is retained as the sanctioned **exception topology** (used only when Azure Quota Group limits or a mandatory Prod-isolation boundary make one pool impossible). The HC-3/HC-7 arithmetic is unchanged and remains correct; in the single-pool model the terms map as `Effective_NonProd_Ceiling → Allocatable_NonProd`, `NonProd_DR_Group_Limit → Pool_Limit`, and `DR_Floor_vCPU → DR_Earmark_vCPU` (max-not-sum, DR-017). Also: the EU cross-geo DR extension region is **Switzerland North** (REG-002). See ADR-002 v2.2, the Calculation Logic Reference v2.2 (Scenario 8/9), the FDD §4.2, and the TDD §8.3.
+
 ---
 
 ## Overview
@@ -223,7 +225,7 @@ Ensures non-correlated failure domains between Prod and DR regions. This constra
 | East US | Central US | MEDIUM | ❌ No |
 | East US | West Europe | HIGH | ✅ Yes (cross-geo) |
 | UAE North | Saudi Arabia Central | MEDIUM | ❌ No (same geography) |
-| UAE North | Belgium Central | HIGH | ✅ Yes (cross-geo extension) |
+| UAE North | Switzerland North | HIGH | ✅ Yes (cross-geo extension) |
 
 #### Implementation
 
@@ -475,9 +477,9 @@ def get_prod_candidates(geography):
 |---|---|---|
 | US | East US, West US, Central US, ... | West Europe, UK South, ... |
 | Europe | West Europe, North Europe, UK South, ... | East US, Australia East, ... |
-| Middle East | UAE North, Saudi Arabia Central | East US, Belgium Central* |
+| Middle East | UAE North, Saudi Arabia Central | East US, Switzerland North* |
 
-*Belgium Central becomes eligible only via **HC-10 Cross-Geo Extension Path** for DR, not for Prod.
+*Switzerland North becomes eligible only via **HC-10 Cross-Geo Extension Path** for DR, not for Prod.
 
 #### Evidence Tag
 
@@ -589,7 +591,7 @@ DR assignments to Standard Capacity Regions in a **different geography** are rej
 
 | Source Geography | Approved DR Geographies | Primary DR Region | Rationale |
 |---|---|---|---|
-| Middle East | Europe | Belgium Central | Middle East has only 2 regions (UAE North, Saudi Arabia); insufficient for 3-region model |
+| Middle East | Europe | Switzerland North | Middle East has only 2 regions (UAE North, Saudi Arabia); insufficient for 3-region model |
 | Australia | Asia Pacific | Singapore | Regional pair fallback |
 | India | Asia Pacific | Singapore | Regional pair fallback |
 
@@ -602,16 +604,16 @@ DR assignments to Standard Capacity Regions in a **different geography** are rej
 **Placement:**
 1. **Prod:** `argmax(PS_Prod)` over {UAE North, Saudi Arabia Central} → e.g., UAE North
 2. **CVAL/NonProd:** Remaining Middle East region → Saudi Arabia Central
-3. **DR:** Cross-Geo Extension to **Belgium Central** (approved path)
+3. **DR:** Cross-Geo Extension to **Switzerland North** (approved path)
 
 **Validation:**
-- Belgium Central must pass **HC-1 through HC-10** including DR coverage floor (HC-6)
-- If Belgium Central fails any HC, the placement is **rejected with an ops alert**
+- Switzerland North must pass **HC-1 through HC-10** including DR coverage floor (HC-6)
+- If Switzerland North fails any HC, the placement is **rejected with an ops alert**
 - The engine does **not** silently select any alternative outside the approved extension paths
 
 #### Validation Rules (VR)
 
-- **VR-6:** For Middle East geography, DR region must be Belgium Central via approved Cross-Geo Extension path
+- **VR-6:** For Middle East geography, DR region must be Switzerland North via approved Cross-Geo Extension path
 - **VR-11:** Cross-Geo Extension DR path must be explicitly approved in active `PlacementPolicy`
 
 #### Implementation
@@ -640,7 +642,7 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
   "policy_version": "2026-08-Q3",
   "cross_geo_extension_paths": {
     "Middle East": {
-      "approved_dr_regions": ["Belgium Central"],
+      "approved_dr_regions": ["Switzerland North"],
       "rationale": "Middle East has only 2 Standard regions; 3-region model requires cross-geo DR"
     },
     "Australia": {
@@ -762,8 +764,8 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 | **VR-5** | All automated placement paths must use Standard Capacity Regions only | HC-9 |
 | **VR-6** | CVAL and DR must not use Restricted Capacity Regions under any condition | HC-9 |
 | **VR-7** | Standard region passes HC-1 through HC-10 → if all excluded, exhaustion error | HC-1..10 |
-| **VR-8** | For Middle East geography, DR region must be Belgium Central via approved cross-geo path | HC-10 |
-| **VR-9** | If Belgium Central fails HC-1..HC-10, block placement with ops alert | HC-1..10 |
+| **VR-8** | For Middle East geography, DR region must be Switzerland North via approved cross-geo path | HC-10 |
+| **VR-9** | If Switzerland North fails HC-1..HC-10, block placement with ops alert | HC-1..10 |
 | **VR-10** | Restricted region requested by customer → Scenario 2 exception path only | HC-9 |
 | **VR-11** | Cross-Geo Extension DR path must be explicitly approved in active PlacementPolicy | HC-10 |
 
@@ -802,7 +804,7 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
     "allow_single_zone_dev": false,
     "cross_geo_extension_paths": {
       "Middle East": {
-        "approved_dr_regions": ["Belgium Central"],
+        "approved_dr_regions": ["Switzerland North"],
         "rationale": "Middle East has only 2 Standard regions; 3-region model requires cross-geo DR"
       }
     },

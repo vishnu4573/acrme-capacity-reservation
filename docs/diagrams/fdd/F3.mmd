@@ -1,0 +1,17 @@
+flowchart TB
+    subgraph Actors
+        O[Onboarding]
+        A[AEP]
+        Op[Operator]
+        DR[DR coordinator]
+        F[FinOps]
+        Au[Auditor]
+    end
+    O --> UC1((Onboard + place customer))
+    A --> UC2((Query deployment readiness))
+    Op --> UC3((Reconcile capacity/quota))
+    Op --> UC4((Approve increase / override))
+    DR --> UC5((Declare DR + activate standby))
+    DR --> UC6((Run DR drill / failback))
+    F --> UC7((Set cost/buffer policy))
+    Au --> UC8((Audit decisions))

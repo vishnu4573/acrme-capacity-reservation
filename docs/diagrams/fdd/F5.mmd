@@ -1,0 +1,13 @@
+flowchart TD
+    Tick[Reconciliation tick ~6 min] --> Read[Read scope, reservation, allocated, associated, buffer, quota, freshness]
+    Read --> Fresh{State fresh?}
+    Fresh -- No --> Stale[STALE_STATE + refresh]
+    Fresh -- Yes --> Cmp{reserved vs Allocated+Buffer}
+    Cmp -- below --> Up[Attempt scale-up]
+    Up --> Sup{Azure supplies?}
+    Sup -- No --> Def[Hold safe state + expose buffer deficit alert]
+    Sup -- Yes --> Ok[Confirm + snapshot]
+    Cmp -- above --> Guard[Scale-down guards: hold interval, DR earmark, CVAL earmark, maintenance, override, cost]
+    Guard --> Down[Reduce toward target - never below Allocated+Buffer, never delete]
+    Down --> Ok
+    Cmp -- equal --> Ok

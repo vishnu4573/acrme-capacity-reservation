@@ -1,0 +1,18 @@
+flowchart TD
+    Start[Placement request] --> Seed{Seed exists?}
+    Seed -- Yes --> Reuse[Reuse CustomerSeedRecord]
+    Seed -- No --> Mode{Input mode}
+    Mode -- Exact prod region default --> ValP[Validate production region vs catalogue]
+    Mode -- Geography exception --> Appr{Exception approved + acknowledged?}
+    Appr -- No --> PB[POLICY_BLOCKED]
+    Appr -- Yes --> DerP[Derive prod from Standard regions - becomes fixed seed]
+    ValP --> Ok{Valid, supported, fresh?}
+    DerP --> Ok
+    Ok -- No --> Reason[Readiness reason state]
+    Ok -- Yes --> CVAL[Select/validate CVAL - env separation]
+    CVAL --> DR[Select DR or DR_NOT_OFFERED]
+    DR --> Idx[Contribute to SourceDestinationDRIndex]
+    Idx --> Hold[Atomic placement hold]
+    Hold --> Write[Write CustomerSeedRecord]
+    Reuse --> Out[Return DeploymentReadinessResult]
+    Write --> Out

@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant REC as State Reconciler
+    participant OP as Operator
+    participant QPM as Quota-Pool Manager
+    participant AZ as Azure
+    REC->>REC: 1. Detect threshold crossing
+    REC->>AZ: 2. Re-read CR/quota/sharing/assignment
+    REC->>REC: 3. Create CapacityIncreaseRequest
+    REC->>REC: 4. Target = max(Allocated+Buffer, Forecast)
+    REC->>OP: 5. Require approval (Phase 1)
+    OP-->>REC: Approved
+    REC->>QPM: 6. Submit quota action if required
+    QPM->>AZ: 7. Await confirmed quota state
+    AZ-->>QPM: Confirmed
+    QPM->>AZ: 8. Update CR quantity
+    AZ-->>QPM: 9. Confirm actual quantity
+    REC->>REC: 10. Refresh snapshot + close request
