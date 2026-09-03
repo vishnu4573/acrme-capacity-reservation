@@ -24,3 +24,6 @@ venv/
 # Auto-converted diagram PDFs/DOCX (keep source .md only for diagrams)
 docs/diagrams/uml_*.pdf
 docs/diagrams/uml_*.docx
+
+# Any markdown->html preview artifact dirs (e.g. *_v2_2_preview/, *_preview/)
+*_preview/

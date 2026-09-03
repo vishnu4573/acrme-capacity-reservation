@@ -9,31 +9,51 @@ implements every POC test case.
 
 ## Repository layout
 
+Documents are grouped by purpose. Every narrative document is provided as `.md` (source),
+`.docx` (editable), and `.pdf` (print-ready) unless noted. See [`docs/README.md`](docs/README.md)
+for the full per-folder index.
+
 ```
 acrme-capacity-reservation/
 ├── README.md                          # This file
-├── docs/                              # Production-ready design artifacts
-│   ├── acrme_executive_design_document.docx / .pdf
-│   ├── acrme_poc_workbook_v2.docx / .pdf
-│   ├── acrme_production_readiness_review_and_architecture.md / .docx / .pdf
-│   ├── acrme_security_and_rbac_guide.md / .docx / .pdf
-│   ├── research/                      # Source research documents (inputs to the PRR)
-│   │   ├── azure_cr_management_engine_design.md
-│   │   ├── multi_region_placement_design.md
-│   │   ├── design_change_summary.md
-│   │   ├── acrme_requirements_traceability_review.md
-│   │   └── azure_cr_poc_test_workbook.md
-│   └── rbac/                          # Custom role JSONs + deploy scripts
-│       ├── custom_roles/*.json        # 5 least-privilege custom roles
-│       ├── deploy_custom_roles.sh
-│       └── deploy_role_assignments.sh
-└── test_suite/                       # Runnable Python test automation suite
-    ├── README.md                     # Full suite usage guide
+├── docs/
+│   ├── README.md                      # Docs index (what lives where)
+│   ├── requirements/                  # WHAT the system must do
+│   │   ├── acrme_requirements_baseline_v2_2.*   # single source of truth (v2.2)
+│   │   ├── acrme_complete_requirements_reference.*
+│   │   ├── acrme_requirements_deviation_analysis.*
+│   │   └── capacity_and_quota_management_requirements_v2.md
+│   ├── design/                        # HOW it is designed
+│   │   ├── acrme_executive_design_document.*
+│   │   ├── acrme_functional_design_document.*
+│   │   ├── acrme_technical_design_document.*
+│   │   ├── acrme_production_readiness_review_and_architecture.*
+│   │   ├── acrme_design_change_and_fdd_tdd_plan.*
+│   │   ├── acrme_architecture_decision_records.*   # consolidated ADRs
+│   │   └── acrme_uml_class_diagrams_summary.*
+│   ├── reference/                     # Calculation / rules quick-reference
+│   │   ├── acrme_calculation_logic_reference.*
+│   │   ├── acrme_hard_constraints_reference.*
+│   │   ├── acrme_plain_english_walkthrough.*
+│   │   └── ACRME_Scoring_Weights_Explained.*
+│   ├── guides/                        # Operator-facing guides
+│   │   └── acrme_security_and_rbac_guide.*
+│   ├── testing/                       # POC test workbook
+│   │   └── acrme_poc_workbook_v2.docx / .pdf
+│   ├── adr/                           # Individual standalone ADR-001..005 (+ diagrams/)
+│   ├── backlog/                       # Epics→Stories→Tasks + Jira CSV (generated)
+│   ├── diagrams/                      # Source PNG/SVG/MMD + architecture deck (.pptx/.pdf)
+│   ├── presentation/                  # Executive slide deck (.pptx/.pdf)
+│   ├── rbac/                          # Custom role JSONs + deploy scripts
+│   ├── research/                      # Source research inputs to the PRR
+│   └── tools/                         # Doc-build helper scripts
+└── test_suite/                        # Runnable Python test automation suite
+    ├── README.md                      # Full suite usage guide
     ├── requirements.txt
     ├── config.yaml.template
-    ├── runner.py                     # CLI: preflight / run / report / gate / list
-    ├── acrme_suite/                  # Engine, config, az client, reporter, preflight
-    └── reports/                      # Generated reports land here (git-ignored)
+    ├── runner.py                      # CLI: preflight / run / report / gate / list
+    ├── acrme_suite/                   # Engine, config, az client, reporter, preflight
+    └── reports/                       # Generated reports land here (git-ignored)
 ```
 
 ---
@@ -111,7 +131,7 @@ and vector (`.svg`, infinitely zoomable) form:
 - **Entity schemas:** Cosmos DB partition keys, indexes, TTL for all entities
 - **Service contracts:** FastAPI DTOs, RBAC, endpoints for all services
 
-See [`docs/acrme_uml_class_diagrams_summary.md`](docs/acrme_uml_class_diagrams_summary.md) for full analysis and next steps.
+See [`docs/design/acrme_uml_class_diagrams_summary.md`](docs/design/acrme_uml_class_diagrams_summary.md) for full analysis and next steps.
 
 ---
 
