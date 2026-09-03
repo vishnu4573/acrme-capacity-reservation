@@ -1,15 +1,28 @@
 flowchart TD
-    subgraph REGION[Per-Region Quota Model]
+    START[Per-Region / Quota-Family<br/>Quota Provisioning] --> DECIDE{Policy decision:<br/>can one governed pool<br/>cover Prod + NonProd/CVAL + DR?}
+
+    DECIDE -->|Yes — DEFAULT<br/>QUA-004 v2.2| PRIMARY
+    DECIDE -->|No — narrow EXCEPTION<br/>Azure Quota Group limit<br/>or mandatory Prod-isolation| EXC
+
+    subgraph PRIMARY["PRIMARY MODEL — Single Governed Quota Pool (per region / quota family)"]
       direction TB
-      subgraph PG[Prod-only Quota Group]
-        P1[Prod CRG quota<br/>isolated from NonProd surge]
-      end
-      subgraph NG["Shared NonProd + DR Quota Group"]
-        direction TB
-        CEIL[Effective NonProd Ceiling<br/>= Group Limit − DR Floor]
-        FLOOR["DR Floor vCPU<br/>= Potential_DR_Demand<br/>× vCPU_Per_Instance × dr_ratio_max 0.40<br/>engine-enforced, protected"]
-        CEIL --- FLOOR
-      end
+      POOL["One pool covers Prod + NonProd/CVAL + DR<br/>allocation by logical earmarks, not physical groups"]
+      PF["Earmark: Prod_Reserved_Floor<br/>floor below which Prod quota cannot be reduced<br/>protects production growth buffer"]
+      DE["Earmark: DR_Earmark_vCPU<br/>protects DR capacity<br/>= MAX over source portions (max-not-sum, A.6)<br/>NOT the sum of concurrent DR demands"]
+      ALLOC["NonProd / CVAL Allocatable Headroom<br/>= Pool Limit − Prod_Reserved_Floor − DR_Earmark_vCPU<br/>also funds quota-neutral emergency transfers"]
+      POOL --> PF
+      POOL --> DE
+      POOL --> ALLOC
     end
-    NOTE["Tier 2 Emergency Transfer is quota-neutral:<br/>NonProd reduction releases quota to the SAME pool<br/>that DR expansion consumes → net change ≈ 0"]
-    NG -.-> NOTE
+
+    subgraph EXC["EXCEPTION TOPOLOGY — Two Quota Groups (used ONLY when single pool is impossible)"]
+      direction TB
+      PG["Prod-only Quota Group<br/>Prod CRG quota isolated from NonProd surge"]
+      NG["Shared NonProd + DR Quota Group<br/>Effective NonProd Ceiling = Group Limit − DR Floor"]
+    end
+
+    PRIMARY --> NEUTRAL["Tier 2 Emergency Transfer is quota-neutral:<br/>NonProd reduction releases quota to the SAME pool<br/>that DR expansion consumes → net change ≈ 0"]
+    EXC --> EXCNOTE["Exception rationale: retained only where Azure Quota Group<br/>limits or a governance boundary prevent one pool.<br/>Same earmark semantics apply within the shared group."]
+
+    MAXNOTE["max-not-sum (Appendix D, formula A.6):<br/>DR_Earmark_vCPU = MAX over source DR portions,<br/>because DR events are treated as non-concurrent"]
+    DE -.-> MAXNOTE

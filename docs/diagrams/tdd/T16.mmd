@@ -1,0 +1,21 @@
+flowchart TD
+    TICK["Reconciliation tick<br/>every reconciliation_interval_seconds"] --> READ
+    READ["Read current state<br/>allocated VMs · reserved capacity"] --> HR
+    HR["Compute headroom<br/>free_slots = reserved − allocated"] --> RATIO
+    RATIO["Compute headroom ratio<br/>headroom_ratio = free_slots / reserved"] --> CHECK
+
+    CHECK{"headroom_ratio < threshold<br/>for this CRG type?"}
+    CHECK -->|No| LOOP["No action —<br/>wait for next tick"]
+    LOOP -.-> TICK
+
+    CHECK -->|Yes| DEBOUNCE{"Debounce check:<br/>last_trigger < now − 30 min<br/>(per region + CRG type)?"}
+    DEBOUNCE -->|No — in cooldown| SKIP["Skip — suppress duplicate<br/>within cooldown window"]
+    SKIP -.-> TICK
+    DEBOUNCE -->|Yes| CREATE["Create CapacityIncreaseRequest<br/>writes OperationRecord →<br/>escalates to quota / capacity subsystem"]
+    CREATE --> TICK
+
+    THRESH["Configurable thresholds (PlacementPolicy, remaining-headroom %):<br/>prod_autoincrease_threshold = 0.20<br/>nonprod_autoincrease_threshold = 0.20<br/>dr_autoincrease_threshold = 0.35 (higher — DR is lean bootstrap)"]
+    CHECK -.-> THRESH
+
+    FLOOR["Reconciliation floor vs threshold:<br/>Floor = Allocated + Buffer is the minimum the CRG must always reserve.<br/>The threshold is the EARLY-WARNING signal that fires above that floor."]
+    RATIO -.-> FLOOR

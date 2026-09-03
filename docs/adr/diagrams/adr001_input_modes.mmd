@@ -1,10 +1,10 @@
 flowchart TD
     A[Prod region input] --> Q1{Input type?}
-    Q1 -->|Geography supplied<br/>Scenario 1| G1[Derive Prod = argmax PS_Prod<br/>over Standard regions in geography]
+    Q1 -->|"Specific region — DEFAULT<br/>(PLC-001, Scenario 2)"| S1{Region<br/>classification?}
+    Q1 -->|"Geography supplied — EXCEPTIONAL<br/>(PLC-002, Scenario 1)<br/>requires exception approval<br/>+ customer acknowledgement"| G1[Derive Prod = argmax PS_Prod<br/>over Standard regions in geography]
     G1 --> G2{Geography<br/>exhausted?}
     G2 -->|Yes| R1[Reject — never cross-geo<br/>or use Restricted region]
     G2 -->|No| ANCHOR[Validated Prod anchor]
-    Q1 -->|Specific region<br/>Scenario 2| S1{Region<br/>classification?}
     S1 -->|Standard| V1[Validate HC-1..HC-10] --> ANCHOR
     S1 -->|Restricted| EC[Exception Deployment Workflow]
     EC --> EC1{EC-1..EC-4 all met?<br/>explicit + Prod-only +<br/>approval + Scenario 2}
@@ -12,3 +12,6 @@ flowchart TD
     EC1 -->|Yes| ANCHOR2[Exception Prod Anchor<br/>+ persisted approval ID<br/>+ capacity warning]
     ANCHOR --> NEXT[CVAL and DR selected<br/>sequentially from anchor]
     ANCHOR2 --> NEXT
+
+    NOTE["Input-mode policy:<br/>• Specific exact region is the DEFAULT input (PLC-001) — ACRME validates it.<br/>• Geography-only selection is EXCEPTIONAL (PLC-002) — requires explicit exception<br/>approval + customer acknowledgement that the derived Prod region becomes the<br/>fixed seed until an approved migration changes it."]
+    Q1 -.-> NOTE

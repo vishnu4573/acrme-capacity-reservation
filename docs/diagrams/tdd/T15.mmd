@@ -1,0 +1,31 @@
+flowchart TD
+    SNAP["Regional Snapshot (per candidate region r)<br/>free_slots · reserved_quantity · quota_headroom · quota_limit<br/>customer_count · total_customers · dr_coverage_ratio · az_count"]
+
+    SNAP --> COMP
+
+    subgraph COMP["Component Computation (each clamped to [0,1])"]
+      direction TB
+      A["α_comp = Clamp(nonprod_crg.effective_free / prod_crg.quantity)<br/>NonProd headroom signal"]
+      B["β_comp = Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)<br/>Prod quota headroom"]
+      G["γ_comp = Clamp(1 − prod_customer_count / total_customers)<br/>Distribution fairness"]
+      D["δ_comp = Clamp(dr_crg.coverage_ratio)<br/>DR readiness signal"]
+      E["ε_comp = Clamp(az_count / 3)<br/>Zone diversity"]
+    end
+
+    CLAMP["Clamping applied to every component<br/>Clamp(x) = max(0, min(1, x))"]
+    A --> CLAMP
+    B --> CLAMP
+    G --> CLAMP
+    D --> CLAMP
+    E --> CLAMP
+
+    CLAMP --> SUM["Weighted Sum<br/>PS = 0.30·α + 0.20·β + 0.25·γ + 0.15·δ + 0.10·ε<br/>weights must sum to 1.0 → PS ∈ [0,1]"]
+
+    SUM --> ARGMAX{"argmax over eligible<br/>Standard regions"}
+    ARGMAX --> SEED["Seed Record<br/>Prod anchor selected → derives DR → then CVAL<br/>(sequential Prod → NonProd → DR)"]
+
+    TIE["Tie-break: deterministic —<br/>first region in the Standard Capacity Region<br/>list order for that geography"]
+    ARGMAX -.-> TIE
+
+    VARIANT["Formula variants (same weights, different signals):<br/>• PS_Prod: α uses nonprod effective_free / prod quantity; δ = dr coverage_ratio<br/>• PS_NonProd: α & δ use nonprod effective_free / nonprod quantity<br/>• PS_DR: α = dr free/qty; δ = min(1, coverage_ratio / dr_ratio_target)<br/>See Calculation Logic Reference v2.2"]
+    COMP -.-> VARIANT

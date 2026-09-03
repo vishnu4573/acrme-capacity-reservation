@@ -7,4 +7,7 @@ stateDiagram-v2
     FAILBACK_PENDING --> STEADY_STATE: failback complete (reversible)
     STEADY_STATE --> INCIDENT_HOLD: inputs untrusted / stale
     DR_EVENT_ACTIVE --> INCIDENT_HOLD: safety trip
+    FAILBACK_PENDING --> INCIDENT_HOLD: safety trip
     INCIDENT_HOLD --> STEADY_STATE: inputs restored
+    INCIDENT_HOLD --> DR_EVENT_ACTIVE: inputs restored (was active)
+    INCIDENT_HOLD --> FAILBACK_PENDING: inputs restored (was failback)

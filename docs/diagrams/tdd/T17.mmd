@@ -1,0 +1,49 @@
+flowchart TD
+    ROOT[ACRME-managed Geographies<br/>region classification per HC-8 / HC-9]
+
+    ROOT --> US
+    ROOT --> EU
+    ROOT --> ME
+    ROOT --> APAC
+
+    subgraph US["US Geography"]
+      direction TB
+      USS["Standard (automated placement):<br/>West US 3 · Central US · Canada Central"]
+      USR["Restricted (exception path only):<br/>East US 2"]
+    end
+
+    subgraph EU["Europe Geography"]
+      direction TB
+      EUS["Standard (automated placement):<br/>Switzerland North · Sweden Central ·<br/>UK South · West Europe · North Europe"]
+      EUR["Restricted / sovereign (exception path only):<br/>e.g. Azure Government EU"]
+    end
+
+    subgraph ME["Middle East Geography"]
+      direction TB
+      MES["Standard (automated placement):<br/>UAE North · Saudi Arabia Central"]
+      MEDR["DR status: DR_NOT_OFFERED<br/>(DR-014, DEC-001 — under legal review)"]
+      MEX["Conditional cross-geo DR → Switzerland North<br/>INACTIVE until DEC-001 legal clearance"]
+      MES --> MEDR --> MEX
+    end
+
+    subgraph APAC["APAC Geography"]
+      direction TB
+      APS["Standard (automated placement):<br/>East Asia · Australia East · Japan East"]
+      APR["Restricted (exception path only):<br/>Australia Southeast"]
+    end
+
+    STD["Standard Capacity Regions →<br/>eligible for automated placement<br/>(PS_Prod scoring via HC-8 / HC-9)"]
+    RES["Restricted Regions →<br/>exception path only<br/>(Scenario 2, operator approval)"]
+    XGEO["Cross-geo extension →<br/>conditional only<br/>(DEC-001 required for Middle East)"]
+
+    USS -.-> STD
+    EUS -.-> STD
+    MES -.-> STD
+    APS -.-> STD
+    USR -.-> RES
+    EUR -.-> RES
+    APR -.-> RES
+    MEX -.-> XGEO
+
+    NOTE["Regions are canonical examples from the Hard Constraints Reference and<br/>Calculation Logic Reference v2.2. Actual Azure region inventory may differ;<br/>the authoritative Standard/Restricted lists live in PlacementPolicy (HC-8/HC-9)."]
+    ROOT -.-> NOTE
