@@ -260,6 +260,102 @@ across multiple physical failure domains.
 **In plain English:** a region with more Availability Zones is more resilient and scores higher on
 this component, all else equal.
 
+#### Important: The Weights Are NOT Calculated — The Components Are
+
+A common point of confusion: **α, β, γ, δ, ε themselves are never calculated.** They are **fixed
+policy constants** (α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10) stored in `PlacementPolicy` and loaded at
+runtime. They only change if an operator edits the policy file (see Section 3.8).
+
+What the engine **calculates at runtime**, per region, is the **component value** that each weight
+multiplies — the `α_component`, `β_component`, etc. Each component is a ratio derived from the
+**regional snapshot** (the live, versioned state of each region's reservations, quota, customers, and
+zones). The formula is always:
+
+```
+weight (fixed policy constant)  ×  component (calculated from the snapshot)
+```
+
+So "how is α calculated?" really means "how is the **α_component** calculated from the snapshot?" —
+which is what the next two subsections show with concrete numbers.
+
+#### Regional Snapshot — Assumed Starter Values
+
+The engine reads a **regional snapshot** before scoring. A snapshot is the current state of every
+candidate region. The raw fields below are the inputs to the component formulas. The values here are
+**assumed starter values** for a worked example (US Geography, `PS_Prod` scoring, deploying a Prod
+workload). In production these come from live Azure state + the reservation store; here they are fixed
+so the arithmetic is reproducible.
+
+| Snapshot field | West US 3 | Central US | Canada Central | Used by |
+|---|---|---|---|---|
+| `prod_crg.quantity` (reserved Prod slots) | 200 | 200 | 200 | α (denominator) |
+| `nonprod_crg.effective_free` (free NonProd slots after DR overflow reserve) | 130 | 80 | 40 | α (numerator) |
+| `prod_crg.quota_limit` (vCPU) | 1000 | 1000 | 1000 | β (denominator) |
+| `prod_crg.quota_headroom` (vCPU free below limit) | 700 | 550 | 300 | β (numerator) |
+| `prod_customer_count` (customers already in region) | 40 | 25 | 20 | γ |
+| `total_customers` (across all regions) | 100 | 100 | 100 | γ |
+| `dr_crg.coverage_ratio` (DR coverage already in place) | 0.50 | 0.45 | 0.60 | δ |
+| `az_count` (Availability Zones) | 3 | 3 | 2 | ε |
+
+> **Note on "starter" values.** These are illustrative seed values for the walkthrough, not baseline
+> defaults. The only true baseline defaults are the *weights* (Section 3.3) and the *configurable
+> parameters* (Section 8.1). Snapshot values are always live data, never configuration.
+
+#### Worked Calculation — Deriving Each Component (West US 3)
+
+Using the `PS_Prod` formulas from Section 3.3 and the snapshot row for **West US 3**. Every component
+is clamped to [0, 1] via `Clamp(x) = max(0, min(1, x))`.
+
+```
+α_component = Clamp(nonprod_crg.effective_free / prod_crg.quantity)
+            = Clamp(130 / 200) = Clamp(0.65) = 0.65
+
+β_component = Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)
+            = Clamp(700 / 1000) = Clamp(0.70) = 0.70
+
+γ_component = Clamp(1 − prod_customer_count / total_customers)
+            = Clamp(1 − 40 / 100) = Clamp(0.60) = 0.60
+
+δ_component = Clamp(dr_crg.coverage_ratio)
+            = Clamp(0.50) = 0.50
+
+ε_component = Clamp(az_count / 3)
+            = Clamp(3 / 3) = Clamp(1.0) = 1.0
+```
+
+Now apply the fixed weights:
+
+```
+PS_Prod(West US 3) = 0.30 × 0.65    (α)
+                   + 0.20 × 0.70    (β)
+                   + 0.25 × 0.60    (γ)
+                   + 0.15 × 0.50    (δ)
+                   + 0.10 × 1.00    (ε)
+                   = 0.195 + 0.140 + 0.150 + 0.075 + 0.100
+                   = 0.66
+```
+
+Repeating the same derivation for the other two regions from the snapshot:
+
+| Component (calculated) | West US 3 | Central US | Canada Central |
+|---|---|---|---|
+| α_component = effective_free / prod quantity | 130/200 = **0.65** | 80/200 = **0.40** | 40/200 = **0.20** |
+| β_component = quota_headroom / quota_limit | 700/1000 = **0.70** | 550/1000 = **0.55** | 300/1000 = **0.30** |
+| γ_component = 1 − customers / total | 1−0.40 = **0.60** | 1−0.25 = **0.75** | 1−0.20 = **0.80** |
+| δ_component = dr coverage_ratio | **0.50** | **0.45** | **0.60** |
+| ε_component = az_count / 3 | 3/3 = **1.0** | 3/3 = **1.0** | 2/3 = **0.67** |
+| **PS_Prod (weighted sum)** | **0.66** | **0.58** | **0.48** |
+
+**These are exactly the component values used in the Section 3.5 US walkthrough** — that section
+applies these same numbers to pick `argmax(PS_Prod) = West US 3`. The snapshot above is where those
+numbers come from.
+
+**Key takeaways:**
+- The **weights** (0.30, 0.20, 0.25, 0.15, 0.10) are identical for every region — they are policy.
+- The **components** differ per region — they are calculated from that region's snapshot.
+- A change in live state (e.g., West US 3 fills up, dropping `effective_free`) changes only the
+  components, never the weights, and can flip which region wins.
+
 ### 3.4 Putting It Together — The Score and the Winner
 
 Each region gets a score between 0 and 1:
@@ -291,9 +387,9 @@ All three regions pass HC-1..HC-10. The engine scores all three and picks the hi
 ```
 Candidate regions: { West US 3, Central US, Canada Central }
 
-Score(West US 3):    0.30 × 0.65 + 0.20 × 0.70 + 0.25 × 0.60 + 0.15 × 0.50 + 0.10 × 1.0 = 0.63
+Score(West US 3):    0.30 × 0.65 + 0.20 × 0.70 + 0.25 × 0.60 + 0.15 × 0.50 + 0.10 × 1.0 = 0.66
 Score(Central US):   0.30 × 0.40 + 0.20 × 0.55 + 0.25 × 0.75 + 0.15 × 0.45 + 0.10 × 1.0 = 0.58
-Score(Canada Central): 0.30 × 0.20 + 0.20 × 0.30 + 0.25 × 0.80 + 0.15 × 0.60 + 0.10 × 0.67 = 0.44
+Score(Canada Central): 0.30 × 0.20 + 0.20 × 0.30 + 0.25 × 0.80 + 0.15 × 0.60 + 0.10 × 0.67 = 0.48
 
 argmax → West US 3 (Prod anchor)
 ```
