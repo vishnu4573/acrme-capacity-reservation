@@ -1504,4 +1504,145 @@ EPICS = [
             },
         ],
     },
+    # =====================================================================
+    {
+        "id": "ACRME-E20",
+        "name": "v2.4 Reservation-Model Reconciliation",
+        "goal": "Deliver the reservation-model requirements folded into Requirements "
+                "Baseline v2.4 from the reviewed architecture diagrams: reservation "
+                "eligibility gates (CAP-020/CAP-021), the seed-at-0 SKU/AZ matrix and "
+                "product-team budget governance (CAP-022), the explicit regional + per-AZ "
+                "CRG structure (CAP-023), reactive SKU/AZ discovery (CAP-024), even "
+                "zone-distribution + rebalancing (PLC-011), and the deterministic naming "
+                "convention (OPS-006/C-12).",
+        "prr_refs": ["Baseline v2.4 §2.4 changelog", "CAP-020..024", "PLC-011", "OPS-006", "C-12/C-13", "Appendix A.9"],
+        "stories": [
+            {
+                "id": "ACRME-S2001",
+                "title": "Reservation eligibility gate — Availability-Set ineligibility & AZ onboarding precondition",
+                "as_a": "onboarding engineer",
+                "i_want": "the engine to reject reservation onboarding for Availability-Set VMs and require deallocate/redeploy-to-AZ first",
+                "so_that": "only zone-aligned, reservation-eligible VMs enter the CRG model (CAP-020, CAP-021)",
+                "priority": "Highest", "points": 5, "phase": "P1",
+                "prr_refs": ["CAP-020", "CAP-021"],
+                "depends_on": ["ACRME-S0201"],
+                "acceptance": [
+                    "VMs deployed in an Availability Set are classified reservation-ineligible and blocked from CRG onboarding (CAP-020).",
+                    "Onboarding a running non-zonal VM requires the deallocate-or-redeploy-to-an-availability-zone precondition to be satisfied first (CAP-021).",
+                    "The `ReservationEligibility` record captures ineligibility reason and the onboarding precondition state.",
+                    "A blocked onboarding returns a deterministic, actionable error and raises a governance item.",
+                ],
+                "tasks": [
+                    {"id": "ACRME-T200101", "title": "Implement Availability-Set detection and reservation-ineligibility classification (CAP-020)"},
+                    {"id": "ACRME-T200102", "title": "Implement deallocate/redeploy-to-AZ onboarding precondition check (CAP-021)"},
+                    {"id": "ACRME-T200103", "title": "Persist ReservationEligibility record with reason + precondition state"},
+                ],
+            },
+            {
+                "id": "ACRME-S2002",
+                "title": "Seed-at-0 SKU/AZ matrix and product-team budget governance",
+                "as_a": "capacity governance owner",
+                "i_want": "an eligible-SKU/AZ seed matrix initialised at count 0 under product-team budget governance",
+                "so_that": "reservations exist as governed placeholders before demand, extending the CAP-009 seed model (CAP-022)",
+                "priority": "Highest", "points": 8, "phase": "P1",
+                "prr_refs": ["CAP-022", "CAP-009"],
+                "depends_on": ["ACRME-S0301"],
+                "acceptance": [
+                    "The seed matrix enumerates eligible SKU × AZ combinations with initial reserved count 0 (seed reservations).",
+                    "Product-team budget governance approves any increase of a seed reservation above 0.",
+                    "`SeedMatrixEntry` records SKU, AZ, environment, governance status, and current count.",
+                    "Seed reservations are distinguished from active reservations (`reservationType = SEED`).",
+                ],
+                "tasks": [
+                    {"id": "ACRME-T200201", "title": "Model SeedMatrixEntry (SKU × AZ × env, count-0 seed) per CAP-022"},
+                    {"id": "ACRME-T200202", "title": "Implement product-team budget-governance gate for seed increases"},
+                    {"id": "ACRME-T200203", "title": "Distinguish SEED vs ACTIVE reservationType in the reservation model"},
+                ],
+            },
+            {
+                "id": "ACRME-S2003",
+                "title": "Explicit regional + per-AZ CRG structure per environment",
+                "as_a": "capacity engineer",
+                "i_want": "each environment provisioned with one regional CRG plus one CRG per availability zone",
+                "so_that": "reservations are held at the correct regional/zonal scope, extending CAP-011 (CAP-023)",
+                "priority": "High", "points": 5, "phase": "P1",
+                "prr_refs": ["CAP-023", "CAP-011", "OPS-006"],
+                "depends_on": ["ACRME-S0301"],
+                "acceptance": [
+                    "Each environment (Prod, NonProd, DR) has one regional CRG (`crg-<env>-<region>-reg`) and one CRG per AZ (`az1/az2/az3`).",
+                    "`CapacityReservationGroup` carries `environment` and `crgScope` (REGIONAL | ZONAL).",
+                    "CRG names are generated deterministically per OPS-006/C-12.",
+                    "Per-AZ CRG sizing aligns with the even zone-distribution target (PLC-011).",
+                ],
+                "tasks": [
+                    {"id": "ACRME-T200301", "title": "Provision regional + per-AZ CRG set per environment (CAP-023)"},
+                    {"id": "ACRME-T200302", "title": "Add environment + crgScope to CRG model and provisioning"},
+                    {"id": "ACRME-T200303", "title": "Wire deterministic CRG naming (OPS-006/C-12)"},
+                ],
+            },
+            {
+                "id": "ACRME-S2004",
+                "title": "Reactive SKU/AZ discovery auto-create with scope-file governance",
+                "as_a": "capacity engineer",
+                "i_want": "the engine to auto-create missing SKU/AZ reservations against the seed matrix and raise a scope-file governance item",
+                "so_that": "newly requested SKU/AZ combinations are captured and governed, reconciling CAP-019 (CAP-024)",
+                "priority": "High", "points": 5, "phase": "P2",
+                "prr_refs": ["CAP-024", "CAP-019", "CAP-022"],
+                "depends_on": ["ACRME-S2002", "ACRME-S2003"],
+                "acceptance": [
+                    "A request for a SKU/AZ combination not yet in a CRG triggers auto-creation of the reservation against the seed matrix.",
+                    "Each reactive discovery raises a scope-file governance item for review (reconciles CAP-019).",
+                    "Auto-created reservations are recorded with provenance (reactive vs. seeded vs. planned).",
+                    "Reactive discovery respects reservation eligibility (CAP-020/CAP-021).",
+                ],
+                "tasks": [
+                    {"id": "ACRME-T200401", "title": "Implement reactive SKU/AZ discovery + auto-create against seed matrix (CAP-024)"},
+                    {"id": "ACRME-T200402", "title": "Raise scope-file governance item on reactive discovery (CAP-019 reconciliation)"},
+                    {"id": "ACRME-T200403", "title": "Record reservation provenance (reactive/seeded/planned)"},
+                ],
+            },
+            {
+                "id": "ACRME-S2005",
+                "title": "Even zone-distribution target and rebalancing action",
+                "as_a": "placement engineer",
+                "i_want": "placement to target an even ≈1/zone_count spread and raise a rebalancing action when skew exceeds tolerance",
+                "so_that": "per-zone failover exposure is bounded and per-AZ CRG sizing stays balanced (PLC-011)",
+                "priority": "High", "points": 5, "phase": "P2",
+                "prr_refs": ["PLC-011", "C-13", "Appendix A.9", "CAP-023"],
+                "depends_on": ["ACRME-S2003", "ACRME-S0701"],
+                "acceptance": [
+                    "New placement prefers the most under-represented zone (`argmin` VMs per zone) toward ≈`1/zone_count` per zone.",
+                    "`Max Skew > Configured Skew Tolerance` (C-13) raises a rebalancing recommendation/action, subject to approval and Azure feasibility.",
+                    "The target ratio and tolerance are configuration-driven in `PlacementPolicy`.",
+                    "Behaviour matches Appendix A.9 skew formula and is distinct from the ε zone-diversity scoring signal (PLC-007).",
+                ],
+                "tasks": [
+                    {"id": "ACRME-T200501", "title": "Implement even zone-distribution target + under-represented-zone preference (PLC-011/A.9)"},
+                    {"id": "ACRME-T200502", "title": "Implement skew-tolerance (C-13) rebalancing recommendation/action"},
+                    {"id": "ACRME-T200503", "title": "Expose target ratio + tolerance as PlacementPolicy config"},
+                ],
+            },
+            {
+                "id": "ACRME-S2006",
+                "title": "Deterministic RG/CRG/subscription naming convention & counter",
+                "as_a": "platform operator",
+                "i_want": "a deterministic naming convention with a counter for resource groups, CRGs, and subscriptions",
+                "so_that": "resource identities are predictable, collision-free, and auditable (OPS-006, C-12)",
+                "priority": "Medium", "points": 3, "phase": "P1",
+                "prr_refs": ["OPS-006", "C-12"],
+                "depends_on": [],
+                "acceptance": [
+                    "RG, CRG, and subscription names are generated by a single deterministic convention (OPS-006).",
+                    "The naming counter (C-12) guarantees uniqueness and is persisted/auditable.",
+                    "Generated names are stable across re-runs for the same inputs.",
+                    "RBAC scope assignments consume the deterministic names (no ad-hoc naming).",
+                ],
+                "tasks": [
+                    {"id": "ACRME-T200601", "title": "Implement deterministic RG/CRG/subscription naming convention (OPS-006)"},
+                    {"id": "ACRME-T200602", "title": "Implement + persist the naming counter (C-12)"},
+                    {"id": "ACRME-T200603", "title": "Align RBAC scope assignment with deterministic names"},
+                ],
+            },
+        ],
+    },
 ]

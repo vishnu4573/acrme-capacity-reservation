@@ -9,17 +9,17 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 
 | Metric | Value |
 |---|---|
-| Epics | 19 |
-| Stories | 66 |
-| Tasks | 175 |
-| Total story points | 426 |
+| Epics | 20 |
+| Stories | 72 |
+| Tasks | 193 |
+| Total story points | 457 |
 
 ### Points & stories by delivery phase
 
 | Phase | Meaning | Stories | Story points |
 |---|---|---|---|
-| P1 | Pilot — foundation, manual-assist, single/few regions | 55 | 350 |
-| P2 | Controlled automation — scoring, sharing, quota, multi-region | 11 | 76 |
+| P1 | Pilot — foundation, manual-assist, single/few regions | 59 | 371 |
+| P2 | Controlled automation — scoring, sharing, quota, multi-region | 13 | 86 |
 
 ## 2. Legend & Conventions
 
@@ -53,6 +53,7 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 | ACRME-E17 | Reconciliation & Scaling | 4 | 23 |
 | ACRME-E18 | POC & Validation Program | 4 | 29 |
 | ACRME-E19 | Production Readiness Gates & Governance | 3 | 13 |
+| ACRME-E20 | v2.4 Reservation-Model Reconciliation | 6 | 31 |
 
 ## 4. Epics, Stories & Tasks
 
@@ -1598,4 +1599,146 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 
 - [ ] `ACRME-T190301` Encode pilot + production entry-gate checklists
 - [ ] `ACRME-T190302` Record named approvers + separate-authorization rule
+
+### ACRME-E20 — v2.4 Reservation-Model Reconciliation
+
+**Goal.** Deliver the reservation-model requirements folded into Requirements Baseline v2.4 from the reviewed architecture diagrams: reservation eligibility gates (CAP-020/CAP-021), the seed-at-0 SKU/AZ matrix and product-team budget governance (CAP-022), the explicit regional + per-AZ CRG structure (CAP-023), reactive SKU/AZ discovery (CAP-024), even zone-distribution + rebalancing (PLC-011), and the deterministic naming convention (OPS-006/C-12).
+
+**PRR references.** Baseline v2.4 §2.4 changelog, CAP-020..024, PLC-011, OPS-006, C-12/C-13, Appendix A.9  
+**Rollup.** 6 stories · 31 points
+
+| Story | Title | Priority | Points | Phase | Depends on |
+|---|---|---|---|---|---|
+| ACRME-S2001 | Reservation eligibility gate — Availability-Set ineligibility & AZ onboarding precondition | Highest | 5 | P1 | ACRME-S0201 |
+| ACRME-S2002 | Seed-at-0 SKU/AZ matrix and product-team budget governance | Highest | 8 | P1 | ACRME-S0301 |
+| ACRME-S2003 | Explicit regional + per-AZ CRG structure per environment | High | 5 | P1 | ACRME-S0301 |
+| ACRME-S2004 | Reactive SKU/AZ discovery auto-create with scope-file governance | High | 5 | P2 | ACRME-S2002, ACRME-S2003 |
+| ACRME-S2005 | Even zone-distribution target and rebalancing action | High | 5 | P2 | ACRME-S2003, ACRME-S0701 |
+| ACRME-S2006 | Deterministic RG/CRG/subscription naming convention & counter | Medium | 3 | P1 | — |
+
+#### ACRME-S2001 — Reservation eligibility gate — Availability-Set ineligibility & AZ onboarding precondition
+
+> **As a** onboarding engineer, **I want** the engine to reject reservation onboarding for Availability-Set VMs and require deallocate/redeploy-to-AZ first, **so that** only zone-aligned, reservation-eligible VMs enter the CRG model (CAP-020, CAP-021).
+
+- **Priority:** Highest · **Points:** 5 · **Phase:** P1
+- **PRR refs:** CAP-020, CAP-021
+- **Depends on:** ACRME-S0201
+
+**Acceptance criteria**
+
+- VMs deployed in an Availability Set are classified reservation-ineligible and blocked from CRG onboarding (CAP-020).
+- Onboarding a running non-zonal VM requires the deallocate-or-redeploy-to-an-availability-zone precondition to be satisfied first (CAP-021).
+- The `ReservationEligibility` record captures ineligibility reason and the onboarding precondition state.
+- A blocked onboarding returns a deterministic, actionable error and raises a governance item.
+
+**Tasks**
+
+- [ ] `ACRME-T200101` Implement Availability-Set detection and reservation-ineligibility classification (CAP-020)
+- [ ] `ACRME-T200102` Implement deallocate/redeploy-to-AZ onboarding precondition check (CAP-021)
+- [ ] `ACRME-T200103` Persist ReservationEligibility record with reason + precondition state
+
+#### ACRME-S2002 — Seed-at-0 SKU/AZ matrix and product-team budget governance
+
+> **As a** capacity governance owner, **I want** an eligible-SKU/AZ seed matrix initialised at count 0 under product-team budget governance, **so that** reservations exist as governed placeholders before demand, extending the CAP-009 seed model (CAP-022).
+
+- **Priority:** Highest · **Points:** 8 · **Phase:** P1
+- **PRR refs:** CAP-022, CAP-009
+- **Depends on:** ACRME-S0301
+
+**Acceptance criteria**
+
+- The seed matrix enumerates eligible SKU × AZ combinations with initial reserved count 0 (seed reservations).
+- Product-team budget governance approves any increase of a seed reservation above 0.
+- `SeedMatrixEntry` records SKU, AZ, environment, governance status, and current count.
+- Seed reservations are distinguished from active reservations (`reservationType = SEED`).
+
+**Tasks**
+
+- [ ] `ACRME-T200201` Model SeedMatrixEntry (SKU × AZ × env, count-0 seed) per CAP-022
+- [ ] `ACRME-T200202` Implement product-team budget-governance gate for seed increases
+- [ ] `ACRME-T200203` Distinguish SEED vs ACTIVE reservationType in the reservation model
+
+#### ACRME-S2003 — Explicit regional + per-AZ CRG structure per environment
+
+> **As a** capacity engineer, **I want** each environment provisioned with one regional CRG plus one CRG per availability zone, **so that** reservations are held at the correct regional/zonal scope, extending CAP-011 (CAP-023).
+
+- **Priority:** High · **Points:** 5 · **Phase:** P1
+- **PRR refs:** CAP-023, CAP-011, OPS-006
+- **Depends on:** ACRME-S0301
+
+**Acceptance criteria**
+
+- Each environment (Prod, NonProd, DR) has one regional CRG (`crg-<env>-<region>-reg`) and one CRG per AZ (`az1/az2/az3`).
+- `CapacityReservationGroup` carries `environment` and `crgScope` (REGIONAL | ZONAL).
+- CRG names are generated deterministically per OPS-006/C-12.
+- Per-AZ CRG sizing aligns with the even zone-distribution target (PLC-011).
+
+**Tasks**
+
+- [ ] `ACRME-T200301` Provision regional + per-AZ CRG set per environment (CAP-023)
+- [ ] `ACRME-T200302` Add environment + crgScope to CRG model and provisioning
+- [ ] `ACRME-T200303` Wire deterministic CRG naming (OPS-006/C-12)
+
+#### ACRME-S2004 — Reactive SKU/AZ discovery auto-create with scope-file governance
+
+> **As a** capacity engineer, **I want** the engine to auto-create missing SKU/AZ reservations against the seed matrix and raise a scope-file governance item, **so that** newly requested SKU/AZ combinations are captured and governed, reconciling CAP-019 (CAP-024).
+
+- **Priority:** High · **Points:** 5 · **Phase:** P2
+- **PRR refs:** CAP-024, CAP-019, CAP-022
+- **Depends on:** ACRME-S2002, ACRME-S2003
+
+**Acceptance criteria**
+
+- A request for a SKU/AZ combination not yet in a CRG triggers auto-creation of the reservation against the seed matrix.
+- Each reactive discovery raises a scope-file governance item for review (reconciles CAP-019).
+- Auto-created reservations are recorded with provenance (reactive vs. seeded vs. planned).
+- Reactive discovery respects reservation eligibility (CAP-020/CAP-021).
+
+**Tasks**
+
+- [ ] `ACRME-T200401` Implement reactive SKU/AZ discovery + auto-create against seed matrix (CAP-024)
+- [ ] `ACRME-T200402` Raise scope-file governance item on reactive discovery (CAP-019 reconciliation)
+- [ ] `ACRME-T200403` Record reservation provenance (reactive/seeded/planned)
+
+#### ACRME-S2005 — Even zone-distribution target and rebalancing action
+
+> **As a** placement engineer, **I want** placement to target an even ≈1/zone_count spread and raise a rebalancing action when skew exceeds tolerance, **so that** per-zone failover exposure is bounded and per-AZ CRG sizing stays balanced (PLC-011).
+
+- **Priority:** High · **Points:** 5 · **Phase:** P2
+- **PRR refs:** PLC-011, C-13, Appendix A.9, CAP-023
+- **Depends on:** ACRME-S2003, ACRME-S0701
+
+**Acceptance criteria**
+
+- New placement prefers the most under-represented zone (`argmin` VMs per zone) toward ≈`1/zone_count` per zone.
+- `Max Skew > Configured Skew Tolerance` (C-13) raises a rebalancing recommendation/action, subject to approval and Azure feasibility.
+- The target ratio and tolerance are configuration-driven in `PlacementPolicy`.
+- Behaviour matches Appendix A.9 skew formula and is distinct from the ε zone-diversity scoring signal (PLC-007).
+
+**Tasks**
+
+- [ ] `ACRME-T200501` Implement even zone-distribution target + under-represented-zone preference (PLC-011/A.9)
+- [ ] `ACRME-T200502` Implement skew-tolerance (C-13) rebalancing recommendation/action
+- [ ] `ACRME-T200503` Expose target ratio + tolerance as PlacementPolicy config
+
+#### ACRME-S2006 — Deterministic RG/CRG/subscription naming convention & counter
+
+> **As a** platform operator, **I want** a deterministic naming convention with a counter for resource groups, CRGs, and subscriptions, **so that** resource identities are predictable, collision-free, and auditable (OPS-006, C-12).
+
+- **Priority:** Medium · **Points:** 3 · **Phase:** P1
+- **PRR refs:** OPS-006, C-12
+- **Depends on:** —
+
+**Acceptance criteria**
+
+- RG, CRG, and subscription names are generated by a single deterministic convention (OPS-006).
+- The naming counter (C-12) guarantees uniqueness and is persisted/auditable.
+- Generated names are stable across re-runs for the same inputs.
+- RBAC scope assignments consume the deterministic names (no ad-hoc naming).
+
+**Tasks**
+
+- [ ] `ACRME-T200601` Implement deterministic RG/CRG/subscription naming convention (OPS-006)
+- [ ] `ACRME-T200602` Implement + persist the naming counter (C-12)
+- [ ] `ACRME-T200603` Align RBAC scope assignment with deterministic names
 

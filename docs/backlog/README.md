@@ -17,7 +17,7 @@ Both outputs are generated from the same data module, so the Markdown and the CS
 
 ## Rollup
 
-- **19 Epics** · **66 Stories** · **175 Tasks** · **426 story points**
+- **20 Epics** · **72 Stories** · **193 Tasks** · **457 story points**
 - Phased **P1 Pilot → P2 Controlled automation → P3 Production/Future**
 
 ## ID scheme
