@@ -64,9 +64,14 @@ DR_region      ≠ Prod_region
 
 #### Rationale
 
-NonProd/DR co-location is permitted to allow **DR overflow capacity reuse** from the NonProd CRG. This change (Decision D8) enables the engine to leverage unused NonProd capacity as a DR buffer, reducing the minimum region count from 4 to 3.
+NonProd/DR co-location is permitted to allow **DR overflow capacity reuse** from the NonProd CRG. This change (Decision D8) enables the engine to leverage unused NonProd capacity as a DR buffer, reducing the minimum region count from 4 to 3 — and, in the two-region model, to 2.
 
-**With 3 regions:**  
+The number of regions available in a geography (a configurable value, REG-001) determines how the environments distribute:
+
+**With 2 regions (current model for Europe, Australia, Asia Pacific, Middle East):**  
+Prod is isolated in one region; **NonProd/CVAL and DR co-locate in the other region — deterministically and mandatorily** (there is no third region to separate them). This is the normal outcome, not an exception (baseline PLC-010a). VR-1 (Prod ≠ DR) and VR-2 (Prod ≠ CVAL) still hold because Prod is in the other region; VR-3 (CVAL/DR co-location) is satisfied by design. HC-6/HC-7 combined-capacity checks apply to the shared co-located region. *(Middle East additionally carries `DR_NOT_OFFERED` until DEC-001 clears, in which case no DR region is assigned — a legal override, not a region-count outcome.)*
+
+**With 3 regions (current model for US):**  
 Prod is isolated; NonProd and DR both draw from the remaining 2 regions (they may land on the same region or on different ones — determined by HC-6 and PS score).
 
 **With 4 regions:**  
@@ -367,7 +372,9 @@ where:
 
 #### Rationale
 
-Prevents NonProd allocation from **encroaching on the protected DR quota floor**. Within the Two-Group Quota Architecture, the NonProd+DR group has a shared limit; the DR floor reserves a portion for DR use only.
+Prevents NonProd allocation from **encroaching on the protected DR quota floor**. Within the Two-Group Quota Architecture, the NonProd+DR group has a shared limit; the DR floor reserves a portion for DR use only. (Under the v2.2+ single governed quota pool the same arithmetic applies with `NonProd_DR_Group_Limit → Pool_Limit` and `DR_Floor_vCPU → DR_Earmark_vCPU`.)
+
+**Two-region geographies.** In any geography with only two Standard regions (currently Europe, Australia, Asia Pacific, Middle East), CVAL/NonProd and DR are co-located in the single non-Prod region (PLC-010a). HC-7 is therefore especially load-bearing there: it — together with HC-6 — is what guarantees the shared co-located pool can carry the customer's DR demand without the NonProd allocation eroding the DR earmark. This check is geography-agnostic and evaluated against whichever region the two-region placement co-locates onto.
 
 #### Evaluation Order
 
@@ -448,7 +455,9 @@ the Standard Capacity Regions for the customer's chosen geography.
 
 #### Rationale
 
-When a customer supplies an Azure geography (e.g., "US", "Europe", "Middle East") rather than a specific region, the engine derives the Prod anchor via `argmax(PS_Prod)` over Standard Capacity Regions **within that geography only**. This constraint ensures the derived Prod region respects the customer's geographic preference.
+When a customer supplies an Azure geography (one of the five in-scope geographies — **US, Europe, Australia, Asia Pacific, Middle East**) rather than a specific region, the engine derives the Prod anchor via `argmax(PS_Prod)` over Standard Capacity Regions **within that geography only**. This constraint ensures the derived Prod region respects the customer's geographic preference.
+
+The set of valid geographies and their Standard/Restricted region membership is **configuration-driven (REG-001)** — the engine must read the in-scope catalogue from `PlacementPolicy` rather than hard-coding a fixed geography list, so that adding/removing a geography or region is a config change, not a code change.
 
 #### Enforcement Stage
 
@@ -478,13 +487,17 @@ def get_prod_candidates(geography):
 
 #### Examples
 
-| Customer Geography | Eligible Regions | Ineligible (HC-8) |
-|---|---|---|
-| US | East US, West US, Central US, ... | West Europe, UK South, ... |
-| Europe | West Europe, North Europe, UK South, ... | East US, Australia East, ... |
-| Middle East | UAE North, Saudi Arabia Central | East US, Switzerland North* |
+| Customer Geography | Distribution model | Eligible Standard Regions | Ineligible (HC-8) |
+|---|---|---|---|
+| US | 3-region | West US 3, Central US, Canada Central | East US 2 (Restricted), all non-US regions |
+| Europe | 2-region | Switzerland North, Sweden Central | North Europe, West Europe (Restricted), all non-EU regions |
+| Australia | 2-region | Australia East, Australia Southeast | all non-AU regions |
+| Asia Pacific | 2-region | East Asia, Southeast Asia | Japan East (pending confirmation), all non-APAC regions |
+| Middle East | 2-region | UAE North, Saudi Arabia Central | East US, Switzerland North* |
 
-*Switzerland North becomes eligible only via **HC-10 Cross-Geo Extension Path** for DR, not for Prod — and that path is **inactive** for the Middle East while ME DR is `DR_NOT_OFFERED` (DR-014, pending DEC-001 legal approval).
+*Switzerland North becomes eligible for the Middle East only via the **HC-10 Cross-Geo Extension Path** for DR, not for Prod — and that path is **inactive** while ME DR is `DR_NOT_OFFERED` (DR-014, pending DEC-001 legal approval).
+
+**Region lists above are examples of the current configured catalogue (Requirements Baseline v2.3 Section 6). The authoritative, versioned lists live in `PlacementPolicy` (REG-001); the engine must not hard-code them.**
 
 #### Evidence Tag
 
@@ -517,13 +530,17 @@ Exception deployments (customer explicitly requests a Restricted region) proceed
 - Commercial Azure public cloud regions with full SKU availability
 - No sovereign cloud restrictions
 - No special approval required for CRG creation
-- Examples: East US, West Europe, Australia East, Japan East, Brazil South
+- Eligible for automated placement of Prod, CVAL/NonProd, and DR
+- In-scope catalogue examples (Baseline v2.3 Section 6): West US 3, Central US, Canada Central (US); Switzerland North, Sweden Central (Europe); Australia East, Australia Southeast (Australia); East Asia, Southeast Asia (Asia Pacific); UAE North, Saudi Arabia Central (Middle East)
 
 **Restricted Capacity Regions:**
 - Azure Government (US DoD, US Gov)
 - Azure China (21Vianet)
 - Regions with limited SKU availability (flagged in Azure metadata)
 - Regions requiring special tenant approval (sovereign cloud onboarding)
+- In-scope catalogue examples flagged Restricted: East US 2 (US); North Europe, West Europe (Europe) — Prod-only via the Scenario 2 exception path; **CVAL and DR must never use them (VR-6)**
+
+**Pending / conditional:** Japan East is under business review for inclusion as an Asia Pacific Standard region; until confirmed in `PlacementPolicy` it is not selectable by automated placement.
 
 #### Enforcement Stage
 

@@ -12,7 +12,7 @@
 | Field                   | Value                                                                                                                             |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | **Title**               | Azure Capacity & Quota Management — Consolidated Requirements Baseline                                                            |
-| **Version**             | 2.2 (EU cross-geo DR region corrected; Switzerland North confirmed as the authoritative EU extension region)                      |
+| **Version**             | 2.3 (region scope expanded to 5 geographies; two-region distribution model generalised via ENV-003/PLC-010 co-location)          |
 | **Status**              | Working baseline — 90–95% approved direction; open POCs and business decisions remain                                             |
 | **Baseline date**       | 27 August 2026                                                                                                                    |
 | **Owners**              | Vishnuvardhan Reddy (design/requirements), Roy Szabady (strategy/business alignment)                                              |
@@ -25,6 +25,7 @@
 
 | Version | Date           | Change                                                                                                                                                                                                                                                                                                                                             |
 |---------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 2.3     | 7 Sep 2026     | **Region scope expanded to five geographies** (US, Europe, Australia, Asia Pacific, Middle East) with an authoritative in-scope catalogue in Section 6. **US is the only three-region geography; all others use a two-region distribution model.** Generalised the CVAL/DR co-location mechanism to all two-region geographies (new **PLC-010a**), reconciled REG-003, DR-002, PLC-002, and Section 2 strategic drivers. Region catalogue reaffirmed as a configurable item (REG-001). Australia and Asia Pacific back in scope; Japan East pending confirmation. |
 | 2.2     | 27 Aug 2026    | EU Geography cross-geo DR region corrected from **Belgium Central** to **Switzerland North** per REG-002 configuration review. Switzerland North confirmed as the authoritative cross-geo DR extension region for Middle East deployments. All region examples updated to reflect authoritative placement configuration.                           |
 | 1.0     | 22–26 Aug 2026 | Initial capacity reservation design flow, region categorisation, DR reserve model (\~30–40%).                                                                                                                                                                                                                                                      |
 | 2.0     | 27 Aug 2026    | Pivot to **minimal bootstrap + dynamic reconciliation**; separated capacity vs quota; distributed DR; region-selection seed-record model; production-region-first onboarding; cost-driven buffer policy; Middle East DR flag.                                                                                                                      |
@@ -111,17 +112,23 @@ v1 to v2.
     cost and consumption governor** — it caps how much capacity a team
     can consume. Production maintains a quota buffer to support growth;
     DR quota strategy must align to the capacity-sharing model.
--   **Business volatility.** Requirements evolve continually (Japan/APAC
-    descoped, DHL-dedicated and Apple lost, region strategy narrowed).
-    The design must be **flexible and configuration-driven** rather than
-    optimised for a single fixed scenario.
+-   **Business volatility.** Requirements evolve continually (region
+    scope has both narrowed and re-expanded over time — e.g., Japan East
+    is currently pending confirmation, while Australia and Asia Pacific
+    are now back in scope; DHL-dedicated and Apple lost). The design must
+    be **flexible and configuration-driven** rather than optimised for a
+    single fixed scenario — the in-scope region catalogue (Section 6) is
+    a configurable item (REG-001).
 -   **Legal ownership of Middle East.** Legal has taken charge of the
     Middle East programme. Data-sovereignty constraints (a large share
     of customers are government/medical-associated) mean **DR is
     unlikely to be offered there** — cross-border DR cannot meet
     residency requirements.
--   **Region strategy narrowed.** The active region strategy is now
-    effectively **North America** and **Europe** focused.
+-   **Region strategy (current).** Five geographies are in scope — **US,
+    Europe, Australia, Asia Pacific, and Middle East** (Section 6). US
+    runs a three-region distribution model; all others run a two-region
+    model. The catalogue is configuration-driven and expected to keep
+    changing.
 -   **No multi-cloud.** Multi-cloud DR has been repeatedly rejected at
     the ELT level; “all of Azure down” is explicitly out of scope as an
     addressable failure mode.
@@ -225,30 +232,69 @@ v1 to v2.
 ## 6. Region Strategy & Classification
 
 The estate is organised into two capacity classes across the in-scope
-regions. The active strategy is **North America and Europe** focused;
-APAC/Australia and Japan are descoped or on hold, and Middle East is
-legal-owned with **no DR**.
+regions. Five geographies are in scope: **US, Europe, Australia, Asia
+Pacific, and Middle East**. **US** operates a **three-region
+distribution model**; **all other geographies operate a two-region
+distribution model** (see REG-003 and the ENV-003 CVAL/DR co-location
+mechanism, which makes the two-region model viable). Middle East is
+legal-owned with its **DR strategy pending legal confirmation**
+(`DR_NOT_OFFERED` today, DEC-001).
 
 | Class                             | Behaviour                                                                                   | Notes                                                          |
 |-----------------------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------|
 | **Standard capacity regions**     | Eligible for automatic selection by the placement/region-selection engine.                  | Default provisioning targets for production, CVAL, and DR.     |
 | **Restricted deployment regions** | Production-only; **not** auto-selected unless explicitly provided as the production region. | Used only when a customer/contract specifies the exact region. |
 
+### In-Scope Region Catalogue (v2.2 — configurable, see REG-001)
+
+The following is the current authoritative in-scope catalogue. **This
+list is a configurable item (REG-001)** — geographies, regions, class,
+and distribution model are all driven by versioned `PlacementPolicy`
+configuration, so the catalogue can change without a design change. The
+placement engine must read the catalogue from configuration and adapt
+region selection to whatever regions are currently available per
+geography, rather than assuming a fixed set.
+
+| Geography         | Distribution model | Standard capacity regions (engine-selectable) | Restricted regions (exception only)      | Notes                                                                                   |
+|-------------------|--------------------|-----------------------------------------------|------------------------------------------|-----------------------------------------------------------------------------------------|
+| **US**            | 3-region           | West US 3 · Central US · Canada Central        | East US 2 *(exception required)*         | Only geography with full Prod / CVAL / DR region separation.                              |
+| **Europe**        | 2-region           | Switzerland North · Sweden Central             | North Europe · West Europe *(exception)* | Switzerland North is the authoritative cross-geo DR extension region (REG-002).           |
+| **Australia**     | 2-region           | Australia East · Australia Southeast           | —                                        | In scope as of v2.2.                                                                      |
+| **Asia Pacific**  | 2-region           | East Asia · Southeast Asia                     | —                                        | **Japan East** — pending business confirmation before inclusion as a Standard region.    |
+| **Middle East**   | 2-region           | Saudi Arabia Central · UAE North               | —                                        | DR strategy pending legal confirmation (`DR_NOT_OFFERED`, DEC-001; DR-014).               |
+
+All Standard capacity regions in every geography are eligible to host
+**Prod, CVAL/NonProd, and DR** environments; region selection is driven
+by the placement scoring pipeline over the regions currently available
+in that geography (subject to the Hard Constraints and the ENV-003
+separation rules).
+
 **REG-001 — Configurable region catalogue.** The region classification,
-eligibility, and per-region flags (e.g., `DR_NOT_OFFERED`, zone support,
-restricted) must be configuration-driven and versioned.
+eligibility, distribution model, and per-region flags (e.g.,
+`DR_NOT_OFFERED`, zone support, restricted) must be configuration-driven
+and versioned. Adding, removing, or reclassifying a region — or changing
+a geography's distribution model — is a configuration change, not a code
+or design change; the engine must adapt its placement behaviour to the
+configured catalogue at runtime.
 
 **REG-002 — Example correction discipline.** Region examples must be
 sourced from authoritative configuration, not slideware (e.g., “Belgium”
 was corrected to **Switzerland North** during review). Placement config
 is the single source of truth.
 
-**REG-003 — Multi-region distribution benefit.** Three-to-four regions
-per geography is a design goal because it distributes customer workloads
-and materially reduces the DR capacity that must be reserved per region.
-A **two-region** model is explicitly identified as problematic — it
-cannot guarantee sufficient failover capacity if all production
-concentrates in one location.
+**REG-003 — Distribution model.** **US** uses a **three-region model**
+(Prod, CVAL, and DR each in a distinct region), which best distributes
+customer workloads and minimises the DR capacity reserved per region.
+**All other in-scope geographies currently operate a two-region model.**
+A two-region geography cannot separate all three environments, so it
+relies on the **ENV-003 CVAL/DR co-location** mechanism (PLC-010): Prod
+occupies one region and **CVAL + DR co-locate in the other**. The
+two-region model is therefore a **supported, normative configuration**
+(not an error state), provided co-location capacity accounting (HC-6,
+HC-7, PLC-010) is honoured so that co-located CVAL is not double-counted
+as both live CVAL and available DR headroom. Expanding a geography to
+three-plus regions remains a design goal wherever the region catalogue
+allows it.
 
 ## 7. Environment Policy Requirements
 
@@ -515,8 +561,8 @@ avoids “I picked North America but meant East Coast” churn and the
 contract rewrites it causes.
 
 **PLC-002 — Geography-based selection is exceptional.** Geography-only
-selection (North America / Europe / Middle East / APAC → engine derives
-the region) is an exceptional path. It requires explicit exception
+selection (US / Europe / Australia / Asia Pacific / Middle East →
+engine derives the region) is an exceptional path. It requires explicit exception
 approval and customer acknowledgement that the derived production region
 becomes fixed until an approved migration changes the seed. Without an
 approved exception, the exact-region default (PLC-001) applies.
@@ -565,6 +611,32 @@ record that the CVAL capacity is earmarked as releasable toward that
 customer’s DR activation, and must not double-count it as both live CVAL
 and available DR headroom.
 
+**PLC-010a — Co-location is mandatory in two-region geographies.**
+Co-location is *optional* only where a geography has enough regions to
+separate all three environments (currently **US**, the three-region
+model). In a **two-region** geography (currently **Europe, Australia,
+Asia Pacific, and Middle East**), once Prod is anchored in one region
+only a single region remains, so **CVAL and DR co-locate there
+deterministically** — this is the normal, required outcome, not an
+exception. The engine must:
+
+-   derive the co-location automatically whenever the geography's
+    available Standard-region count is two (do not fail placement for
+    lack of a third region);
+-   apply the HC-6 (DR coverage floor) and HC-7 (DR floor integrity)
+    combined-capacity checks against the co-located region so the shared
+    CVAL/DR pool can absorb the customer's DR demand; and
+-   record `cval_region == dr_region` in the seed record and flag the
+    co-location so downstream accounting never double-counts the shared
+    capacity.
+
+This rule is geography-agnostic and driven purely by the configured
+region count per geography (REG-001); it is **not** specific to any one
+geography. The Middle East case additionally carries `DR_NOT_OFFERED`
+(DR-014, DEC-001) until legal approval, in which case no DR region is
+assigned at all — this is a Middle-East-specific legal override, **not**
+a general property of two-region geographies.
+
 ## 12. Disaster Recovery Capacity Requirements
 
 **DR-001 — Single-region failure basis.** The default model plans for
@@ -576,9 +648,12 @@ geography, we’re in serious trouble”).
 **DR-002 — Distributed DR.** DR capacity is computed from the
 **portion** of the source region’s production workload assigned to each
 destination — not by reserving the full source workload in every
-destination. Because a customer’s workload is distributed across the 3–4
-regions in a geography, only that customer’s *portion* needs protecting
-per destination.
+destination. In a multi-region geography a customer’s workload is
+distributed across the available regions, so only that customer’s
+*portion* needs protecting per destination. In a **two-region**
+geography (the current model for all geographies except US) the single
+non-Prod region absorbs the full protected portion for the Prod region,
+with CVAL and DR co-located there per ENV-003/PLC-010.
 
 **DR-003 — Destination distribution.** Record how each source region’s
 recoverable workload distributes across eligible destination

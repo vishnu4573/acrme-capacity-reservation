@@ -51,7 +51,8 @@ The design extends the existing **EPIC-07 Placement Engine** (stories E07-S01 th
 ### Functional
 - **R1:** Customer selects Prod region from the available region set.
 - **R2:** Engine selects NonProd and DR regions automatically, never the same as Prod. NonProd and DR may share a region to enable DR overflow capacity reuse from the NonProd CRG. [Updated — see D8]
-- **R3:** With 3 regions: all three regions are used, one per environment, per customer (no choice).
+- **R3a:** With 2 regions (current model for all geographies except US): Prod occupies one region; NonProd/CVAL and DR co-locate in the other — deterministic and mandatory (no choice), per PLC-010a. HC-6/HC-7 verify the co-located pool can absorb DR demand.
+- **R3:** With 3 regions (current model for US): all three regions are used, one per environment, per customer (no choice).
 - **R4:** With 4 regions: engine selects the optimal 2 from the remaining 3 regions using the weighted formula.
 - **R5:** Selection is weighted against live CR/CRG capacity state (headroom, utilization, sharing headroom).
 - **R6:** Selection must also account for quota headroom, zone diversity, and DR buffer compliance.
@@ -232,7 +233,10 @@ HC-1  REGION_SEPARATION [UPDATED — see D8]:
         DR_region      ≠ Prod_region
         [Constraint DR_region ≠ NonProd_region REMOVED — NonProd and DR may share a region]
         → NonProd/DR co-location is permitted to allow DR overflow capacity reuse from the NonProd CRG.
-        → With 3 regions: Prod is isolated; NonProd and DR both draw from the remaining 2 regions
+        → With 2 regions (current model for all geographies except US): Prod is isolated in one region;
+          NonProd/CVAL and DR co-locate in the other, deterministically and mandatorily (PLC-010a).
+          HC-6/HC-7 verify the shared co-located pool can absorb the customer's DR demand.
+        → With 3 regions (current model for US): Prod is isolated; NonProd and DR both draw from the remaining 2 regions
           (they may land on the same region or on different ones — determined by HC-6 and PS score).
         → With 4 regions: Prod eliminates 1; NonProd selects from 3; DR may share with NonProd
           or use the remaining regions — whichever satisfies HC-6 and maximises PS_DR.
