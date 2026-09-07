@@ -1,11 +1,13 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 1.0  
-**Date:** 2 September 2026  
-**Status:** Accepted - new ADR introduced with Requirements Baseline v2.2  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
+**Version:** 1.1  
+**Date:** 7 September 2026  
+**Status:** Accepted - new ADR introduced with Requirements Baseline v2.2; reconciled to Baseline v2.4 (no DR-model change)  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR consolidates the distributed DR reference model (Section 12A of the requirements baseline) that was previously distributed across ADR-003 and the calculation logic reference. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+>
+> **v2.4 reconciliation note — no DR-model change.** The distributed, reciprocal DR reference model, max-not-sum destination sizing (DR-017), the `SourceDestinationDRIndex` (DR-018), the reference topology and the Middle East `DR_NOT_OFFERED` carve-out (DR-014, DEC-001) are **unchanged** by Baseline v2.4. v2.4 folds in only the *reservation-model* gaps (seed matrix CAP-022, per-AZ CRG structure CAP-023, reactive discovery CAP-024, Availability-Set ineligibility CAP-020/021, even zone distribution PLC-011, naming OPS-006/C-12), none of which alter this reference model. Where DR sizing is applied **per zone**, the per-zone floors are held in the destination's per-AZ CRGs (CAP-023) and are kept balanced by the PLC-011 even-distribution target — see ADR-003 *DR Sizing Formula* for that cross-reference.
 
 ---
 
@@ -20,7 +22,7 @@
 
 ## Context
 
-Requirements Baseline v2.2 replaces the fixed-ratio, per-customer DR clone with a **distributed, reciprocal DR reference model** (Section 12A). At platform scale, dedicating a fixed 30-40% standby copy of every production region is prohibitively expensive and does not reflect the operating assumption that **one source region fails at a time**. `[Decided]`
+The requirements baseline (introduced at v2.2, current v2.4) replaces the fixed-ratio, per-customer DR clone with a **distributed, reciprocal DR reference model** (Section 12A). At platform scale, dedicating a fixed 30-40% standby copy of every production region is prohibitively expensive and does not reflect the operating assumption that **one source region fails at a time**. `[Decided]`
 
 The distributed model spreads each customer's standby capacity across the same shared regional footprint that already hosts production and CVAL. This creates a many-to-many topology in which a single region is simultaneously a **production** region for some customers, a **CVAL** host for others, and a **DR standby** host for customers whose production is in one or more *different* source regions. `[Decided]`
 
@@ -50,7 +52,7 @@ Adopt the **distributed, reciprocal DR reference model** with the following norm
 
 ## Middle East DR Carve-Out (DR-014, DEC-001) — currently `DR_NOT_OFFERED`
 
-> **As it stands, DR is NOT offered in the Middle East.** Baseline v2.2 records that Legal has taken ownership of the Middle East programme and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements** (baseline Section 2 Strategic Drivers, Section 5.2 Out of Scope "Final Middle East DR offering (pending legal/business direction)", Section 6 "Middle East is legal-owned with no DR", and **DR-014**). This is an open **legal/business decision, DEC-001**, and one of the programme's remaining major architectural risks (baseline Section 25).
+> **As it stands, DR is NOT offered in the Middle East.** The baseline (current v2.4) records that Legal has taken ownership of the Middle East programme and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements** (baseline Section 2 Strategic Drivers, Section 5.2 Out of Scope "Final Middle East DR offering (pending legal/business direction)", Section 6 "Middle East is legal-owned with no DR", and **DR-014**). This is an open **legal/business decision, DEC-001**, and one of the programme's remaining major architectural risks (baseline Section 25).
 
 Normative consequences for this reference model:
 
