@@ -280,17 +280,20 @@ for name, what, treat, col in tiers:
 s = add_slide()
 header(s, "Section 6", "How Placement Decisions Are Made", 6)
 tb, tf = textbox(s, Inches(0.6), Inches(1.75), Inches(12.1), Inches(0.7))
-para(tf, "Managed regions are split into two classes. Hard rules filter candidates "
-         "first; the engine then scores the survivors on five weighted components.",
+para(tf, "Managed regions span five geographies — US is three-region; Europe, "
+         "Australia, Asia Pacific and Middle East are two-region. They split into two "
+         "classes: hard rules filter candidates first, then the engine scores the "
+         "survivors on five weighted components. Japan East is pending confirmation.",
      14, INK, first=True)
 # Standard regions card
 card(s, Inches(0.6), Inches(2.55), Inches(6.0), Inches(2.7), LIGHT, accent=GREEN)
 tb, tf = textbox(s, Inches(0.85), Inches(2.7), Inches(5.6), Inches(2.4))
 para(tf, "Standard Capacity Regions", 15, GREEN, bold=True, first=True, space_after=6)
-for g, r in [("North America", "West US 3, Central US, Canada Central"),
-             ("Europe", "Sweden Central, Belgium Central"),
-             ("Middle East", "Saudi Arabia, UAE North"),
-             ("Asia Pacific", "Japan East, Southeast Asia, Australia East")]:
+for g, r in [("US (3-region)", "West US 3, Central US, Canada Central"),
+             ("Europe (2-region)", "Switzerland North, Sweden Central"),
+             ("Australia (2-region)", "Australia East, Australia Southeast"),
+             ("Asia Pacific (2-region)", "East Asia, Southeast Asia"),
+             ("Middle East (2-region)", "Saudi Arabia Central, UAE North")]:
     p = tf.add_paragraph(); p.space_after = Pt(4)
     r1 = p.add_run(); set_run(r1, g + ":  ", 12.5, DEEP, bold=True)
     r2 = p.add_run(); set_run(r2, r, 12.5, INK)
@@ -300,9 +303,10 @@ tb, tf = textbox(s, Inches(6.98), Inches(2.7), Inches(5.6), Inches(2.4))
 para(tf, "Restricted Capacity Regions", 15, RED, bold=True, first=True, space_after=6)
 para(tf, "Excluded from automated placement — eligible only via an explicit, "
          "approved exception (production only).", 12.5, INK, space_after=6)
-for r in ["East US 2 (North America)", "North Europe, West Europe (Europe)",
-          "East Asia, Australia Southeast (Asia Pacific)"]:
+for r in ["East US 2 (US)", "North Europe, West Europe (Europe)"]:
     para(tf, r, 12.5, INK, bullet=True, space_after=3)
+para(tf, "Japan East (Asia Pacific) — pending business confirmation, not yet "
+         "selectable.", 12, MUTED, italic=True, space_after=3)
 # Scoring strip
 tb, tf = textbox(s, Inches(0.6), Inches(5.45), Inches(12.1), Inches(0.4))
 para(tf, "Scoring components", 14, AZURE, bold=True, first=True)
@@ -317,16 +321,17 @@ para(tf, "Weights are versioned and recorded with every decision. During the pil
 # SLIDE 7 — Middle East cross-geo
 # ===========================================================================
 s = add_slide()
-header(s, "Section 6", "Middle East — Cross-Geo DR Extension", 7)
-tb, tf = textbox(s, Inches(0.6), Inches(1.8), Inches(12.1), Inches(1.0))
-para(tf, "Middle East has only two Standard Capacity Regions, but a full deployment "
-         "needs three (production, non-production, disaster recovery). The engine "
-         "extends DR to Belgium Central in Europe — the only currently approved "
-         "cross-geography DR path.", 15, INK, first=True)
+header(s, "Section 6", "Middle East — DR Not Offered (Legal Pending)", 7)
+tb, tf = textbox(s, Inches(0.6), Inches(1.8), Inches(12.1), Inches(1.15))
+para(tf, "Middle East is a two-region geography (Saudi Arabia Central, UAE North) and "
+         "is legal-owned. The current position is DR_NOT_OFFERED (DEC-001): "
+         "data-sovereignty rules prevent cross-border DR, so no DR region is assigned. "
+         "A cross-geo DR path to Switzerland North (Europe) is pre-configured but "
+         "INACTIVE, pending legal clearance.", 15, INK, first=True)
 rows = [
-    ("Production", "Higher-scoring of Saudi Arabia or UAE North", AZURE),
-    ("Non-production", "The other in-geography region (deterministic)", RGBColor(0x6A,0x4C,0x93)),
-    ("Disaster recovery", "Belgium Central (Europe) — cross-geo", GREEN),
+    ("Production", "Higher-scoring of Saudi Arabia Central or UAE North", AZURE),
+    ("Non-production (CVAL)", "The other in-geography region (deterministic)", RGBColor(0x6A,0x4C,0x93)),
+    ("Disaster recovery", "DR_NOT_OFFERED today (DEC-001) — no DR region assigned; Switzerland North path staged but inactive", RED),
 ]
 ry = Inches(3.1)
 for env, asg, col in rows:
@@ -339,9 +344,10 @@ for env, asg, col in rows:
     para(tf, asg, 14, INK, first=True)
     ry += Inches(0.98)
 tb, tf = textbox(s, Inches(0.6), Inches(6.2), Inches(12.1), Inches(0.7))
-para(tf, "Belgium Central must still pass capacity and quota checks; if it fails, the "
-         "deployment is blocked with an alert — the engine never silently substitutes "
-         "another region.", 13, DEEP, bold=True, first=True)
+para(tf, "No DR is provisioned while DR_NOT_OFFERED is in force. Activating the staged "
+         "Switzerland North cross-geo path is a legal/business decision (DEC-001); it "
+         "would still have to pass capacity and quota checks, and the engine never "
+         "silently substitutes another region.", 13, DEEP, bold=True, first=True)
 
 # ===========================================================================
 # SLIDE 8 — Disaster recovery
