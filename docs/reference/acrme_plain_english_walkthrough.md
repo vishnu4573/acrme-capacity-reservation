@@ -1,14 +1,16 @@
-# ACRME Calculation Logic — Plain English Walkthrough (v2.2)
+# ACRME Calculation Logic — Plain English Walkthrough (v2.4)
 
 > **Document type:** Companion reference — plain-language explanation of every formula in the
-> Calculation Logic Reference (v2.2). This document does **not** replace the Calculation Logic
+> Calculation Logic Reference. This document does **not** replace the Calculation Logic
 > Reference or the Technical Design Document. Read it alongside those documents to understand the
 > *intent* behind each formula before reading the formal notation.
 >
 > **Audience:** Platform engineers, product owners, and architects who need to reason about ACRME
 > behaviour without working through mathematical notation first.
 >
-> **Version:** 1.0 — 2 September 2026. Authored from the ACRME Q&A design walkthrough session.
+> **Version:** 1.1 — reconciled to Requirements Baseline **v2.4** (7 September 2026); originally authored 2 September 2026 from the ACRME Q&A design walkthrough session.
+>
+> **v2.4 reconciliation note.** The geography-aware region model (US three-region; EU/Australia/Asia Pacific/Middle East two-region with CVAL+DR co-located per PLC-010a; Middle East `DR_NOT_OFFERED` per DEC-001) is unchanged and already reflected below. v2.4 adds the reservation-model concepts folded from the architecture diagrams — reservation **eligibility** (CAP-020/CAP-021), the **seed-at-0** SKU/AZ matrix (CAP-022), the explicit **regional + per-AZ CRG** structure (CAP-023), **reactive SKU/AZ discovery** (CAP-024), and the **even zone-distribution** target + rebalancing (PLC-011, Appendix A.9). These are explained in plain language in the new Section 5.11.
 
 ---
 
@@ -17,10 +19,10 @@
 | Field | Value |
 |---|---|
 | **Title** | ACRME Calculation Logic — Plain English Walkthrough |
-| **Version** | 1.0 |
+| **Version** | 1.1 (reconciled to Requirements Baseline v2.4) |
 | **Status** | Baseline |
-| **Date** | 2 September 2026 |
-| **Source** | ACRME Q&A design walkthrough session; Calculation Logic Reference v2.2; Requirements Baseline v2.2 |
+| **Date** | 7 September 2026 (originally 2 September 2026) |
+| **Source** | ACRME Q&A design walkthrough session; Calculation Logic Reference; Requirements Baseline v2.4 |
 | **Companion documents** | `acrme_calculation_logic_reference.md` (formal notation); `acrme_technical_design_document.md` (component design) |
 
 ---
@@ -74,7 +76,7 @@ Each domain section follows the same pattern:
 - **Sad path** — what happens when something is wrong.
 
 Geography-specific examples use the authoritative Standard Capacity region sets (Requirements Baseline
-v2.3 Section 6, ADR-001). **Five geographies are in scope. US is the only three-region geography; all
+v2.4 Section 6, ADR-001). **Five geographies are in scope. US is the only three-region geography; all
 others use a two-region distribution model** — Prod in one region, CVAL + DR co-located in the other
 (PLC-010a). The catalogue is a configurable item (REG-001), so this table is the current example, not
 a hard-coded set:
@@ -1204,6 +1206,103 @@ which are throttled during regional failure events.
 
 ---
 
+### 5.11 v2.4 Reservation-Model Additions (Plain English)
+
+Requirements Baseline v2.4 folded the reservation-model detail from the reviewed architecture
+diagrams (Reservation Model, Reservation Creation, Reservation Decommissioning) into the baseline.
+Nothing above changes; the following concepts are added.
+
+#### 5.11.1 Which VMs can even have a reservation? (CAP-020, CAP-021)
+
+Not every VM is eligible for a capacity reservation:
+
+- **Availability-Set VMs are ineligible (CAP-020).** A VM deployed into an Azure **Availability Set**
+  cannot be backed by a capacity reservation. Capacity reservations are an **availability-zone**
+  concept; Availability Sets are the older, non-zonal placement model, and Azure does not let the two
+  mix. In plain terms: if a workload is in an Availability Set, ACRME will not try to reserve capacity
+  for it — it flags it as ineligible with the reason recorded.
+- **Onboarding a running VM needs a deallocate-or-redeploy step first (CAP-021).** To bring an
+  existing running VM under the reservation model, it must first be placed into an availability zone.
+  That means either **deallocating** it and restarting it into a zone, or **redeploying** it to a
+  zone. ACRME treats this as an onboarding **precondition**: until the VM is zone-aligned, it cannot
+  join a per-AZ CRG. The engine records this precondition state so operators know exactly what step is
+  outstanding.
+
+Both facts are captured in a `ReservationEligibility` record (the reason it is or isn't eligible, and
+the onboarding precondition status).
+
+#### 5.11.2 Reservations start at zero — the seed matrix (CAP-022)
+
+ACRME does **not** guess how much capacity each product will need. Instead it starts from a
+**seed matrix**: a table of every **eligible SKU × availability zone** combination, each initialised
+with a reserved count of **0**. These zero-count entries are called **seed reservations** — governed
+placeholders that say "this SKU is allowed in this zone" without reserving anything yet.
+
+- A seed reservation only grows above 0 when the **product team's budget governance** approves it.
+  Capacity costs money, so the product team owns the decision to fund it. This extends the existing
+  seed model (CAP-009).
+- Because the matrix begins at 0, there is no speculative spend — capacity is reserved only when a
+  real, funded need appears.
+
+A `SeedMatrixEntry` records the SKU, zone, environment, current count, and governance status. A
+reservation is tagged `SEED` (still at/for the placeholder) or `ACTIVE` (funded and holding capacity).
+
+#### 5.11.3 One regional CRG plus one CRG per zone (CAP-023)
+
+Earlier sections described three CRGs per region (Prod, NonProd, DR). v2.4 makes the **zonal**
+structure explicit: **each environment** gets
+
+- **one regional CRG** (named `crg-<env>-<region>-reg`), plus
+- **one CRG per availability zone** (`az1`, `az2`, `az3`).
+
+This lets ACRME hold and size reservations **per zone**, which is what makes the even-distribution
+target below meaningful. All names are produced by the deterministic naming convention (OPS-006, see
+Section 5.11.6).
+
+#### 5.11.4 Reactive discovery — filling gaps automatically (CAP-024)
+
+When a request arrives for a SKU/zone combination that **isn't yet backed by a CRG**, ACRME does not
+simply fail. It **reactively discovers** the gap and **auto-creates** the missing reservation against
+the seed matrix, then **raises a scope-file governance item** so the addition is reviewed rather than
+silently accepted. This reconciles the earlier reactive-discovery governance requirement (CAP-019).
+Each auto-created reservation is stamped with its provenance (reactive vs. seeded vs. planned), and it
+still respects the eligibility rules in 5.11.1.
+
+#### 5.11.5 Spreading VMs evenly across zones (PLC-011)
+
+Within the region already chosen, ACRME aims to spread a workload's VMs **evenly across the zones** —
+about **`1 / zone_count`** per zone (≈ 33% each in a three-zone region). This is a placement
+**target**, not just the ε "zone diversity" scoring nudge used during region selection:
+
+- When placing a new VM, the engine **prefers the most under-represented zone** (the one with the
+  fewest VMs so far).
+- When a new deployment or a growth event would tilt the balance **beyond a configured tolerance**
+  (`C-13`), the engine raises a **rebalancing recommendation/action** to move things back toward even
+  — subject to approval and whether Azure can actually accommodate the move.
+
+The skew maths is simple:
+
+```
+Even Zone Share          = 1 / Zone Count                      (≈33% in a 3-zone region)
+Target VMs per Zone      = round( Workload VM Count / Zone Count )
+Zone Skew(z)             = VMs in zone z − Target VMs per Zone
+Max Skew                 = largest |Zone Skew(z)| across zones
+Rebalance Trigger        = Max Skew > Configured Skew Tolerance (C-13)
+Preferred Placement Zone = the zone with the fewest VMs (argmin)
+```
+
+Even distribution bounds how exposed a workload is if a single zone fails, and it keeps the per-AZ
+CRGs (5.11.3) balanced. (Formal version: Appendix A.9.)
+
+#### 5.11.6 Predictable names for everything (OPS-006, C-12)
+
+Finally, v2.4 pins down a **deterministic naming convention** for resource groups, CRGs, and
+subscriptions, backed by a **counter (C-12)** that guarantees uniqueness. In plain terms: given the
+same inputs, ACRME always produces the **same, collision-free name** — so resources are predictable,
+auditable, and RBAC scopes attach to stable identities instead of ad-hoc names.
+
+---
+
 ## 6. Scoring Weight Invariant
 
 ### 6.1 The Rule
@@ -1450,8 +1549,8 @@ This table combines all key values (configurable and fixed) for quick lookup:
 
 ---
 
-*Document version 1.0 — 2 September 2026.*
-*Source: ACRME Q&A design walkthrough session, Calculation Logic Reference v2.2, Requirements
-Baseline v2.2.*
+*Document version 1.1 — reconciled to Requirements Baseline v2.4 (7 September 2026); originally 2 September 2026.*
+*Source: ACRME Q&A design walkthrough session, Calculation Logic Reference, Requirements
+Baseline v2.4.*
 *Next review: when Calculation Logic Reference is next revised or when POC-001/POC-011 results
 are available.*
