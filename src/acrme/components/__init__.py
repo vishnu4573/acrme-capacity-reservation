@@ -16,6 +16,9 @@ from .reconciler import StateReconciler
 from .quota_manager import QuotaPoolManager
 from .inventory import InventoryCollector
 from .config_service import ConfigService
+from .dr_index_manager import DRIndexManager
+from .dr_activation import DRActivationEngine, STAGED_ACQUISITION_SEQUENCE
+from .dr_simulator import DRSimulator
 
 __all__ = [
     "PlacementEngine",
@@ -23,4 +26,8 @@ __all__ = [
     "QuotaPoolManager",
     "InventoryCollector",
     "ConfigService",
+    "DRIndexManager",
+    "DRActivationEngine",
+    "STAGED_ACQUISITION_SEQUENCE",
+    "DRSimulator",
 ]

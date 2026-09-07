@@ -15,6 +15,12 @@ from .readiness import ReadinessState, ReadinessCode
 from .seed import CustomerSeedRecord
 from .policy import PlacementPolicy, RegionCatalogue, RegionEntry, ScoringWeights
 from .dr_index import SourceDestinationDRIndex
+from .dr_declaration import (
+    DRDeclaration,
+    DRDeclarationStatus,
+    DRActivationRecord,
+    ActivationState,
+)
 from .earmark import CVALEarmarkRecord
 from .quota import QuotaPoolState
 from .reservation import ReservationState
@@ -28,6 +34,10 @@ __all__ = [
     "RegionEntry",
     "ScoringWeights",
     "SourceDestinationDRIndex",
+    "DRDeclaration",
+    "DRDeclarationStatus",
+    "DRActivationRecord",
+    "ActivationState",
     "CVALEarmarkRecord",
     "QuotaPoolState",
     "ReservationState",

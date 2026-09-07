@@ -9,5 +9,12 @@ Key algorithms for Phase 3:
 """
 
 from .scoring import PlacementScorer, clamp
+from .dr_sizing import DRSizer, DestinationSizing, SourcePortion
 
-__all__ = ["PlacementScorer", "clamp"]
+__all__ = [
+    "PlacementScorer",
+    "clamp",
+    "DRSizer",
+    "DestinationSizing",
+    "SourcePortion",
+]
