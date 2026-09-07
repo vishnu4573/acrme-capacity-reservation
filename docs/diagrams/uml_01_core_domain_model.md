@@ -12,6 +12,8 @@ classDiagram
         +String resourceGroupName
         +String name
         +String location
+        +String environment
+        +String crgScope
         +List~String~ zones
         +Int totalCapacityVCPUs
         +Int allocatedVCPUs
@@ -22,13 +24,17 @@ classDiagram
         +getTotalCapacity() Int
         +getAllocatedVMs() Int
         +getEffectiveFree() Int
+        +isZonal() Boolean
     }
+    note for CapacityReservationGroup "CAP-023: per environment/region the engine holds ONE regional CRG (crgScope=reg, non-zonal SKUs) PLUS one per-AZ CRG per zone (crgScope=az1|az2|az3). Environments never mixed in a CRG (ENV-003). Name follows OPS-006/C-12: crg-<env>-<region>-<scope>."
 
     class CapacityReservation {
         +String crgId
         +String name
         +String skuName
         +Int quantity
+        +String reservationType
+        +String placementType
         +List~String~ zones
         +Int allocatedVMCount
         +ProvisioningState state
@@ -36,7 +42,35 @@ classDiagram
         +getReservedVCPUs() Int
         +getAllocatedVCPUs() Int
         +isFullyAllocated() Boolean
+        +isSeed() Boolean
     }
+    note for CapacityReservation "CAP-022: reservationType=seed means a count-0 (quantity=0) seed reservation in the seed matrix, scaled up from 0 on first allocated demand. CAP-020: placementType is Zonal (preferred) or Regional (SKU without zonal support); Availability-Set VMs are ineligible and never reserved. A 'seed reservation' (count-0) is distinct from the placement 'seed record' (CustomerSeedRecord, PLC-003)."
+
+    class SeedMatrixEntry {
+        +String entryId [PK]
+        +String skuFamily
+        +String region
+        +String availabilityZone
+        +String crgScope
+        +Boolean eligible
+        +String owningProductTeam
+        +String approvedBudgetLine
+        +String scopeFileVersion
+        +String governanceStatus
+        +isBudgetApproved() Boolean
+    }
+    note for SeedMatrixEntry "CAP-022: one row per eligible SKU x region x AZ combination in the scope file (CAP-019, versioned). A combination enters the matrix only with a named owning product team AND an approved budget line. Reactive discovery (CAP-024) inserts an entry with governanceStatus=PENDING_RATIFICATION."
+
+    class ReservationEligibility {
+        +String vmId [PK]
+        +String skuName
+        +String placementKind
+        +Boolean reservationEligible
+        +String remediationAction
+        +String onboardingState
+        +requiresRedeployToAZ() Boolean
+    }
+    note for ReservationEligibility "CAP-020/CAP-021: placementKind in {AvailabilityZone, Regional, AvailabilitySet}. AvailabilitySet VMs are reservationEligible=false and excluded from allocated/associated counts; remediationAction records the deallocate/redeploy-to-AZ onboarding precondition. The engine never auto-migrates running workloads."
 
     %% ===== ACRME CONTROL PLANE ENTITIES =====
     class CustomerRegionAssignment {
@@ -229,7 +263,37 @@ classDiagram
     CapacityIncreaseRequest --> IncreaseRequestStatus : status
     EmergencyCapacityTransfer --> TransferStatus : status
     EmergencyCapacityTransfer --> TransferTier : tier
+    SeedMatrixEntry "1" --> "0..1" CapacityReservation : seeds (count-0)
+    SeedMatrixEntry "*" --> "1" CapacityReservationGroup : placedIn (per-AZ or regional)
+    ReservationEligibility "*" --> "0..1" CapacityReservation : eligibleFor
+    CapacityReservationGroup --> ReservationType : holds
+    class ReservationType {
+        <<enumeration>>
+        SEED
+        ACTIVE
+    }
+    class CRGScope {
+        <<enumeration>>
+        REGIONAL
+        AZ1
+        AZ2
+        AZ3
+    }
+    class PlacementKind {
+        <<enumeration>>
+        AVAILABILITY_ZONE
+        REGIONAL
+        AVAILABILITY_SET
+    }
+    class GovernanceStatus {
+        <<enumeration>>
+        RATIFIED
+        PENDING_RATIFICATION
+        REJECTED
+    }
 ```
+
+> **v2.4 additions to the core domain model.** Three concepts from Baseline v2.4 are now modelled: (1) **`SeedMatrixEntry`** + `CapacityReservation.reservationType=SEED` capture the **seed-at-0 matrix and budget governance** (CAP-022); (2) `CapacityReservationGroup.crgScope` (`REGIONAL`/`AZ1..AZ3`) + `environment` capture the **regional + per-AZ CRG structure** (CAP-023) with OPS-006/C-12 naming; (3) **`ReservationEligibility`** + `CapacityReservation.placementType` capture **Availability-Set ineligibility and the deallocate/redeploy-to-AZ onboarding precondition** (CAP-020/CAP-021). Reactive discovery (CAP-024) is a service-layer flow (uml_03) that inserts a `SeedMatrixEntry` with `governanceStatus=PENDING_RATIFICATION` and an `ACTIVE` reservation sized `allocated + buffer`.
 
 ## Known Gaps (to be resolved in design session):
 
@@ -241,7 +305,7 @@ classDiagram
 - **All entities**: Cosmos DB partition keys, indexes, TTL settings TBD
 
 ### Relationships (cardinality/constraints TBD):
-- CustomerRegionAssignment → CRG: Hard constraint that Prod ≠ NonProd ≠ DR regions (enforced where?)
+- CustomerRegionAssignment → CRG: geography-aware region-distinctness constraint — three-region geography (US) requires Prod, CVAL, DR distinct; two-region geography requires Prod distinct with **CVAL + DR co-located** (PLC-010a); `DR_NOT_OFFERED` geography (Middle East, DEC-001) has Prod + CVAL only (enforced in placement validation / PlacementPolicy)
 - QuotaGroup → CRG: One group can contain multiple CRGs in same region, exact cardinality TBD
 - SharingRelationship: 100-consumer hard limit per CRG (enforced in entity or service layer?)
 
