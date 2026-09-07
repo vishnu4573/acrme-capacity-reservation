@@ -8,7 +8,7 @@
 
 ## 0. Method & Baseline Reconciliation
 
-The uploaded *Consolidated Requirements Baseline* was compared line-by-line against the in-repo baseline (`acrme_requirements_baseline_v2_2.md`) and the existing design corpus.
+The uploaded *Consolidated Requirements Baseline* was compared line-by-line against the in-repo baseline (`acrme_requirements_baseline_v2_4.md`) and the existing design corpus.
 
 - **Requirement set is identical to repo v2.2** — same requirement IDs (REG/ENV/CAP/QUA/RDY/PLC/DR/FIN/INT/DAT/OBS/GOV/NFR/OPS/POC/DEC/DEP and the C-/DEV- registers); no new or removed IDs. The uploaded file is therefore confirmed as the authoritative v2.2 requirements baseline, not a new revision.
 - **The gap is design-side, not requirements-side.** The requirements pivot (lean DR bootstrap, distributed/reciprocal DR, max-not-sum sizing, exact-region-first onboarding, seed record, source→destination DR index, standby activation, CVAL earmarking, quota-as-governor) is fully expressed in the baseline but only **partially** reflected in the design artifacts.

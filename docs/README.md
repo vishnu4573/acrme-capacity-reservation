@@ -4,8 +4,8 @@ All ACRME design and reference documentation, grouped by purpose. Every narrativ
 provided in three synchronized formats — `.md` (authoritative source), `.docx` (editable), and
 `.pdf` (print-ready) — generated from the Markdown source, unless noted otherwise.
 
-> **Single source of truth:** [`requirements/acrme_requirements_baseline_v2_2.md`](requirements/acrme_requirements_baseline_v2_2.md)
-> is the authoritative living requirements baseline (v2.2). All other documents reconcile to it.
+> **Single source of truth:** [`requirements/acrme_requirements_baseline_v2_4.md`](requirements/acrme_requirements_baseline_v2_4.md)
+> is the authoritative living requirements baseline (v2.4). All other documents reconcile to it.
 
 ---
 
@@ -13,7 +13,7 @@ provided in three synchronized formats — `.md` (authoritative source), `.docx`
 
 | Document | Purpose |
 |---|---|
-| [`acrme_requirements_baseline_v2_2`](requirements/acrme_requirements_baseline_v2_2.md) | **Authoritative** consolidated requirements baseline (v2.2). Single source of truth. |
+| [`acrme_requirements_baseline_v2_4`](requirements/acrme_requirements_baseline_v2_4.md) | **Authoritative** consolidated requirements baseline (v2.4). Single source of truth. |
 | [`acrme_complete_requirements_reference`](requirements/acrme_complete_requirements_reference.md) | All 89 requirements (FR/NFR/R) with Must-Should-Could classification and design-coverage evidence. |
 | [`acrme_requirements_deviation_analysis`](requirements/acrme_requirements_deviation_analysis.md) | Deviation analysis between requirements and the production-ready design (17 deviations, 4 severity tiers). |
 | [`capacity_and_quota_management_requirements_v2.md`](requirements/capacity_and_quota_management_requirements_v2.md) | Earlier v2 requirements input (historical). |

@@ -174,7 +174,7 @@ black --check src/acrme
 
 | Document | Path |
 |---|---|
-| Requirements Baseline v2.3 | `docs/requirements/acrme_requirements_baseline_v2_2.md` |
+| Requirements Baseline v2.4 | `docs/requirements/acrme_requirements_baseline_v2_4.md` |
 | Technical Design Document | `docs/design/acrme_technical_design_document.md` |
 | Functional Design Document | `docs/design/acrme_functional_design_document.md` |
 | ADR-001 Region Selection | `docs/adr/acrme_adr_001_region_selection.md` |

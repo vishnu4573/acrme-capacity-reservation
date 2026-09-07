@@ -6,6 +6,8 @@ A legacy combined document, `../acrme_architecture_decision_records.md`, contain
 
 The v2.2 reconciliation aligned these ADRs to Requirements Baseline v2.2: **single governed quota pool** (ADR-002, QUA-004), Belgium Central → **Switzerland North** cross-geo DR, max-not-sum sizing, seed record, `SourceDestinationDRIndex`, standby activation, and the distributed DR reference model (new ADR-005).
 
+> **Current authoritative baseline: v2.4.** The single source of truth is now [`../requirements/acrme_requirements_baseline_v2_4.md`](../requirements/acrme_requirements_baseline_v2_4.md). ADR-002 is already reconciled to the v2.4 single-governed-quota-pool model. The remaining ADRs (**ADR-001, ADR-003, ADR-004, ADR-005**) still reflect the earlier v2.2/v2.3 region model — notably the legacy "three-region gate" wording in ADR-001, which is superseded by the v2.4 geography-aware model (US three-region; Europe/Australia/Asia Pacific two-region with CVAL+DR co-located per **PLC-010a**; Middle East `DR_NOT_OFFERED` per **DEC-001**). These ADRs are scheduled for v2.4 reconciliation in the design-reconciliation phase and should be read against the v2.4 baseline until then.
+
 | ADR | Title | Scope | Files |
 |---|---|---|---|
 | **ADR-001** | Region Selection and Customer Placement | Exact-region-first (default) vs geography exception, `CustomerSeedRecord`, `DR_NOT_OFFERED`, three-region gate, readiness-state enum, versioned region catalogue, atomic placement holds, DR-index contribution | `acrme_adr_001_region_selection.{md,pdf,docx}` |

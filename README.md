@@ -19,7 +19,7 @@ acrme-capacity-reservation/
 ├── docs/
 │   ├── README.md                      # Docs index (what lives where)
 │   ├── requirements/                  # WHAT the system must do
-│   │   ├── acrme_requirements_baseline_v2_2.*   # single source of truth (v2.2)
+│   │   ├── acrme_requirements_baseline_v2_4.*   # single source of truth (v2.4)
 │   │   ├── acrme_complete_requirements_reference.*
 │   │   ├── acrme_requirements_deviation_analysis.*
 │   │   └── capacity_and_quota_management_requirements_v2.md
