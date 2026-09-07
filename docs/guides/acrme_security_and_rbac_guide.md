@@ -1,9 +1,11 @@
 # ACRME Security and RBAC Guide
 
 **Azure Capacity Reservation Management Engine (ACRME)**
-**Author:** Vishnuvardhan Reddy — August 2026
+**Author:** Vishnuvardhan Reddy — August 2026 (reconciled to Requirements Baseline v2.4, 7 September 2026)
 **Status:** Prescriptive baseline for implementation and security review
 **Companion artifacts:** `docs/rbac/custom_roles/*.json`, `docs/rbac/deploy_custom_roles.sh`, `docs/rbac/deploy_role_assignments.sh`
+
+> **v2.4 reconciliation note (7 Sep 2026).** The authorization model — least-privilege UAMIs, isolated role-assignment authority, resource-group-scoped assignment, and the G-14 consent posture — is **unchanged** by Requirements Baseline v2.4. Two v2.4 items intersect this guide and are addressed inline: (a) **OPS-006/C-12 deterministic naming** — RBAC assignment scopes must bind to the deterministic RG/CRG/subscription names produced by OPS-006 (not ad-hoc names); see the new **Section 5.1**. (b) **CAP-023 regional + per-AZ CRG structure** — where a role is assigned at CRG scope, the target CRG set now includes the regional CRG (`crg-<env>-<region>-reg`) plus the per-AZ CRGs (`az1/az2/az3`); assignment stays at the narrowest resource-group/CRG scope as before. The seed-matrix governance (CAP-022) and reactive-discovery auto-create (CAP-024) are performed by the existing **ACRME Capacity Operator** identity within its approved provider resource groups — no new engine identity or broader scope is introduced.
 
 ---
 
@@ -172,6 +174,15 @@ Design notes:
 | Consumer Compute Operator | Subscription | Enumerated consumer **resource groups** only |
 
 `deploy_role_assignments.sh` assigns each role to its UAMI at the narrowest scope and prints the resulting assignment IDs for audit capture. Never assign a mutation role at subscription scope when a resource-group scope suffices.
+
+### 5.1 Deterministic naming and per-AZ CRG scopes (v2.4 — OPS-006, C-12, CAP-023)
+
+Baseline v2.4 pins a **deterministic naming convention** for resource groups, CRGs, and subscriptions (**OPS-006**), backed by a uniqueness **counter (C-12)**. This does not change *what* rights are granted or *how narrow* the scope is — it changes only how the scope's **resource identity** is derived. Two practical rules:
+
+1. **Bind assignment scopes to OPS-006 names, not ad-hoc names.** Assignment scopes (RG paths, CRG resource IDs) must reference the deterministic names emitted by OPS-006 rather than hand-picked strings. `deploy_role_assignments.sh` parameterises the RG/CRG names (`PROVIDER_CRG_RG`, etc.) precisely so these can be set to the OPS-006-generated values; keep those variables sourced from the naming output so assignments and resources never drift. Deterministic names also make **audit** trivial — the same inputs always yield the same, collision-free scope string.
+2. **CRG-scoped assignments now span a regional + per-AZ CRG set (CAP-023).** Each environment carries one **regional** CRG (`crg-<env>-<region>-reg`) plus one CRG **per availability zone** (`az1/az2/az3`). Where a role (e.g. **ACRME Capacity Operator** or **ACRME Sharing Operator**) is assigned at CRG scope, enumerate the regional CRG **and** the per-AZ CRGs for that environment — still at the narrowest CRG/RG scope, never widened to the subscription. Because the names are deterministic, the per-AZ CRG scope list is derivable from the environment/region inputs without lookup.
+
+**No new identity or broader scope.** Seed-matrix governance (**CAP-022**) and reactive-discovery auto-create (**CAP-024**) are ordinary CRG/CR create/update operations performed by the existing **ACRME Capacity Operator** within its approved provider resource groups. The product-team **budget-governance** approval for raising a seed reservation above 0 is an **application-layer** gate (an engine-API approval), not an Azure RBAC grant — it does not require any change to the control-plane roles here.
 
 ---
 
