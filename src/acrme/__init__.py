@@ -9,8 +9,8 @@ continuous reconciliation.
 Architecture:
     - Requirements Baseline: v2.3 (5 geographies: US 3-region; Europe/Australia/
       Asia Pacific/Middle East 2-region with ENV-003 CVAL/DR co-location)
-    - Technical Design: docs/design/acrme_technical_design_document.md
-    - Functional Design: docs/design/acrme_functional_design_document.md
+    - Technical Design: Design/acrme_technical_design_document.md
+    - Functional Design: Design/acrme_functional_design_document.md
 
 Phase 3 Scope (Placement & Customer Seed):
     - Exact production-region input validation
