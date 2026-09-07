@@ -1,11 +1,13 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 2.3  
+**Version:** 2.4  
 **Date:** 7 September 2026  
-**Status:** Accepted - supersedes ADR-001 v2.2 region-selection content  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.3.
+**Status:** Accepted - supersedes ADR-001 v2.2 region-selection content; reconciled to Baseline v2.4  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.3 ADR updates the accepted region-selection decision to match the consolidated requirements baseline — notably the five-geography region model with per-geography distribution models and mandatory two-region CVAL/DR co-location (PLC-010a). Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR states the accepted region-selection decision matching the consolidated requirements baseline — notably the five-geography region model with per-geography distribution models and mandatory two-region CVAL/DR co-location (PLC-010a). Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+>
+> **v2.4 reconciliation note — no region-model change.** Baseline v2.4 folds in the *reservation-model* gaps (seed-at-0 matrix CAP-022, per-AZ CRG structure CAP-023, reactive discovery CAP-024, Availability-Set ineligibility CAP-020/021, even zone-distribution PLC-011, naming convention OPS-006/C-12). **None of these change the region-selection or DR-placement decision recorded here** — the five-geography model, per-geography distribution models, exact-production-region-first placement, `CustomerSeedRecord`, two-region CVAL/DR co-location (PLC-010a) and the Middle East `DR_NOT_OFFERED` position (DEC-001) are all unchanged. The only wording update in this revision is the *region-model gate* (below), whose legacy "three-region gate" label is replaced with an explicit geography-aware statement so it can no longer be read as a universal three-distinct-regions minimum. The new per-AZ CRG structure (CAP-023) operates **within** a selected region and is specified in ADR-002/ADR-004, not here.
 
 ---
 
@@ -123,7 +125,7 @@ Seeds are not regenerated on upgrades, rebuilds, or routine deployments. Changes
 | Standard automated path | Automated selection uses Standard regions only. | `POLICY_BLOCKED` |
 | Restricted region exception | Restricted regions require explicit production-only request and approval. | `POLICY_BLOCKED` |
 | `DR_NOT_OFFERED` | Geography/country flagged as no-DR writes `NOT_OFFERED` and blocks cross-geo substitution. | `READY_WITH_RISK` or `POLICY_BLOCKED` per policy |
-| Three-region gate | Geography must provide Prod, CVAL, and DR separation or approved cross-geo/no-DR path. | `POLICY_BLOCKED` |
+| Region-model gate (geography-aware) | Placement satisfies the geography's **distribution model** (REG-001): a **three-region** geography (US) requires Prod, CVAL and DR in three distinct regions; a **two-region** geography requires Prod in one region and **CVAL + DR co-located** in the other (PLC-010a); a `DR_NOT_OFFERED` geography (Middle East, DEC-001) requires Prod + CVAL only, with no DR region. A universal "three distinct regions" minimum is **not** enforced. | `POLICY_BLOCKED` |
 | Freshness | Snapshot age <= configured maximum or synchronous refresh succeeds. | `STALE_STATE` |
 | Capacity | Required reserved capacity exists or over-allocation is approved. | `RESERVATION_DEFICIT` or `CAPACITY_UNAVAILABLE` |
 | Quota | Consumer/deploying subscription has required quota. | `QUOTA_DEFICIT` |
