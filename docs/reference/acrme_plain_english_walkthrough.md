@@ -74,13 +74,24 @@ Each domain section follows the same pattern:
 - **Sad path** — what happens when something is wrong.
 
 Geography-specific examples use the authoritative Standard Capacity region sets (Requirements Baseline
-v2.2 Section 6, ADR-001):
+v2.3 Section 6, ADR-001). **Five geographies are in scope. US is the only three-region geography; all
+others use a two-region distribution model** — Prod in one region, CVAL + DR co-located in the other
+(PLC-010a). The catalogue is a configurable item (REG-001), so this table is the current example, not
+a hard-coded set:
 
-| Geography | Standard Capacity Regions (engine-selectable) | Restricted Regions (exception only) |
-|---|---|---|
-| **US** | West US 3 · Central US · Canada Central | East US 2 |
-| **EU** | Switzerland North · Sweden Central | North Europe · West Europe |
-| **Middle East** | UAE North · Saudi Arabia Central | — |
+| Geography | Distribution model | Standard Capacity Regions (engine-selectable) | Restricted Regions (exception only) |
+|---|---|---|---|
+| **US** | 3-region | West US 3 · Central US · Canada Central | East US 2 |
+| **EU** | 2-region | Switzerland North · Sweden Central | North Europe · West Europe |
+| **Australia** | 2-region | Australia East · Australia Southeast | — |
+| **Asia Pacific** | 2-region | East Asia · Southeast Asia | Japan East *(pending confirmation)* |
+| **Middle East** | 2-region | UAE North · Saudi Arabia Central | — |
+
+The two-region walkthrough below uses **EU** as the worked example; **Australia, Asia Pacific, and
+Middle East follow the exact same 2-region pattern** (Prod in one region, CVAL + DR co-located in the
+other). The only geography-specific difference is Middle East, which currently carries
+`DR_NOT_OFFERED` (a legal override pending DEC-001) — there, no DR region is assigned at all until
+Legal clears it.
 
 Representative SKU examples throughout: **E16ads\_v5** (16 vCPU per VM) and **E8ads\_v5** (8 vCPU
 per VM).
@@ -417,8 +428,10 @@ gate does the engine fall into the exception workflow.
 This is a structural constraint: with only two Standard regions, the engine cannot place Prod, CVAL,
 and DR in three separate regions.
 
-**How EU handles this — the co-location rule (PLC-010):** one region is Prod, the other is both CVAL
-and DR together (co-located). CVAL and DR share the second region. This is by design, not a fallback.
+**How EU handles this — the co-location rule (PLC-010 / PLC-010a):** one region is Prod, the other is
+both CVAL and DR together (co-located). CVAL and DR share the second region. This is by design, not a
+fallback. In a two-region geography the co-location is **mandatory and deterministic** — once Prod is
+anchored, only one region remains, so CVAL and DR *must* land there (PLC-010a).
 
 The `CVALEarmarkRecord` prevents double-counting: CVAL capacity earmarked for DR activation cannot
 simultaneously be counted as live NonProd headroom.
@@ -460,6 +473,63 @@ may still pass NonProd constraints because they check different quota groups/poo
 
 If **both** regions fail the gate for the same environment type, the engine has no eligible candidate
 and escalates to the exception workflow (Scenario 3).
+
+### 3.6a Australia, Asia Pacific & Middle East — Same 2-Region Pattern
+
+EU is not special. **Every two-region geography behaves identically** (PLC-010a): the placement logic
+depends only on the *count* of Standard regions in the geography (a configurable value, REG-001), not
+on which geography it is. Substitute the region names and the walkthrough above applies verbatim.
+
+**Australia** (Standard: Australia East, Australia Southeast):
+
+```
+Candidate regions: { Australia East, Australia Southeast }
+
+Step 1 (Prod):  argmax(PS_Prod) → say Australia East scores highest → Prod = Australia East
+Step 2 (CVAL):  only Australia Southeast remains → CVAL = Australia Southeast (deterministic)
+Step 3 (DR):    co-located with CVAL by PLC-010a → DR = Australia Southeast
+
+CustomerSeedRecord:
+  production_region = "Australia East"
+  cval_region       = "Australia Southeast"
+  dr_region         = "Australia Southeast"   ← co-located with CVAL
+```
+
+**Asia Pacific** (Standard: East Asia, Southeast Asia; Japan East pending confirmation):
+
+```
+Candidate regions: { East Asia, Southeast Asia }   ← Japan East excluded until confirmed in PlacementPolicy
+
+Step 1 (Prod):  argmax(PS_Prod) → say Southeast Asia scores highest → Prod = Southeast Asia
+Step 2 (CVAL):  only East Asia remains → CVAL = East Asia (deterministic)
+Step 3 (DR):    co-located with CVAL by PLC-010a → DR = East Asia
+
+CustomerSeedRecord:
+  production_region = "Southeast Asia"
+  cval_region       = "East Asia"
+  dr_region         = "East Asia"   ← co-located with CVAL
+```
+
+**Middle East** (Standard: UAE North, Saudi Arabia Central) — the **one** difference: DR is currently
+`DR_NOT_OFFERED` (legal override, DR-014, DEC-001). Prod and CVAL place normally, but **no DR region
+is assigned**:
+
+```
+Candidate regions: { UAE North, Saudi Arabia Central }
+
+Step 1 (Prod):  argmax(PS_Prod) → say UAE North scores highest → Prod = UAE North
+Step 2 (CVAL):  only Saudi Arabia Central remains → CVAL = Saudi Arabia Central (deterministic)
+Step 3 (DR):    DR_NOT_OFFERED → dr_region = NOT_OFFERED   ← NO DR assigned (legal), not co-location
+
+CustomerSeedRecord:
+  production_region = "UAE North"
+  cval_region       = "Saudi Arabia Central"
+  dr_region         = "NOT_OFFERED"   ← legal override pending DEC-001
+```
+
+If and only if Legal clears DEC-001, the Middle East reverts to the standard 2-region co-location
+pattern (or activates the pre-configured Switzerland North cross-geo DR extension) via a config flip
+— no code change (REG-001, HC-10).
 
 ### 3.7 Worked Example — E16ads\_v5 (16 vCPU) at US Scale
 
@@ -1368,11 +1438,15 @@ This table combines all key values (configurable and fixed) for quick lookup:
 | Forecast horizons | 30 / 60 / 90 days | Capacity Management |
 | Quota alert lead time | 14 days at 80% of limit | Capacity Management |
 | Reconciliation loop interval | 6 minutes (configurable) | Capacity Management |
-| US Standard Capacity Regions | West US 3 · Central US · Canada Central | All domains |
-| EU Standard Capacity Regions | Switzerland North · Sweden Central | All domains |
-| Middle East Standard Capacity Regions | UAE North · Saudi Arabia Central | All domains |
+| US Standard Capacity Regions (3-region) | West US 3 · Central US · Canada Central | All domains |
+| EU Standard Capacity Regions (2-region) | Switzerland North · Sweden Central | All domains |
+| Australia Standard Capacity Regions (2-region) | Australia East · Australia Southeast | All domains |
+| Asia Pacific Standard Capacity Regions (2-region) | East Asia · Southeast Asia | All domains |
+| Middle East Standard Capacity Regions (2-region) | UAE North · Saudi Arabia Central | All domains |
+| Japan East (Asia Pacific) | Pending business confirmation — not selectable until added to config | Region Selection |
 | Middle East DR status | `DR_NOT_OFFERED` (DEC-001 pending) | Region Selection |
-| EU CVAL + DR co-location | Mandatory (PLC-010) — 2-region geography | Region Selection |
+| CVAL + DR co-location | Mandatory (PLC-010a) in all 2-region geographies (EU, Australia, Asia Pacific, Middle East) | Region Selection |
+| Region catalogue | Configurable & versioned (REG-001) — geographies, regions, class, distribution model | All domains |
 
 ---
 

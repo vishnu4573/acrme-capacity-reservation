@@ -386,6 +386,8 @@ Requirements state:
 **Required action:**
 - ADR-001: Document the three-region minimum as a normative constraint on the placement pipeline. A two-region geography is a known limitation (Middle East) requiring explicit governance approval and a `DR_NOT_OFFERED` or cross-geo exception.
 
+> **⚠️ Resolution superseded (v2.3, baseline Section 6 / REG-003).** This gap and the quoted REG-003 text above reflect the earlier model and are **no longer current**. The v2.3 baseline replaces the "three-region minimum" idea with a **per-geography distribution model**: the **US** is the only **three-region** geography; **EU, Australia, Asia Pacific and the Middle East are supported, normative two-region geographies** that separate environments via **ENV-003 CVAL/DR co-location (PLC-010a)** — Prod in one region, CVAL + DR co-located in the other. A two-region geography is therefore **not** a limitation requiring a cross-geo exception. The **Middle East** is the sole geography where DR is `DR_NOT_OFFERED` (DEC-001); the Switzerland North cross-geo path is pre-configured but inactive. ADR-001 was reconciled accordingly (it does **not** assert a universal three-region minimum).
+
 ---
 
 ### DEV-017 — Configurable Region Catalogue with Version Control (REG-001/REG-002): Not Explicit

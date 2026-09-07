@@ -1,5 +1,8 @@
-# ACRME Calculation Logic Reference — All Scenarios (v2.2)
+# ACRME Calculation Logic Reference — All Scenarios (v2.3)
 
+> **Revision v2.3 — 7 September 2026.**
+> This revision reconciles the reference to the **five-geography region model** (baseline Section 6): the **US** is the only **three-region** geography (West US 3, Central US, Canada Central; East US 2 Restricted); **EU** (Switzerland North + Sweden Central; North Europe & West Europe Restricted), **Australia** (Australia East + Australia Southeast), **Asia Pacific** (East Asia + Southeast Asia; Japan East **pending**) and the **Middle East** (UAE North + Saudi Arabia Central) are **two-region** geographies. In every two-region geography, **CVAL and DR co-locate** in the non-production region (**PLC-010a**), except the Middle East where DR is `DR_NOT_OFFERED` (DEC-001). Scenario 4 is retitled a **two-region** deployment accordingly; all other calculation logic is unchanged.
+>
 > **Revision v2.2 — 27 August 2026.**
 > This document supersedes the previous calculation logic reference. Key changes in v2.2:
 > - **DR sizing formula replaced**: fixed `dr_ratio_*` percentage approach (v1) is superseded by the
@@ -24,7 +27,7 @@ evidence tag:
 - `[Derived]` — a logical consequence of the design; requires POC validation where noted.
 - `[Assumed]` — a policy default or working hypothesis, tunable and not yet empirically validated.
 
-**Sources:** Requirements Baseline v2.1/v2.2 (Appendix A–D); ADR-001 through ADR-004 v1.2;
+**Sources:** Requirements Baseline v2.3 (Section 6 region model; Appendix A–D); ADR-001 through ADR-005;
 `acrme_production_readiness_review_and_architecture.md` (PRR Section 26–Section 32).
 
 > **Convention.** `vCPU` = `vCPU_per_instance` for the SKU family. `CVAL` (Customer Validation) and
@@ -40,7 +43,7 @@ evidence tag:
 | 1 | Prod region derivation — customer picks a **geography** (**exception path**; explicit approval + customer acknowledgement required) | `argmax(PS_Prod)` over Standard regions | Current |
 | 2 | Prod region validation — customer supplies the **exact region** (**default input**; ACRME validates, does not derive) | HC-1..HC-10 gate + `PS_Prod` post-validation | Current |
 | 3 | Restricted region request | Exception workflow (no scoring) | Current |
-| 4 | Middle East three-region deployment | `argmax(PS_Prod)` in-geo; **DR currently `NOT_OFFERED`** (DR-014, DEC-001 under legal review) — Switzerland North cross-geo DR is pre-configured but **inactive**, conditional on DEC-001 | **Updated** |
+| 4 | Middle East two-region deployment | `argmax(PS_Prod)` in-geo; **DR currently `NOT_OFFERED`** (DR-014, DEC-001 under legal review) — Switzerland North cross-geo DR is pre-configured but **inactive**, conditional on DEC-001 | **Updated** |
 | 5 | CVAL / NonProd region selection | `argmax(PS_NonProd)` | Current |
 | 6 | DR region selection | `argmax(PS_DR)` | Current |
 | 7 | Hard-constraint eligibility gate | HC-3, HC-6, HC-7 arithmetic | Current |
@@ -241,9 +244,9 @@ never enter the scoring pipeline. `[Decided]`
 
 ---
 
-## Scenario 4 — Middle East Three-Region Deployment (Current position: `DR_NOT_OFFERED`)
+## Scenario 4 — Middle East Two-Region Deployment (Current position: `DR_NOT_OFFERED`)
 
-**Trigger:** a Middle East deployment requiring Prod + CVAL (and, subject to legal, DR).
+**Trigger:** a Middle East deployment requiring Prod + CVAL (and, subject to legal, DR). The Middle East is a **two-region** geography (UAE North + Saudi Arabia Central); with DR `NOT_OFFERED`, production is placed in one region and CVAL in the other.
 
 > **⚠️ Current legal position — no DR is offered in the Middle East (DR-014, DEC-001).** The Middle East
 > programme is legal-owned and serves government/medical customers under data-residency/sovereignty
@@ -320,6 +323,8 @@ the reviewer-recommended refinement. Neither is empirically validated yet.
 **CVAL/DR co-location rule (PLC-010):** a customer's CVAL and DR *may* co-locate in the same destination
 region. When co-located, CVAL capacity earmarked for DR activation must **not** be double-counted as both
 live CVAL headroom and available DR headroom. The `CVALEarmarkRecord` tracks this. `[Decided]`
+
+**Two-region co-location is mandatory (PLC-010a):** in a two-region geography (EU, Australia, Asia Pacific, Middle East) there is only one non-production region, so CVAL selection is **deterministic** — the remaining in-geo region — and DR **must** co-locate there with CVAL (except the Middle East, where DR is `DR_NOT_OFFERED`, so that region hosts CVAL only). The `argmax` above is only exercised in the three-region US geography, where CVAL and DR each have a distinct candidate region. `[Decided]`
 
 ---
 
@@ -919,7 +924,7 @@ Available_Quota = Assigned_Regional_VM_Family_Quota - Current_Regional_VM_Family
 ```
 CustomerSeedRecord {
     customer_realm_id       : string        # authoritative customer/realm identifier
-    geography               : string        # e.g. "NorthAmerica", "Europe"
+    geography               : string        # one of: US, EU, Australia, "Asia Pacific", "Middle East"
     production_region       : string        # exact Azure region name
     cval_region             : string        # exact Azure region name
     dr_region               : string | "NOT_OFFERED"
@@ -968,7 +973,7 @@ IF seed change requested:
 
 ---
 
-## B. Consolidated Policy-Constant Table (v2.2)
+## B. Consolidated Policy-Constant Table (v2.3)
 
 | Constant | Value | Used in Scenario(s) | Status |
 |---|---|---|---|
@@ -992,6 +997,7 @@ IF seed change requested:
 | Max-not-sum default | `MAX(source portions)` | 17 | Current |
 | SUM override (C-11) | `SUM(source portions)` — per-scope opt-in | 17 | Current |
 | EU cross-geo DR extension region (Middle East) | **Switzerland North** — pre-configured but **inactive**; conditional on DEC-001 (current position `DR_NOT_OFFERED`) | 4 | **Updated (was Belgium Central; now gated by DEC-001)** |
+| Geography distribution model | US = three-region; EU / Australia / Asia Pacific / Middle East = two-region (CVAL+DR co-located, PLC-010a) | 4, 5, 6 | **New (v2.3)** |
 
 ---
 

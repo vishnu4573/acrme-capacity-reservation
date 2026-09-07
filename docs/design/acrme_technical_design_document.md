@@ -6,15 +6,17 @@
 | **Version** | 1.0 (net-new) |
 | **Date** | 2 September 2026 |
 | **Status** | Draft for review — supersedes the Production Readiness Review as the technical design of record |
-| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.2** (27 Aug 2026) |
+| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.3** (7 Sep 2026) |
 | **Owner** | Vishnuvardhan Reddy · Principal Cloud Architect |
 | **Audience** | Engineering, SRE/platform operations, security, POC leads |
 | **Companion** | Functional Design Document (`acrme_functional_design_document.md`) |
-| **Decision records** | ADR-001 (region selection), ADR-002 (quota & capacity, single-pool), ADR-003 (capacity during DR), ADR-004 (forecast & increase), ADR-005 (distributed DR reference model) — all v2.2 |
+| **Decision records** | ADR-001 (region selection), ADR-002 (quota & capacity, single-pool), ADR-003 (capacity during DR), ADR-004 (forecast & increase), ADR-005 (distributed DR reference model) — all v2.3 |
 
-> **Purpose.** This TDD describes **how** ACRME is built — components, runtime, topology, data, state, algorithms, interfaces, security, observability, NFRs, integration, and POC gating — traceable to Requirements Baseline v2.2 and to the companion FDD (which owns the *what*). This document is **self-contained**: all normative algorithms, formulas, schemas, enumerations, and constants are inlined, not referenced externally.
+> **Purpose.** This TDD describes **how** ACRME is built — components, runtime, topology, data, state, algorithms, interfaces, security, observability, NFRs, integration, and POC gating — traceable to Requirements Baseline v2.3 and to the companion FDD (which owns the *what*). This document is **self-contained**: all normative algorithms, formulas, schemas, enumerations, and constants are inlined, not referenced externally.
 
-> **Reconciliation note (v2.2).** This TDD implements the confirmed v2.2 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002) — pre-configured but **conditional and currently inactive** for the Middle East, whose current legal position is `DR_NOT_OFFERED` pending DEC-001 (see Section 2.2 constraints); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
+> **Reconciliation note (v2.3).** This TDD implements the confirmed v2.3 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002) — pre-configured but **conditional and currently inactive** for the Middle East, whose current legal position is `DR_NOT_OFFERED` pending DEC-001 (see Section 2.2 constraints); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
+>
+> **Region model update (v2.3, baseline Section 6).** The catalogue now defines **five geographies** each carrying an explicit `distribution_model`: the **US is the only three-region geography** (West US 3, Central US, Canada Central; East US 2 Restricted); **EU** (Switzerland North + Sweden Central; North Europe & West Europe Restricted), **Australia** (Australia East + Australia Southeast), **Asia Pacific** (East Asia + Southeast Asia; Japan East **pending**) and the **Middle East** (UAE North + Saudi Arabia Central) are **two-region geographies**. In every two-region geography, **CVAL and DR co-locate** in the non-production region (**PLC-010a**), except the Middle East where DR is `DR_NOT_OFFERED` (DEC-001) so its second region hosts CVAL only. The region catalogue and `distribution_model` are configuration-driven (REG-001); adding Japan East or activating Middle East DR are config changes with no code change.
 
 ---
 
@@ -24,7 +26,7 @@
 This document specifies the technical design of ACRME: the control engine that guarantees every managed Azure deployment has **both** reserved physical capacity and deployable VM-family quota — in the correct region/zone/SKU — before it proceeds, while minimising idle cost through lean distributed DR and continuous reconciliation. It covers component architecture, runtime and deployment, data and state, the placement/scoring/DR algorithms, the API surface, security, observability, non-functional behaviour, integration, and the POC dependencies that gate production reliance.
 
 ### 1.2 Relationship to the FDD
-The FDD (`acrme_functional_design_document.md`) defines **what** ACRME does — capabilities, flows, states, and rules — traceable to Baseline v2.2. This TDD defines **how** those capabilities are realised. Where the FDD names a behaviour (e.g. "single governed pool", "max-not-sum DR", "readiness states"), this TDD gives the component, schema, algorithm, and interface that implements it. Section references to the FDD use the form *(FDD Section 4.x)*.
+The FDD (`acrme_functional_design_document.md`) defines **what** ACRME does — capabilities, flows, states, and rules — traceable to Baseline v2.3. This TDD defines **how** those capabilities are realised. Where the FDD names a behaviour (e.g. "single governed pool", "max-not-sum DR", "readiness states"), this TDD gives the component, schema, algorithm, and interface that implements it. Section references to the FDD use the form *(FDD Section 4.x)*.
 
 ### 1.3 Decision records referenced
 | ADR | Title | Key technical mandate used here |
@@ -222,7 +224,7 @@ flowchart TB
 A versioned document store with per-document optimistic concurrency (`policy_version` / `_etag`-style guards), freshness metadata on every snapshot, and append-only operation/audit records (DAT-001..006, NFR-007). Every decision-driving read carries a `capacity_snapshot_ref` for deterministic replay. `[Decided]`
 
 ### 6.2 Core entities
-The three v2.2-critical entities are **`CustomerSeedRecord`**, **`SourceDestinationDRIndex`**, and **`CVALEarmarkRecord`**, alongside reservation/quota snapshots, `PlacementPolicy`, and operation/audit records.
+The three v2.3-critical entities are **`CustomerSeedRecord`**, **`SourceDestinationDRIndex`**, and **`CVALEarmarkRecord`**, alongside reservation/quota snapshots, `PlacementPolicy`, and operation/audit records.
 
 ```text
 CustomerSeedRecord {                       # PLC-003/004/005 — first-placement authority
@@ -718,9 +720,10 @@ Production reliance on max-not-sum DR sizing and single-pool consumer-quota beha
 
 ## 17. Traceability — Requirement/Deviation → Component/Algorithm/Entity
 
-| Requirement group (v2.2 IDs) | Component(s) | Algorithm / formula | Entity / diagram |
+| Requirement group (v2.3 IDs) | Component(s) | Algorithm / formula | Entity / diagram |
 |---|---|---|---|
-| REG-001..003 | Config/Scope-File, Placement Engine | catalogue validation; input modes | `PlacementPolicy`; T8 |
+| REG-001..003 | Config/Scope-File, Placement Engine | catalogue validation; per-geography `distribution_model`; input modes | `PlacementPolicy`; T8 |
+| PLC-010a | Placement Engine, DR Orchestrator | two-region CVAL/DR co-location enforcement | `CVALEarmarkRecord`; T7 |
 | ENV-001..007 | Placement Engine, DR Orchestrator | env separation; role flip | `CustomerSeedRecord`; T7 |
 | CAP-001..019 | Inventory Collector, State Reconciler | `Allocated+Buffer` floor; zero-not-delete; over-alloc | `ReservationState`; T9, F5 |
 | QUA-001..014 | Quota-Pool Manager | Section 8.3 pool arithmetic; earmarks; quota-as-governor | `QuotaPoolState`; T4 |
@@ -737,7 +740,7 @@ Production reliance on max-not-sum DR sizing and single-pool consumer-quota beha
 | POC-001..011 | (gating) | consumer quota; DR topology; bootstrap; overcommit safety | Section 16 |
 | DEC-001..003 / DEP-001 | Config/Scope-File, Quota-Pool Manager | Middle East DR policy — **current position `DR_NOT_OFFERED`, pending legal review** (production allowed, no DR, Switzerland North path inactive until config flip); failback duration; geo-exception approver; groupQuotas maturity | `PlacementPolicy`; Section 2.2, Section 5.3 |
 
-*Every Baseline v2.2 requirement group resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD Section 9.*
+*Every Baseline v2.3 requirement group resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD Section 9.*
 
 ---
 
@@ -779,7 +782,15 @@ classDiagram
         +float alpha_beta_gamma_delta_epsilon
         +float prod_growth_buffer
         +float nonprod_growth_buffer
+        +RegionCatalogue region_catalogue
         +string version
+    }
+    class RegionCatalogue {
+        +string geography
+        +string distribution_model
+        +list~string~ regions
+        +list~string~ restricted_regions
+        +bool dr_not_offered
     }
     class ActivationRecord {
         +int priority_wave
@@ -798,6 +809,7 @@ classDiagram
     CustomerSeedRecord "1" --> "0..*" SourceDestinationDRIndex : reverse view
     CustomerSeedRecord "1" --> "0..*" CVALEarmarkRecord
     CustomerSeedRecord --> PlacementPolicy : policy_version
+    PlacementPolicy "1" --> "1..*" RegionCatalogue : catalogue
     SourceDestinationDRIndex "1" --> "0..*" ActivationRecord
     QuotaPoolState "1" --> "0..*" ReservationState
     OperationRecord --> ReservationState : mutates

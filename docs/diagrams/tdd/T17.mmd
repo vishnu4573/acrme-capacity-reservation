@@ -1,24 +1,36 @@
 flowchart TD
-    ROOT[ACRME-managed Geographies<br/>region classification per HC-8 / HC-9]
+    ROOT[ACRME-managed Geographies<br/>region classification per HC-8 / HC-9<br/>catalogue is configurable & versioned — REG-001]
 
     ROOT --> US
     ROOT --> EU
-    ROOT --> ME
+    ROOT --> AU
     ROOT --> APAC
+    ROOT --> ME
 
-    subgraph US["US Geography"]
+    subgraph US["US Geography — 3-region model"]
       direction TB
       USS["Standard (automated placement):<br/>West US 3 · Central US · Canada Central"]
       USR["Restricted (exception path only):<br/>East US 2"]
     end
 
-    subgraph EU["Europe Geography"]
+    subgraph EU["Europe Geography — 2-region model"]
       direction TB
-      EUS["Standard (automated placement):<br/>Switzerland North · Sweden Central ·<br/>UK South · West Europe · North Europe"]
-      EUR["Restricted / sovereign (exception path only):<br/>e.g. Azure Government EU"]
+      EUS["Standard (automated placement):<br/>Switzerland North · Sweden Central"]
+      EUR["Restricted (exception path only):<br/>North Europe · West Europe"]
     end
 
-    subgraph ME["Middle East Geography"]
+    subgraph AU["Australia Geography — 2-region model"]
+      direction TB
+      AUS["Standard (automated placement):<br/>Australia East · Australia Southeast"]
+    end
+
+    subgraph APAC["Asia Pacific Geography — 2-region model"]
+      direction TB
+      APS["Standard (automated placement):<br/>East Asia · Southeast Asia"]
+      APP["Pending confirmation:<br/>Japan East (not selectable until added to config)"]
+    end
+
+    subgraph ME["Middle East Geography — 2-region model"]
       direction TB
       MES["Standard (automated placement):<br/>UAE North · Saudi Arabia Central"]
       MEDR["DR status: DR_NOT_OFFERED<br/>(DR-014, DEC-001 — under legal review)"]
@@ -26,24 +38,24 @@ flowchart TD
       MES --> MEDR --> MEX
     end
 
-    subgraph APAC["APAC Geography"]
-      direction TB
-      APS["Standard (automated placement):<br/>East Asia · Australia East · Japan East"]
-      APR["Restricted (exception path only):<br/>Australia Southeast"]
-    end
-
-    STD["Standard Capacity Regions →<br/>eligible for automated placement<br/>(PS_Prod scoring via HC-8 / HC-9)"]
-    RES["Restricted Regions →<br/>exception path only<br/>(Scenario 2, operator approval)"]
+    STD["Standard Capacity Regions →<br/>eligible for automated placement of<br/>Prod, CVAL/NonProd & DR<br/>(PS scoring via HC-8 / HC-9)"]
+    RES["Restricted Regions →<br/>Prod-only exception path<br/>(Scenario 2, operator approval;<br/>CVAL/DR never allowed — VR-6)"]
+    COLO["2-region distribution (all geos except US):<br/>Prod in one region;<br/>CVAL + DR co-located in the other<br/>(mandatory & deterministic — PLC-010a)"]
     XGEO["Cross-geo extension →<br/>conditional only<br/>(DEC-001 required for Middle East)"]
 
     USS -.-> STD
     EUS -.-> STD
-    MES -.-> STD
+    AUS -.-> STD
     APS -.-> STD
+    MES -.-> STD
     USR -.-> RES
     EUR -.-> RES
-    APR -.-> RES
     MEX -.-> XGEO
 
-    NOTE["Regions are canonical examples from the Hard Constraints Reference and<br/>Calculation Logic Reference v2.2. Actual Azure region inventory may differ;<br/>the authoritative Standard/Restricted lists live in PlacementPolicy (HC-8/HC-9)."]
+    EUS -.-> COLO
+    AUS -.-> COLO
+    APS -.-> COLO
+    MES -.-> COLO
+
+    NOTE["Regions are canonical examples from the Requirements Baseline v2.3 Section 6,<br/>Hard Constraints Reference and Calculation Logic Reference. Actual Azure region<br/>inventory may differ; the authoritative Standard/Restricted lists and each<br/>geography's distribution model live in PlacementPolicy (HC-8 / HC-9 / REG-001)."]
     ROOT -.-> NOTE

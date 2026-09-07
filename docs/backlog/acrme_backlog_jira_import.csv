@@ -215,14 +215,15 @@ Depends on: ACRME-S0703, ACRME-S0704","- CVAL selected via PS_NonProd (=PS_CVAL)
 - All three environment scores persisted together for replay."
 "Sub-task","ACRME-T070501","ACRME-S0705","ACRME-E07","","Implement sequential CVAL selection (PS_NonProd)","Highest","","P1","ACRME P1","","",""
 "Sub-task","ACRME-T070502","ACRME-S0705","ACRME-E07","","Implement sequential DR selection (PS_DR)","Highest","","P1","ACRME P1","","",""
-"Story","ACRME-S0706","ACRME-E07","ACRME-E07","","Middle East cross-geo extension (Saudi Arabia/UAE North → Belgium Central)","High","5","P1","ACRME P1","§27 Middle East; HC-10; R-12","As a placement owner, I want Middle East DR to use the approved Belgium Central extension path, so that the three-region minimum is met where only two in-geo regions exist.
+"Story","ACRME-S0706","ACRME-E07","ACRME-E07","","Middle East two-region placement (DR_NOT_OFFERED; Switzerland North cross-geo path pre-configured but inactive)","High","5","P1","ACRME P1","§27 Middle East; HC-10; R-12; DR-014; DEC-001; PLC-010a","As a placement owner, I want Middle East to place Prod + CVAL across its two in-geo regions with DR set to NOT_OFFERED, and the Switzerland North cross-geo path pre-configured but inactive until DEC-001 clears, so that Middle East deployments comply with the current DR_NOT_OFFERED legal position (DEC-001) while a compliant DR path is ready to enable by config if approved.
 
-Depends on: ACRME-S0705","- Prod = argmax(PS_Prod) over Saudi Arabia/UAE North; CVAL = the other in-geo region.
-- DR = Belgium Central via the only approved extension path; validated against HC-1..HC-10 incl. DR floor.
-- If Belgium Central fails, placement is blocked with an ops alert (no silent substitution)."
-"Sub-task","ACRME-T070601","ACRME-S0706","ACRME-E07","","Implement Middle East Prod/CVAL in-geo assignment","High","","P1","ACRME P1","","",""
-"Sub-task","ACRME-T070602","ACRME-S0706","ACRME-E07","","Implement Belgium Central cross-geo DR with HC validation","High","","P1","ACRME P1","","",""
-"Sub-task","ACRME-T070603","ACRME-S0706","ACRME-E07","","Block + alert on degraded extension path (no substitution)","High","","P1","ACRME P1","","",""
+Depends on: ACRME-S0705","- Prod = argmax(PS_Prod) over UAE North/Saudi Arabia Central; CVAL = the other in-geo region.
+- DR = NOT_OFFERED by default (DR-014, DEC-001): no SourceDestinationDRIndex entry, no DR earmark, no cross-geo activation.
+- Switzerland North cross-geo extension is pre-configured but inactive; it activates only via config flip (dr_not_offered['Middle East'] = false) after DEC-001, with no code change, and is then validated against HC-1..HC-10 incl. DR floor.
+- The engine never silently substitutes another region; DR_NOT_OFFERED is evaluated before any cross-geo extension."
+"Sub-task","ACRME-T070601","ACRME-S0706","ACRME-E07","","Implement Middle East Prod/CVAL in-geo assignment (two-region)","High","","P1","ACRME P1","","",""
+"Sub-task","ACRME-T070602","ACRME-S0706","ACRME-E07","","Implement DR_NOT_OFFERED handling + pre-configured (inactive) Switzerland North cross-geo path gated on DEC-001","High","","P1","ACRME P1","","",""
+"Sub-task","ACRME-T070603","ACRME-S0706","ACRME-E07","","Block + alert on degraded extension path when active (no substitution)","High","","P1","ACRME P1","","",""
 "Story","ACRME-S0707","ACRME-E07","ACRME-E07","","Exception-based placement workflow for Restricted regions (EC-1..EC-4)","High","5","P1","ACRME P1","§27 Exception workflow; VR-3","As a governance owner, I want restricted-region use gated behind four exception conditions, so that no Restricted region enters production without explicit approval.
 
 Depends on: ACRME-S0704","- EC-1 explicit request, EC-2 Production-only, EC-3 approval record, EC-4 Scenario-2 input all required (VR-3).

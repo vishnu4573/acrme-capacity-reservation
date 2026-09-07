@@ -1,11 +1,11 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 2.2  
-**Date:** 27 August 2026  
-**Status:** Accepted - supersedes ADR-001 v1.2 region-selection content  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
+**Version:** 2.3  
+**Date:** 7 September 2026  
+**Status:** Accepted - supersedes ADR-001 v2.2 region-selection content  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.3.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.2 ADR updates the accepted region-selection decision to match the consolidated requirements baseline. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.3 ADR updates the accepted region-selection decision to match the consolidated requirements baseline — notably the five-geography region model with per-geography distribution models and mandatory two-region CVAL/DR co-location (PLC-010a). Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 
@@ -27,7 +27,7 @@ Key forces:
 
 - Production protection is the primary objective. `[Decided]`
 - Region, zone, quota, and capacity are hard isolation boundaries; capacity is never counted across regions or zones. `[Documented]`
-- Region strategy is configuration-driven and currently focused on North America and Europe; APAC and Middle East entries are policy data, not automatic rollout commitments. `[Derived]`
+- Region strategy is configuration-driven and spans **five supported geographies** (US, EU, Australia, Asia Pacific, Middle East), each catalogued with an explicit **distribution model** (baseline Section 6, REG-001). The US is the only three-region geography; EU, Australia, Asia Pacific and the Middle East are two-region geographies. New regions (e.g. Japan East, pending) are policy data added by config, not automatic rollout commitments. `[Derived]`
 - **Middle East DR is currently `DR_NOT_OFFERED` (DR-014, DEC-001 — under legal review).** As it stands, DR is **not offered** in the Middle East: Legal owns the programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline Section 2, Section 5.2, Section 6). Middle East placement therefore defaults to `dr_region = NOT_OFFERED`; production may still be placed in-geo without DR. Switzerland North is a **pre-configured, conditional** cross-geo extension that activates **only if** Legal clears DEC-001. `[Documented]`
 - Placement must return a fresh, machine-readable readiness state to AEP/provisioning and must fail safely on stale or incomplete state. `[Decided]`
 
@@ -58,7 +58,7 @@ Adopt a **production-region-first, seeded placement architecture**:
 
 ## Region Classification and Policy
 
-`PlacementPolicy` is the authoritative, versioned region catalogue. It includes region classification, supported geographies, zone support, SKU/family eligibility, separation class, approved cross-geo extension paths, `DR_NOT_OFFERED` flags, stale-state thresholds, weights, and exception metadata. `[Decided]`
+`PlacementPolicy` is the authoritative, versioned region catalogue. It includes region classification, supported geographies, **per-geography distribution model** (three-region vs two-region), zone support, SKU/family eligibility, separation class, approved cross-geo extension paths, `DR_NOT_OFFERED` flags, stale-state thresholds, weights, and exception metadata. `[Decided]`
 
 | Attribute | Requirement |
 |---|---|
@@ -68,7 +68,7 @@ Adopt a **production-region-first, seeded placement architecture**:
 | `DR_NOT_OFFERED` | Produces seed value `DR region = NOT_OFFERED`; ACRME must not silently substitute another geography. **Default `true` for the Middle East** (DR-014, current legal position pending DEC-001) — evaluated **before** any cross-geo extension so an inactive extension is never auto-applied. |
 | Policy version | Every change increments version and is recorded with approver, reason, effective date, and replay/audit metadata. |
 
-Three to four regions per geography is the normal design goal. A two-region geography cannot guarantee in-geo Prod + CVAL + DR separation; it requires either an approved cross-geo path or `DR_NOT_OFFERED`. `[Derived]`
+The number of regions per geography is set by the catalogue's **distribution model**, not a universal minimum. The **US is a three-region geography** — production, CVAL and DR each sit in a distinct region. **EU, Australia, Asia Pacific and the Middle East are two-region geographies**: production is placed in one region and **CVAL and DR are co-located in the other region** (mandatory rule **PLC-010a**, via environment separation ENV-003). A two-region geography therefore delivers in-geo Prod + CVAL + DR **without** any cross-geo path — co-location is the standard model, not a fallback. The **Middle East is the single exception**: DR is `DR_NOT_OFFERED` (DR-014, DEC-001), so its second region hosts CVAL only and production may exist without DR. Cross-geo extension (Switzerland North) applies **only** to the Middle East and only if Legal clears DEC-001. `[Derived]`
 
 ## Placement Flow
 
@@ -152,7 +152,7 @@ Seeds are not regenerated on upgrades, rebuilds, or routine deployments. Changes
 | Geography selection as default | Caused ambiguous customer intent and inconsistent product placement. `[Derived]` |
 | Re-run placement per product | Risks drift across products for the same customer/geography. `[Decided]` |
 | Use stale daily/weekly snapshots for deployment | Can deploy into capacity/quota that is no longer available. `[Derived]` |
-| Auto-select cross-geo DR for two-region geographies | Violates sovereignty/contract controls; must be explicit or `DR_NOT_OFFERED`. `[Decided]` |
+| Auto-select cross-geo DR for two-region geographies | Rejected. Two-region geographies co-locate CVAL and DR in-geo (PLC-010a); cross-geo substitution is never silent. Where in-geo DR is legally impossible (Middle East), the seed is `DR_NOT_OFFERED`, and any cross-geo path (Switzerland North) is explicit and approval-gated. `[Decided]` |
 
 ---
 
@@ -160,7 +160,7 @@ Seeds are not regenerated on upgrades, rebuilds, or routine deployments. Changes
 
 | ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-001 Region Selection and Customer Placement | REG-001..005, PLC-001..010, RDY-001..004, DR-014 | DEC-001 Middle East/no-DR policy; DEC-003 geography exception approver; production stale-state threshold |
+| ADR-001 Region Selection and Customer Placement | REG-001..005, PLC-001..010a, RDY-001..004, DR-014 | DEC-001 Middle East/no-DR policy; DEC-003 geography exception approver; production stale-state threshold |
 
 ## Appendix - Status Legend
 

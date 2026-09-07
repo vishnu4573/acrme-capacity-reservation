@@ -6,14 +6,16 @@
 | **Version** | 1.0 (net-new) |
 | **Date** | 2 September 2026 |
 | **Status** | Draft for review — supersedes the Executive Design Document as the functional design of record |
-| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.2** (27 Aug 2026) |
+| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.3** (7 Sep 2026) |
 | **Owner** | Vishnuvardhan Reddy · Principal Cloud Architect |
 | **Audience** | Business, architecture, operations, audit, onboarding, FinOps |
 | **Companion** | Technical Design Document (`acrme_technical_design_document.md`) |
 
-> **Purpose.** This FDD describes **what** ACRME does — its functional behaviour, flows, states, and rules — traceable to every requirement in Baseline v2.2. It is implementation-neutral; the **how** (components, data, algorithms, interfaces, security, NFRs) is in the companion TDD. This document is **self-contained**: all normative detail (readiness states, engine modes, formulas, classification tables, validation rules) is inlined, not referenced externally.
+> **Purpose.** This FDD describes **what** ACRME does — its functional behaviour, flows, states, and rules — traceable to every requirement in Baseline v2.3. It is implementation-neutral; the **how** (components, data, algorithms, interfaces, security, NFRs) is in the companion TDD. This document is **self-contained**: all normative detail (readiness states, engine modes, formulas, classification tables, validation rules) is inlined, not referenced externally.
 
-> **Reconciliation note (v2.2).** This document reflects the confirmed v2.2 design decisions: **single governed quota pool** as the primary model (QUA-004); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019); and **Switzerland North** as the pre-configured EU cross-geo DR extension for the Middle East (REG-002) — **conditional and currently inactive** because Middle East DR is `DR_NOT_OFFERED` pending legal review (DR-014, DEC-001; see Section 4.4/Section 8 below).
+> **Reconciliation note (v2.3).** This document reflects the confirmed v2.3 design decisions: **single governed quota pool** as the primary model (QUA-004); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019); and **Switzerland North** as the pre-configured EU cross-geo DR extension for the Middle East (REG-002) — **conditional and currently inactive** because Middle East DR is `DR_NOT_OFFERED` pending legal review (DR-014, DEC-001; see Section 4.4/Section 8 below).
+>
+> **Region model update (v2.3, baseline Section 6).** The supported footprint is now **five geographies** with an explicit per-geography **distribution model**: the **US is the only three-region geography** (West US 3, Central US, Canada Central; East US 2 Restricted), while **EU, Australia, Asia Pacific and the Middle East are two-region geographies**. In every two-region geography, **CVAL and DR are co-located** in the non-production region — a mandatory rule captured as **PLC-010a** — with the Middle East being the single exception where DR is `DR_NOT_OFFERED` (DEC-001) so its second region hosts CVAL only. The region catalogue remains versioned and configuration-driven (REG-001); Japan East is a **pending** Asia Pacific addition awaiting confirmation.
 
 > **⚠️ Middle East DR (DR-014, DEC-001) — currently NOT offered.** As it stands, DR is **not offered** in the Middle East. Legal owns the Middle East programme and data-sovereignty/residency laws (a largely government/medical customer base) mean cross-border DR cannot meet residency requirements (baseline Section 2, Section 5.2, Section 6). Middle East placement defaults to `dr_region = NOT_OFFERED`; **production may still exist without DR**. Switzerland North is a pre-configured cross-geo extension that becomes usable **only if/when Legal approves DEC-001**. This is a pending decision and a major architectural risk (baseline Section 25).
 
@@ -42,7 +44,7 @@ ACRME governs Azure capacity reservations and VM-family quota across a managed f
 | **Readiness state** | Machine-readable deployment-readiness verdict returned to AEP (RDY-002). |
 
 ### 1.3 Traceability approach
-Every functional capability in Section 4 cites the requirement IDs it satisfies. Section 9 is a full matrix mapping **every** Baseline v2.2 ID (REG/ENV/CAP/QUA/RDY/PLC/DR/FIN/INT/DAT/OBS/GOV/NFR/OPS + POC/DEC/DEP dependencies) to an FDD section.
+Every functional capability in Section 4 cites the requirement IDs it satisfies. Section 9 is a full matrix mapping **every** Baseline v2.3 ID (REG/ENV/CAP/QUA/RDY/PLC/DR/FIN/INT/DAT/OBS/GOV/NFR/OPS + POC/DEC/DEP dependencies) to an FDD section.
 
 ---
 
@@ -187,9 +189,10 @@ stateDiagram-v2
 - **Seed-once, reuse-across-products (PLC-003..005):** the first valid decision writes `CustomerSeedRecord`; later products/environments for the same customer/geography reuse it. Seed changes require an approved migration workflow. `[Decided]`
 - CVAL and DR are selected after production is fixed, using current readiness, environment separation (ENV-003), restriction flags, workload distribution, quota/capacity, and freshness (PLC-006..009). `[Derived]`
 - **CVAL/DR co-location double-count guard (PLC-010):** earmarked CVAL capacity counts toward DR headroom, never as both live CVAL and available DR. `[Decided]`
-- **Region catalogue (REG-001..003):** versioned, configuration-driven; three-region minimum per geography is normative; region examples come from authoritative config (REG-002 — "Belgium" was corrected to **Switzerland North**). `[Decided]`
+- **Two-region CVAL/DR co-location is mandatory (PLC-010a):** in every two-region geography (EU, Australia, Asia Pacific, Middle East), production is in one region and **CVAL and DR are co-located in the other region**. The Middle East is the single exception — DR is `DR_NOT_OFFERED` (DEC-001), so its second region hosts CVAL only. The three-region US geography places production, CVAL and DR across distinct regions. `[Decided]`
+- **Region catalogue (REG-001..003):** versioned, configuration-driven; the catalogue defines **five geographies** each with an explicit **distribution model** — the US is the only **three-region** geography, and EU, Australia, Asia Pacific and the Middle East are **two-region** geographies (there is no universal three-region minimum). Region examples come from authoritative config (REG-002 — "Belgium" was corrected to **Switzerland North**); Japan East is a **pending** Asia Pacific addition awaiting confirmation. `[Decided]`
 
-**Region classification (functional view):** Standard (auto-selectable/scored), Restricted (production-only by exception, never CVAL/DR), Cross-Geo Extension (DR-only, approved paths — Middle East → **Switzerland North**, *pre-configured but inactive pending DEC-001*), and `DR_NOT_OFFERED` (no cross-border substitution; **default for the Middle East** per DR-014). The `DR_NOT_OFFERED` flag is evaluated **before** any cross-geo extension, so an inactive extension is never auto-applied. `[Decided]`
+**Region classification (functional view):** Standard (auto-selectable/scored), Restricted (production-only by exception, never CVAL/DR — e.g. East US 2, North Europe, West Europe), Cross-Geo Extension (DR-only, approved paths — Middle East → **Switzerland North**, *pre-configured but inactive pending DEC-001*), and `DR_NOT_OFFERED` (no cross-border substitution; **default for the Middle East** per DR-014). The `DR_NOT_OFFERED` flag is evaluated **before** any cross-geo extension, so an inactive extension is never auto-applied. `[Decided]`
 
 ### F4 — Onboarding + placement flow
 
@@ -336,11 +339,12 @@ Entering `DR_EVENT_ACTIVE` does not auto-authorise service-impacting CVAL action
 
 ---
 
-## 9. Requirement Traceability Matrix (Baseline v2.2 → FDD)
+## 9. Requirement Traceability Matrix (Baseline v2.3 → FDD)
 
 | Requirement group (IDs) | FDD section(s) |
 |---|---|
-| REG-001..003 | Section 4.4 (catalogue, three-region min, Switzerland North) |
+| REG-001..003 | Section 4.4 (catalogue, per-geography distribution model, Switzerland North) |
+| PLC-010a | Section 4.4 (two-region CVAL/DR co-location) |
 | ENV-001..007 | Section 4.4 (env separation), Section 4.5 (roles) |
 | CAP-001..019 | Section 4.1, Section 5(2), F5 |
 | QUA-001..014 | Section 4.2 |
@@ -356,7 +360,7 @@ Entering `DR_EVENT_ACTIVE` does not auto-authorise service-impacting CVAL action
 | OPS-001..005 | Section 4.8, Section 5 |
 | POC-001..011 / DEC-001..003 / DEP-001 | Section 8 |
 
-*Every Baseline v2.2 requirement ID resolves to at least one FDD section above. Detailed component/algorithm-level traceability is completed in the TDD Section 17.*
+*Every Baseline v2.3 requirement ID resolves to at least one FDD section above. Detailed component/algorithm-level traceability is completed in the TDD Section 17.*
 
 ---
 
