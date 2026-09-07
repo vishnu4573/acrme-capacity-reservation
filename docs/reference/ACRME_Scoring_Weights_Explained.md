@@ -2,8 +2,12 @@
 
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Technical Reference  
-**Version:** 1.0  
-**Date:** August 2026
+**Version:** 1.1  
+**Date:** August 2026 (reconciled to Requirements Baseline v2.4, 7 Sep 2026)
+
+---
+
+> **v2.4 reconciliation note (7 Sep 2026).** The five placement-scoring weights (α, β, γ, δ, ε) and their environment-specific formulas are **unchanged** by Baseline v2.4 — no weight value or formula is revised here. v2.4 clarifies one adjacency that this document must not conflate: the **ε zone-diversity signal** below (a region-selection weight, `az_count / 3`, PLC-007) is **distinct from PLC-011**, the new **even intra-region zone-distribution target** (`≈ 1 / zone_count` per zone) with rebalancing. ε *nudges region ranking* toward regions that have more zones; **PLC-011 governs how a workload's VMs are spread across the zones of the region already chosen**, and can *trigger a rebalancing action* when zone skew exceeds the configured tolerance (C-13, formula Appendix A.9). See the ε section below for the full reconciliation. The remaining v2.4 additions (CAP-020..024, OPS-006) do not change any scoring formula.
 
 ---
 
@@ -118,6 +122,34 @@ Normalizes to 1.0 for a 3-zone region (maximum diversity); proportionally lower 
 | **All (PS_Prod, PS_NonProd, PS_DR)** | Zone diversity | `az_count / 3` |
 
 **Why ε = 0.10 (lowest weight):** Zone diversity is desirable but not a placement blocker. Hard constraint **HC-5 ZONE_AVAILABILITY** already enforces a minimum zone count — ε acts as a tiebreaker that favors 3-zone regions when all else is equal. Increase ε toward 0.15 if zone diversity is a critical operational requirement; keep at 0.10 if capacity/distribution dominate.
+
+#### ε (region-selection) vs. PLC-011 (intra-region even distribution) — v2.4 reconciliation
+
+ε and PLC-011 both concern availability zones but operate at **different stages** and must not be conflated:
+
+| Aspect | ε — Zone Diversity (this weight, PLC-007) | PLC-011 — Even Zone-Distribution Target |
+|---|---|---|
+| **Stage** | Region **selection** (which region wins) | Zone **placement within** the already-selected region |
+| **Signal / target** | `ε = az_count / 3` — a soft ranking *signal* | Even spread ≈ `1 / zone_count` per zone (≈33% each in a 3-zone region) — a placement *target* |
+| **Effect** | Nudges score toward regions that have more zones | (a) Prefers the **under-represented** zone for new placement; (b) raises a **rebalancing** recommendation/action when skew exceeds tolerance |
+| **Trigger** | None — tiebreaker only | `Max Skew > Configured Skew Tolerance` (C-13) triggers rebalance (subject to approval + Azure feasibility) |
+| **Formula** | `az_count / 3` | Appendix A.9 (below) |
+| **CRG interaction** | — | Keeps per-AZ CRG sizing under **CAP-023** balanced |
+
+The baseline is explicit that PLC-011 "is a placement **target**, not merely the zone-diversity scoring *signal* used in PLC-007 weighting … without an explicit target the ε zone-diversity term only nudges scoring and cannot trigger a rebalance." ε therefore remains purely a **region-ranking** tiebreaker; the intra-region distribution target and rebalancing are governed separately by PLC-011.
+
+**Appendix A.9 — Even zone-distribution skew formula (PLC-011):**
+
+```
+Even Zone Share            = 1 / Zone Count                       (e.g. 1/3 ≈ 33% in a 3-zone region)
+Target VMs per Zone        = round( Workload VM Count / Zone Count )
+Zone Skew(z)               = VMs in zone z - Target VMs per Zone
+Max Skew                   = MAX over zones z of | Zone Skew(z) |
+Rebalance Trigger          = Max Skew > Configured Skew Tolerance  (C-13)
+Preferred Placement Zone   = argmin over zones z of ( VMs in zone z )   # under-represented zone
+```
+
+The target ratio and tolerance are configuration-driven (`PlacementPolicy`, constraint **C-13**). See the baseline PLC-011 and Appendix A.9, and ADR-003 (zone-distribution interaction) for the DR-sizing cross-reference.
 
 ---
 
