@@ -1,11 +1,11 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 2.2  
-**Date:** 27 August 2026  
-**Status:** Accepted - supersedes ADR-004 v1.2 forecast-only sizing content  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
+**Version:** 2.4  
+**Date:** 7 September 2026  
+**Status:** Accepted - supersedes ADR-004 v1.2 forecast-only sizing content; reconciled to Baseline v2.4 (seed matrix + reactive discovery)  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.2 ADR separates continuous reconciliation from longer-horizon forecasting and quota/capacity increase workflows. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR separates continuous reconciliation from longer-horizon forecasting and quota/capacity increase workflows. The **v2.4 revision** adds the seed-matrix initialisation model (**CAP-022**) and the reactive SKU/AZ discovery workflow (**CAP-024**) — see *Seed Matrix Initialisation and Reactive Discovery* below. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---
 
@@ -14,7 +14,7 @@
 **Status:** Accepted  
 **Date:** 27 August 2026  
 **Deciders:** Principal Cloud Architect, Platform Engineering, FinOps, Capacity Planning, Operations  
-**Related requirements:** CAP-003..CAP-010, QUA-006..QUA-010, RDY-001..RDY-004, FIN-001..FIN-006, OBS-001..OBS-005, NFR-003..NFR-010, OPS-001..OPS-005  
+**Related requirements:** CAP-003..CAP-010, **CAP-019, CAP-020..CAP-024**, QUA-006..QUA-010, RDY-001..RDY-004, FIN-001..FIN-006, OBS-001..OBS-005, NFR-003..NFR-010, OPS-001..OPS-006  
 **Related POCs:** POC-004, POC-005, POC-008, POC-009, POC-010
 
 ## Context
@@ -81,6 +81,54 @@ if reserved_quantity > target:
 ```
 
 The loop is idempotent, uses durable operation keys for mutations, and confirms Azure resource-provider state before committing engine state. `[Decided]`
+
+## Seed Matrix Initialisation and Reactive Discovery (CAP-022, CAP-024)
+
+The reconciliation floor above assumes a reservation object already exists for each managed SKU/AZ. Baseline v2.4 makes explicit **how that set of reservation objects comes into being** and **how newly-observed SKU/AZ combinations are absorbed** — the two ends of the reconciliation lifecycle that were previously implicit.
+
+### Seed-at-0 eligible-SKU/AZ matrix and budget governance — CAP-022 `[Decided]`
+
+*(Extends CAP-009 zero-capacity support.)* The managed set of **SKU/VM-family × region × availability-zone** combinations is initialised as a **seed matrix of count-0 reservations** ("**seed reservations**"). Normative rules:
+
+1. **Seed at 0.** Every eligible combination in the scope file is created in Azure at reserved quantity **0** (CAP-009 zero-support) inside the correct **regional or per-AZ CRG** (CAP-023), so reconciliation can scale each up from a known baseline the instant allocated demand first appears (CAP-007). Reaching or starting at 0 is a normal state, **not** a decommission (CAP-010).
+2. **Eligibility.** A combination is eligible only if its placement is **reservation-eligible** — an availability zone (preferred), or regional placement only where the SKU has no zonal reservation support (CAP-020). Availability-Set VMs are excluded and carry the CAP-021 deallocate/redeploy-to-AZ remediation.
+3. **Budget governance.** A SKU/AZ combination enters the seed matrix **only with a named owning product team and an approved budget line**, because any reservation scaled above 0 incurs cost. Populating and expanding the matrix is therefore governed by **product-team budget approval**, not by the engine alone.
+4. **Configuration-driven & versioned.** The matrix, its eligibility rules, and its budget owners live in the **scope file** (CAP-019) and are versioned; changes follow scope-file governance.
+5. **Terminology.** A "**seed reservation**" here is a **zero-count capacity reservation** — distinct from the placement **seed record** (`CustomerSeedRecord`, PLC-003), which records *where* a customer is placed. This ADR never conflates the two.
+
+```text
+# Seed-matrix initialisation (per scope-file entry)
+for (sku, region, az) in scope_file.eligible_combinations:
+    assert placement_is_reservation_eligible(sku, region, az)      # CAP-020
+    assert has_owning_product_team(sku) and has_approved_budget(sku) # CAP-022 governance
+    crg = resolve_crg(env, region, az)        # per-AZ CRG, or regional CRG if SKU non-zonal (CAP-023)
+    ensure_crg_exists(crg)                     # name per OPS-006 / C-12
+    ensure_reservation(crg, sku, quantity=0)   # seed reservation at 0 (CAP-009)
+# Reconciliation later scales each seed up from 0 on first allocated demand (CAP-003/CAP-007)
+```
+
+### Reactive SKU/AZ discovery reconciled with governance — CAP-024 `[Decided]`
+
+*(Reconciles CAP-019 scope-file governance with CAP-002 Azure-first protection.)* When reconciliation or a deployment detects an **allocated VM of a SKU/AZ combination not yet in the seed matrix** (e.g. a product team deployed a new SKU), the engine performs **both** of the following, in order, so that live production is never left unprotected while governance catches up:
+
+1. **Protect capacity first (auto-create).** Auto-create the corresponding reservation — the **CRG if absent** plus a reservation sized at **`allocated + buffer`** (CAP-003) in the correct **per-AZ or regional CRG** (CAP-023). This protects production immediately and preserves CAP-002 (the Azure resource still precedes config activation).
+2. **Raise governance simultaneously.** Raise a **scope-file governance item** (CAP-019) so the discovered SKU/AZ is ratified into the scope file with an **owning product team and budget** (CAP-022).
+3. **Reconcile to authoritative or roll back.** Governance reconciliation then either makes the reactive addition **authoritative** (ratified into the versioned scope file), or — if rejected — triggers the **approved decommissioning workflow** (CAP-010) to roll the reactive reservation back. Reconciliation itself never deletes the reactive reservation; only the decommissioning workflow does.
+4. **Governance SLA, not precondition.** Scope-file consistency (CAP-019) is restored **within the governance SLA** rather than being a blocking precondition of protecting live production — this is the explicit resolution of the CAP-019 ↔ CAP-002 tension.
+
+```text
+# Reactive discovery (per reconciliation cycle)
+for vm in allocated_vms:
+    key = (vm.sku, vm.region, vm.az)
+    if key not in seed_matrix and reservation_eligible(vm):     # CAP-020 gate
+        crg = resolve_crg(vm.env, vm.region, vm.az)             # CAP-023
+        ensure_crg_exists(crg)                                  # OPS-006 / C-12 name
+        ensure_reservation(crg, vm.sku, quantity=allocated(key) + buffer)  # CAP-003 — protect now
+        raise_scope_file_governance_item(key, needs=["product_team", "budget"])  # CAP-019/CAP-022
+        # ratify -> authoritative in versioned scope file, OR reject -> decommissioning workflow (CAP-010)
+```
+
+Both flows emit operation resources, durable operation keys, and audit records on the same terms as the reconciliation loop, and surface readiness/alerting states (below) — e.g. a reactive auto-create with a pending governance item is reported distinctly from a fully-ratified reservation.
 
 ## Forecast and Increase Formula
 
@@ -184,7 +232,7 @@ Operators can pause mutation while retaining inventory and alerting. Manual over
 
 | ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-004 Forecast, Reconciliation, and Increase | CAP-003..010, QUA-006..010, RDY-001..004, OBS-001..005, OPS-001..005 | POC-004 throttling, POC-005 allocation states, POC-008/009 buffer policies, POC-010 production interval |
+| ADR-004 Forecast, Reconciliation, and Increase | CAP-003..010, **CAP-019, CAP-020..024**, QUA-006..010, RDY-001..004, OBS-001..005, OPS-001..006 | POC-004 throttling, POC-005 allocation states, POC-008/009 buffer policies, POC-010 production interval; seed-matrix budget-governance workflow and reactive-discovery governance SLA to be validated in first reconciliation dry-run |
 
 ## Appendix - Status Legend
 
