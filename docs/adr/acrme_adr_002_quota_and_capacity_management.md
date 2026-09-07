@@ -1,11 +1,13 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 2.2  
-**Date:** 2 September 2026  
+**Version:** 2.4  
+**Date:** 7 September 2026  
 **Status:** Accepted - supersedes ADR-002 v2.1 quota grouping content  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.2 ADR adopts the **single governed quota pool** as the primary model per QUA-004 and updates quota and capacity accounting to match Requirements Baseline v2.2. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR adopts the **single governed quota pool** as the primary model per QUA-004 and updates quota and capacity accounting to match Requirements Baseline v2.4. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+
+> **v2.4 update — reservation-model gaps.** This revision folds the reviewed architecture-diagram gaps into the capacity-management decision: **reservation eligibility** now explicitly excludes Availability-Set VMs (**CAP-020**) and requires a deallocate/redeploy-to-AZ onboarding precondition (**CAP-021**); the managed estate is initialised as a **seed matrix of count-0 reservations** per eligible SKU×region×AZ under per-product-team budget governance (**CAP-022**, extending CAP-009), reconciled with **reactive SKU/AZ discovery** that auto-creates a reservation and simultaneously raises a scope-file governance item (**CAP-024**, reconciling CAP-019); reservations are organised into an explicit **regional + per-AZ CRG structure per environment** (**CAP-023**, extending CAP-011); VMs are placed toward an **even ≈1/zone_count per-zone distribution with a rebalancing action** (**PLC-011**); a shared **core subscription is classified entirely production** (**CAP-001a**); the **decommissioning-workflow boundary** is made explicit (**CAP-008/CAP-010**); and a deterministic **RG/CRG/subscription naming convention + counter** is adopted (**OPS-006**, config **C-12**; zone tolerance config **C-13**). See the new *Capacity Reservation Model (v2.4)* section below.
 
 ---
 
@@ -14,7 +16,7 @@
 **Status:** Accepted  
 **Date:** 27 August 2026  
 **Deciders:** Principal Cloud Architect, Platform Engineering, FinOps, Quota Owner  
-**Related requirements:** CAP-001..CAP-019, QUA-001..QUA-014, RDY-001..RDY-004, FIN-001..FIN-006, GOV-001..GOV-006  
+**Related requirements:** CAP-001, CAP-001a, CAP-002..CAP-024, QUA-001..QUA-014, RDY-001..RDY-004, PLC-011, OPS-006, FIN-001..FIN-006, GOV-001..GOV-006 (config C-12/C-13)  
 **Related POCs:** POC-001, POC-002, POC-003, POC-008, POC-011, DEP-001
 
 ## Context
@@ -55,7 +57,25 @@ Target Reserved Capacity = Allocated VM Count + Configured Buffer
 
 Azure resource creation must precede config activation: create/update the Azure CRG/reservation first, validate it, then activate deployment configuration that references it. `[Decided]`
 
-Normal reconciliation never deletes CRGs or reservation definitions. Where Azure permits, an unused managed reservation is reduced to zero instead of being deleted; deletion is a separate approved decommissioning workflow. `[Decided]`
+Normal reconciliation never deletes CRGs or reservation definitions. **Decommissioning-workflow boundary (CAP-008/CAP-010).** Automatic reconciliation only ever **right-sizes a reservation down to its `Allocated + Buffer` floor** — it never reduces a reservation to zero and never deletes a CRG or reservation on its own. Reducing an unused managed reservation to **zero (returning it to a `seed`)**, and any subsequent **retirement or deletion**, are **gated actions in the approved decommissioning workflow** (operator approval, cost/DR/maintenance guards, immutable audit), not part of the automatic loop. `[Decided]`
+
+## Capacity Reservation Model (v2.4)
+
+This section records the reservation-model decisions folded in for Baseline v2.4. They refine, and are consistent with, the single-pool quota decision above.
+
+**Reservation eligibility (CAP-020/CAP-021).** Only **zonal, non-Availability-Set** VMs are eligible for the zonal on-demand capacity reservations ACRME manages. **Availability-Set VMs are ineligible** (**CAP-020**) — an Availability Set and a zonal capacity reservation are mutually exclusive Azure placement constructs, so such VMs are rejected from the zonal reservation path. A VM that is not already zone-pinned must first satisfy the **deallocate/redeploy-to-AZ precondition** (**CAP-021**): it is deallocated and redeployed into a target availability zone through the governed onboarding/migration workflow before it can be associated with a per-AZ reservation. `[Decided]`
+
+**Seed matrix + product-team budget governance (CAP-022, extends CAP-009).** The managed estate is initialised as a **seed matrix**: a **count-0 (`seed`) reservation for every eligible SKU × region × availability-zone combination** in scope. Seeds hold no paid capacity but make every eligible placement target pre-modelled, so a scale-up is a right-size of an existing seed rather than a create-from-nothing. The breadth of the seed matrix and the capacity any team may draw from it are bounded by **per-product-team budget governance** recorded in the scope file. `[Decided]`
+
+**Reactive SKU/AZ discovery reconciled with governance (CAP-024, reconciles CAP-019).** When a VM is observed for a SKU×region×AZ combination not yet in the seed matrix, ACRME **reactively auto-creates** the backing reservation so live workloads are protected, and **simultaneously raises a scope-file governance item** so the newly discovered combination is brought under explicit, budgeted governance (CAP-019). Discovery therefore never bypasses governance — it creates capacity and a governance action in the same step. `[Decided]`
+
+**Regional + per-AZ CRG structure (CAP-023, extends CAP-011).** Reservations are organised, per environment (Prod, NonProd/CVAL, DR-standby) and per region, into **one regional CRG plus one CRG per availability zone**. The regional CRG anchors region-scoped (non-zone-pinned) reservations and governance; the per-AZ CRGs hold the zonal seed matrix and zone-pinned reservations. Naming follows OPS-006 (e.g. `crg-pr-eus2-reg`, `crg-pr-eus2-az1/az2/az3`). `[Decided]`
+
+**Even per-zone distribution + rebalancing (PLC-011).** Within a placement region ACRME drives the per-zone VM distribution toward an **even target of ≈1/zone_count per zone** (≈33% for a three-zone region), selecting the eligible zone with the greatest deficit at placement time and raising a **rebalancing action** when the observed distribution drifts beyond the configurable tolerance band. Target and tolerance are configuration-driven (**C-13**); the algorithm and worked example are in the TDD Section 8.5 and Baseline Appendix A.9. `[Decided]`
+
+**Core subscription classification (CAP-001a).** A shared **core subscription is classified entirely as production** for capacity, buffer, and protection purposes — every reservation it holds is governed under production rules regardless of the individual workload's label. `[Decided]`
+
+**Naming convention + counter (OPS-006, C-12).** Resource groups, CRGs, and subscriptions follow a deterministic naming convention with an incrementing counter — e.g. RG `rg-odcr-<env>-<region>-<NN>` (`rg-odcr-prod-eus2-01`), subscription `sub-<org>-<domain>-<purpose>-<NN>` (`sub-jda-cld-core-01`), CRG per the CAP-023 examples. The pattern is configuration-driven (**C-12**) so it can be adjusted without code change. `[Decided]`
 
 ## Quota Pooling and Allocation
 
@@ -168,7 +188,7 @@ Azure Quota Groups and `groupType` semantics remain feature-maturity dependencie
 
 | ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-002 Quota and Capacity Management | CAP-001..019, QUA-001..014, RDY-001..004 | POC-001 consumer quota; POC-008 production quota buffer; POC-011 max-not-sum safety; DEP-001 feature maturity |
+| ADR-002 Quota and Capacity Management | CAP-001/001a, CAP-002..024, QUA-001..014, RDY-001..004, PLC-011, OPS-006 (C-12/C-13) | POC-001 consumer quota; POC-008 production quota buffer; POC-011 max-not-sum safety; DEP-001 feature maturity |
 
 ## Appendix - Status Legend
 

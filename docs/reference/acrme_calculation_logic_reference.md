@@ -1,5 +1,8 @@
-# ACRME Calculation Logic Reference — All Scenarios (v2.3)
+# ACRME Calculation Logic Reference — All Scenarios (v2.4)
 
+> **Revision v2.4 — 7 September 2026.**
+> This revision folds in the Baseline v2.4 reservation-model gaps. It adds **Scenario 21 — Even Per-Zone Distribution & Rebalancing** with the new **Appendix A.9** formulas (`zone_target_share = 1/zone_count`, greatest-deficit-first zone selection, drift-based rebalancing, config **C-13**) and a worked three-zone example, and records the naming-convention config (**C-12**, OPS-006) in the constant table. The reservation-eligibility (CAP-020/021), seed-matrix (CAP-022), reactive-discovery (CAP-024), per-AZ CRG structure (CAP-023), core-subscription classification (CAP-001a) and decommissioning-boundary (CAP-008/010) decisions are captured in ADR-002, the FDD, the TDD, and the requirements baseline; the arithmetic new in v2.4 is A.9. All other calculation logic is unchanged.
+>
 > **Revision v2.3 — 7 September 2026.**
 > This revision reconciles the reference to the **five-geography region model** (baseline Section 6): the **US** is the only **three-region** geography (West US 3, Central US, Canada Central; East US 2 Restricted); **EU** (Switzerland North + Sweden Central; North Europe & West Europe Restricted), **Australia** (Australia East + Australia Southeast), **Asia Pacific** (East Asia + Southeast Asia; Japan East **pending**) and the **Middle East** (UAE North + Saudi Arabia Central) are **two-region** geographies. In every two-region geography, **CVAL and DR co-locate** in the non-production region (**PLC-010a**), except the Middle East where DR is `DR_NOT_OFFERED` (DEC-001). Scenario 4 is retitled a **two-region** deployment accordingly; all other calculation logic is unchanged.
 >
@@ -27,7 +30,7 @@ evidence tag:
 - `[Derived]` — a logical consequence of the design; requires POC validation where noted.
 - `[Assumed]` — a policy default or working hypothesis, tunable and not yet empirically validated.
 
-**Sources:** Requirements Baseline v2.3 (Section 6 region model; Appendix A–D); ADR-001 through ADR-005;
+**Sources:** Requirements Baseline v2.4 (Section 6 region model; Appendix A–D incl. A.9); ADR-001 through ADR-005;
 `acrme_production_readiness_review_and_architecture.md` (PRR Section 26–Section 32).
 
 > **Convention.** `vCPU` = `vCPU_per_instance` for the SKU family. `CVAL` (Customer Validation) and
@@ -60,6 +63,7 @@ evidence tag:
 | 18 | Standby activation (DR-019) | `associated → allocated` staged acquisition | **New** |
 | 19 | Deployment readiness gate | `READY / QUOTA_DEFICIT / STALE_STATE / …` (RDY-002) | **New** |
 | 20 | Customer placement seed record | First-placement persistence + reuse policy | **New** |
+| 21 | Even per-zone distribution & rebalancing | `zone_target_share = 1/zone_count`; greatest-deficit-first; drift → rebalance (A.9, PLC-011) | **New (v2.4)** |
 
 ---
 
@@ -958,6 +962,49 @@ IF seed change requested:
 
 ---
 
+## Scenario 21 — Even Per-Zone Distribution & Rebalancing (PLC-011, Appendix A.9) — New
+
+**Trigger:** every VM placement in a multi-zone region, and every reconciliation cycle (drift check).
+
+**Goal:** distribute VMs across a region's availability zones toward an **even ≈1/zone_count share** (≈33% each for a three-zone region), and raise a rebalancing action when the observed distribution drifts beyond a configurable tolerance.
+
+### A.9 formulas `[Decided]`
+
+```
+zone_count             = number of eligible AZs in the region        # e.g. 3
+zone_target_share      = 1 / zone_count                              # e.g. 0.3333  (C-13)
+total_vm_count         = Σ_z vm_count(z)
+zone_share(z)          = vm_count(z) / total_vm_count                # 0 when total = 0
+zone_deficit(z)        = zone_target_share - zone_share(z)           # >0 ⇒ under target
+
+# Per-placement zone selection (greatest-deficit-first):
+eligible(z)            = has_capacity(z) AND has_quota(z)
+                         AND NOT restricted(z) AND zone_aligned(z)
+chosen_zone            = argmax_{z ∈ eligible} zone_deficit(z)
+
+# Per-cycle drift detection:
+max_drift              = max_z | zone_share(z) - zone_target_share |
+rebalance_needed       = max_drift > zone_balance_tolerance          # C-13 default 0.10 (±10 pp)
+```
+
+### Worked example — three-zone region `[Decided]`
+
+Region with `zone_count = 3` ⇒ `zone_target_share = 0.3333` (33.3%). Current distribution over 30 VMs:
+
+| Zone | vm_count | zone_share | zone_deficit (target − share) |
+|---|---|---|---|
+| az1 | 14 | 0.467 | −0.133 |
+| az2 |  9 | 0.300 | +0.033 |
+| az3 |  7 | 0.233 | +0.100 |
+
+- `max_drift = |0.467 − 0.333| = 0.134` (az1). With `zone_balance_tolerance = 0.10`, `0.134 > 0.10` ⇒ **`rebalance_needed = true`**.
+- Next placement: `argmax(zone_deficit)` = **az3** (+0.100), provided az3 is `eligible` (capacity, quota, not restricted, zone-aligned); if az3 is ineligible, fall back to the next-greatest-deficit eligible zone (az2).
+- The `ZoneRebalanceAction` steers new placements (and, where policy permits, governed redeploys) into az3 then az2 until `max_drift ≤ 0.10`. At the balanced target each zone holds 10 VMs (`0.333` share, `max_drift = 0`).
+
+Rebalancing never violates capacity, quota, restriction, or zone-alignment constraints and never forces a live migration outside an approved workflow. `zone_target_share` (derived from `zone_count`) and `zone_balance_tolerance` are configuration-driven (**C-13**). `[Decided]`
+
+---
+
 ## A. Core Formula Reference (Appendix A — Requirements v2.1)
 
 | Label | Formula | Source |
@@ -970,10 +1017,11 @@ IF seed change requested:
 | **A.6** | `Destination_DR_Requirement(d) = MAX over s (Workload_Portion(s → d))` | DR-017 |
 | **A.7** | `DR_Capacity_Gap(d) = max(0, DR_Requirement(d) - Usable_Capacity(d))` | DR-017 |
 | **A.8** | `Overcommit_Ratio(d) = SUM(portions) / MAX(portions)` | DR-017 |
+| **A.9** | `zone_target_share = 1 / zone_count`; `chosen_zone = argmax_z(zone_target_share − zone_share(z))` over eligible zones; `rebalance_needed = max_z\|zone_share(z) − zone_target_share\| > tolerance` | PLC-011 |
 
 ---
 
-## B. Consolidated Policy-Constant Table (v2.3)
+## B. Consolidated Policy-Constant Table (v2.4)
 
 | Constant | Value | Used in Scenario(s) | Status |
 |---|---|---|---|
@@ -998,6 +1046,9 @@ IF seed change requested:
 | SUM override (C-11) | `SUM(source portions)` — per-scope opt-in | 17 | Current |
 | EU cross-geo DR extension region (Middle East) | **Switzerland North** — pre-configured but **inactive**; conditional on DEC-001 (current position `DR_NOT_OFFERED`) | 4 | **Updated (was Belgium Central; now gated by DEC-001)** |
 | Geography distribution model | US = three-region; EU / Australia / Asia Pacific / Middle East = two-region (CVAL+DR co-located, PLC-010a) | 4, 5, 6 | **New (v2.3)** |
+| `zone_target_share` | `1 / zone_count` (≈0.333 for 3 zones) — config C-13 | 21 | **New (v2.4)** |
+| `zone_balance_tolerance` | 0.10 (±10 pp) — config C-13 | 21 | **New (v2.4)** |
+| RG/CRG/subscription naming pattern + counter | config C-12 (OPS-006) — e.g. `rg-odcr-<env>-<region>-<NN>`, `crg-<env>-<region>-<az\|reg>`, `sub-<org>-<domain>-<purpose>-<NN>` | — | **New (v2.4)** |
 
 ---
 
@@ -1015,6 +1066,7 @@ IF seed change requested:
 | Standby activation staging (Scenario 18) | `[Decided]` | Dependent on POC-005 (VM state semantics) |
 | Deployment readiness gate (Scenario 19) | `[Decided]` | Ready for Phase 1 |
 | Customer seed record (Scenario 20) | `[Decided]` | Ready for Phase 3 |
+| Even per-zone distribution & rebalancing (Scenario 21) | `[Decided]` | Ready for Phase 3 (placement) |
 
 All constants are policy defaults stored in `PlacementPolicy` (config-as-code, versioned). Tuning any
 constant requires updating the config; no code change is needed. The `dr_ratio_*` constants are retained
@@ -1022,4 +1074,4 @@ in the codebase as fallback references for the SUM override (C-11) only.
 
 ---
 
-*Document version 2.2 — 27 August 2026. Next review: upon POC-001 / POC-011 results.*
+*Document version 2.4 — 7 September 2026. Next review: upon POC-001 / POC-011 results.*

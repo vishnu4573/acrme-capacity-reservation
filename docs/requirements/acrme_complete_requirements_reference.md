@@ -156,6 +156,27 @@ Monitors utilization, calculates costs, and recommends right-sizing and chargeba
 
 ---
 
+## Part 1A — v2.4 Reservation-Model Additions (Baseline v2.4)
+
+These requirements were folded into Requirements Baseline **v2.4** from the reviewed architecture-diagram gaps. They refine the capacity-reservation lifecycle (FR-1), availability-zone handling (FR-3), and regional placement (FR-6) above, and are specified normatively in ADR-002 (*Capacity Reservation Model (v2.4)*), the FDD (§4.1, §4.4), the TDD (§5.2, §8.1, §8.5, §10, §17), and the Calculation Logic Reference (Scenario 21 / Appendix A.9).
+
+| Baseline ID | Requirement | Coverage | Implementation / cross-reference |
+|---|---|---|---|
+| **CAP-001a** | A shared **core subscription is classified entirely production** — every reservation it holds is governed under production rules regardless of workload label | ✅ COVERED | Config/Scope-File classification; ADR-002 (v2.4); FDD §4.1; TDD §17 |
+| **CAP-020** | **Availability-Set VMs are ineligible** for zonal capacity reservations (mutually exclusive Azure placement constructs) — **hard constraint HC-11** | ✅ COVERED | Onboarding Validator eligibility gate; TDD §8.1; Hard Constraints Reference HC-11 |
+| **CAP-021** | **Deallocate/redeploy-to-AZ onboarding precondition** — a non-zone-pinned VM is deallocated and redeployed into a target AZ before it can back a per-AZ reservation | ✅ COVERED | Governed onboarding/migration workflow; TDD §8.1; ADR-002 (v2.4) |
+| **CAP-022** (extends CAP-009) | **Seed matrix** of count-0 (`seed`) reservations per eligible SKU×region×AZ, bounded by **per-product-team budget governance** | ✅ COVERED | Extends FR-1.3 zero-size pattern; Inventory Collector + scope-file budget; ADR-002 (v2.4); FDD §4.1 |
+| **CAP-023** (extends CAP-011) | Explicit **regional + per-AZ CRG structure per environment** (1 regional + N per-AZ CRGs) | ✅ COVERED | Provisioning/topology; TDD §5.2, T3; ADR-002 (v2.4); naming per OPS-006 |
+| **CAP-024** (reconciles CAP-019) | **Reactive SKU/AZ discovery** auto-creates the backing reservation **and simultaneously raises a scope-file governance item** | ✅ COVERED | Inventory Collector + Governance & Audit; ADR-002 (v2.4); FDD §4.1; TDD §17 |
+| **CAP-008 / CAP-010** | **Decommissioning-workflow boundary** — automatic reconciliation only right-sizes to `Allocated + Buffer`; reduce-to-zero / retire / delete are **gated** workflow actions | ✅ COVERED (boundary clarified) | Refines FR-1.5/FR-1.6 and FR-8.5; TDD §10; ADR-002 (v2.4) decommissioning boundary |
+| **PLC-011** | **Even ≈1/zone_count per-zone distribution target + rebalancing** (greatest-deficit-first placement; drift → `ZoneRebalanceAction`) | ✅ COVERED | Extends FR-3/FR-6; Calc Logic Scenario 21 / A.9; TDD §8.5; config C-13 |
+| **OPS-006** | Deterministic **RG/CRG/subscription naming convention + counter** | ✅ COVERED | Config-driven naming (C-12); ADR-002 (v2.4); TDD §5.1/§5.2 |
+| **C-12 / C-13** | Config items: naming pattern (C-12); zone target + tolerance (C-13, default ±10 pp) | ✅ COVERED | `PlacementPolicy` config-as-code; Calc Logic §B constant table |
+
+**Part 1A Verdict:** ✅ **All v2.4 reservation-model additions covered** — normative detail resides in the baseline, ADR-002, FDD, TDD, and Calculation Logic Reference.
+
+---
+
 ## Part 2 — Non-Functional Requirements (NFR-1 through NFR-7)
 
 ### NFR-1 — Availability

@@ -6,7 +6,7 @@
 | **Version** | 1.0 (net-new) |
 | **Date** | 2 September 2026 |
 | **Status** | Draft for review — supersedes the Production Readiness Review as the technical design of record |
-| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.3** (7 Sep 2026) |
+| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.4** (7 Sep 2026) |
 | **Owner** | Vishnuvardhan Reddy · Principal Cloud Architect |
 | **Audience** | Engineering, SRE/platform operations, security, POC leads |
 | **Companion** | Functional Design Document (`acrme_functional_design_document.md`) |
@@ -14,6 +14,8 @@
 
 > **Purpose.** This TDD describes **how** ACRME is built — components, runtime, topology, data, state, algorithms, interfaces, security, observability, NFRs, integration, and POC gating — traceable to Requirements Baseline v2.3 and to the companion FDD (which owns the *what*). This document is **self-contained**: all normative algorithms, formulas, schemas, enumerations, and constants are inlined, not referenced externally.
 
+> **Reconciliation note (v2.4 — reservation-model gaps).** This revision folds the reviewed architecture-diagram gaps into the technical design. **Reservation eligibility** is refined: Availability-Set VMs are ineligible for zonal capacity reservations (**CAP-020**), and onboarding requires a **deallocate/redeploy-to-AZ precondition** for any VM not already zone-pinned (**CAP-021**). The managed estate is initialised as a **seed matrix of count-0 (`seed`) reservations** across every eligible SKU×region×AZ combination, governed by per-product-team budget (**CAP-022**, extending CAP-009), reconciled with **reactive SKU/AZ discovery** which auto-creates a reservation and simultaneously raises a scope-file governance item (**CAP-024**, reconciling CAP-019). Reservations are organised into an explicit **regional + per-AZ CRG structure per environment** (**CAP-023**, extending CAP-011 and refining the three-CRG model in Section 5.2). VM placement targets an **even ≈1/zone_count per-zone distribution with a rebalancing action** (**PLC-011**, Section 8.5). A shared **core subscription is classified entirely production** (**CAP-001a**). The **decommissioning-workflow boundary** is made explicit (**CAP-008/CAP-010**): automatic reconciliation only right-sizes a reservation down to `Allocated + Buffer` (never to zero or delete on its own), while reducing to zero, retirement and deletion are **gated** workflow actions. A deterministic **RG/CRG/subscription naming convention + counter** is adopted (**OPS-006**, config **C-12**); the zone-distribution tolerance is config **C-13**. A "**seed reservation**" (count-0 reservation) is distinct from the placement "**seed record**" (`CustomerSeedRecord`, PLC-003).
+>
 > **Reconciliation note (v2.3).** This TDD implements the confirmed v2.3 decisions: **single governed quota pool** as the primary technical model with logical earmarks for Prod/DR protection (QUA-004, ADR-002); **Switzerland North** as the EU cross-geo DR extension region (REG-002) — pre-configured but **conditional and currently inactive** for the Middle East, whose current legal position is `DR_NOT_OFFERED` pending DEC-001 (see Section 2.2 constraints); **max-not-sum** destination DR sizing with an authoritative `SourceDestinationDRIndex` (DR-016/017/018, ADR-005); **exact-production-region-first** validation with a governed `CustomerSeedRecord` (PLC-001..005, ADR-001); **five-state engine machine** and **standby activation waves** (DR-019, ADR-003).
 >
 > **Region model update (v2.3, baseline Section 6).** The catalogue now defines **five geographies** each carrying an explicit `distribution_model`: the **US is the only three-region geography** (West US 3, Central US, Canada Central; East US 2 Restricted); **EU** (Switzerland North + Sweden Central; North Europe & West Europe Restricted), **Australia** (Australia East + Australia Southeast), **Asia Pacific** (East Asia + Southeast Asia; Japan East **pending**) and the **Middle East** (UAE North + Saudi Arabia Central) are **two-region geographies**. In every two-region geography, **CVAL and DR co-locate** in the non-production region (**PLC-010a**), except the Middle East where DR is `DR_NOT_OFFERED` (DEC-001) so its second region hosts CVAL only. The region catalogue and `distribution_model` are configuration-driven (REG-001); adding Japan East or activating Middle East DR are config changes with no code change.
@@ -170,7 +172,7 @@ flowchart TB
 ACRME runs from a platform control subscription with cross-subscription managed-identity access (least-privilege RBAC) to the Prod, NonProd/CVAL, and DR-hosting subscriptions (see T2). All mutations are attributed to the control identity and audited (GOV-002). `[Decided]`
 
 ### 5.2 CRG hierarchy and cross-subscription sharing (Section 25, FC-06)
-- **Three-CRG model per region:** exactly one Prod, one NonProd/CVAL, and one DR-standby CRG target per region per scope (CAP-001). `[Decided]`
+- **Environment-scoped, region + per-AZ CRG structure (CAP-023, extends CAP-011):** each environment (Prod, NonProd/CVAL, DR-standby) owns, per region, **one regional CRG plus one CRG per availability zone** in that region. The regional CRG anchors region-scoped (non-zonal-pinned) reservations and governance; the per-AZ CRGs hold the zonal `seed` matrix and zone-pinned reservations that back the even-distribution target (PLC-011). This refines the earlier "three-CRG-per-region" shorthand: the *three* remains the count of **environment** targets per region, each of which now expands into `1 regional + N per-AZ` CRGs. Naming follows OPS-006 (e.g. `crg-pr-eus2-reg`, `crg-pr-eus2-az1`, `crg-pr-eus2-az2`, `crg-pr-eus2-az3`). `[Decided]`
 - **Zone alignment (FC-06):** cross-subscription CRG sharing requires a validated `ZoneMappingRecord` — logical zones differ across subscriptions, so sharing is only valid when physical zones align (CAP-014..019). `[Decided]`
 - **Sharing limits:** provider→consumer sharing validated for SKU/region/zone/authorisation; a per-provider consumer ceiling applies. `[Decided]`
 
@@ -351,6 +353,8 @@ stateDiagram-v2
 ### 8.1 Input modes and pipeline
 The default input is an **exact production region** which ACRME **validates** (it does not derive). A **geography** input is an **exception path** requiring approval + customer acknowledgement, after which the derived region becomes the fixed seed (ADR-001, PLC-001/002). Restricted regions never enter scoring — they route to the exception workflow.
 
+**Reservation-eligibility gate (CAP-020/CAP-021).** Before a VM enters zonal scoring the Onboarding Validator applies two hard preconditions: (1) **Availability-Set VMs are ineligible** for zonal capacity reservations (**CAP-020**) — a VM in an Availability Set cannot be backed by a zonal on-demand capacity reservation and is rejected from the zonal path; (2) a VM that is not already **zone-pinned** must satisfy the **deallocate/redeploy-to-AZ precondition** (**CAP-021**) — it is deallocated and redeployed into a target availability zone (via the governed onboarding/migration workflow) before it can be associated with a per-AZ CRG reservation. Only zone-pinned, non-Availability-Set VMs proceed to the PLC-011 even-distribution zone selection (Section 8.5).
+
 ### T7 — Staged placement pipeline
 
 ```mermaid
@@ -471,6 +475,21 @@ Forecast_Quantity        = ceil(Forecast_Peak·(1+Growth_Buffer) + DR_Buffer)  #
 ```
 The reconciliation floor is enforced every cycle; the forecast is advisory (horizon ∈ {30,60,90} days) and raises `ForecastApproachingQuotaLimit` with 14-day lead time at 80% of quota limit. Auto-increase target = max(floor, forecast). `[Decided]`
 
+### 8.5 Even per-zone distribution & rebalancing (PLC-011, Baseline App. A.9)
+Within a placement region with `Z` availability zones, ACRME drives the per-zone VM distribution toward an even target and raises a rebalancing action when it drifts:
+```text
+zone_target_share      = 1 / zone_count                              # e.g. 0.333 for Z=3   (C-13)
+zone_share(z)          = vm_count(z) / total_vm_count
+zone_deficit(z)        = zone_target_share - zone_share(z)           # >0 means under-target
+# Placement zone selection (per request):
+eligible(z)            = has_capacity(z) AND has_quota(z) AND NOT restricted(z) AND zone_aligned(z)
+chosen_zone            = argmax_{z in eligible} zone_deficit(z)      # greatest-deficit-first
+# Drift detection (per reconciliation cycle):
+max_drift              = max_z | zone_share(z) - zone_target_share |
+rebalance_needed       = max_drift > zone_balance_tolerance          # C-13 default 0.10 (±10 pp)
+```
+When `rebalance_needed`, a `ZoneRebalanceAction` is raised so subsequent placements (and, where policy permits, governed redeploys) steer new/moved VMs into the most-deficient eligible zones until `max_drift ≤ tolerance`. Rebalancing never violates capacity, quota, restriction, or zone-alignment constraints and never forces a live migration outside an approved workflow. Both `zone_target_share` (derived from `zone_count`) and `zone_balance_tolerance` are configuration-driven (**C-13**); the worked example is Baseline Appendix A.9. `[Decided]`
+
 ---
 
 ## 9. DR Sizing & Activation Algorithms (Section 31, App. A.6/A.7/A.8, App. D)
@@ -587,7 +606,7 @@ The normative 10-step sequence runs only in `STEADY_STATE`:
 9. Confirm actual quantity.
 10. Refresh snapshot and close the request.
 ```
-Triggers: `dr_autoincrease_threshold=0.35`, `prod/nonprod_autoincrease_threshold=0.20`, debounce cooldown 30 min per (region+CRG type). Guarded scale-down never drops below `Allocated`, within a DR window, during maintenance exclusion, or against cost policy; reductions go to zero, never deletion (CAP-009/010). `[Decided]`
+Triggers: `dr_autoincrease_threshold=0.35`, `prod/nonprod_autoincrease_threshold=0.20`, debounce cooldown 30 min per (region+CRG type). Guarded scale-down never drops below `Allocated`, within a DR window, during maintenance exclusion, or against cost policy. **Decommissioning-workflow boundary (CAP-008/CAP-010):** automatic reconciliation only ever **right-sizes a reservation down to its `Allocated + Buffer` floor** — it never reduces a reservation to zero and never deletes a CRG or reservation on its own. Reducing a reservation to **zero (returning it to a `seed`)**, **retiring**, or **deleting** a reservation/CRG are **gated workflow actions** requiring the decommissioning approval path (operator approval, cost/DR/maintenance guards, audit) — they are outside the automatic loop. `[Decided]`
 
 ### T9 — Steady-state 10-step capacity lifecycle
 
@@ -720,12 +739,21 @@ Production reliance on max-not-sum DR sizing and single-pool consumer-quota beha
 
 ## 17. Traceability — Requirement/Deviation → Component/Algorithm/Entity
 
-| Requirement group (v2.3 IDs) | Component(s) | Algorithm / formula | Entity / diagram |
+| Requirement group (v2.4 IDs) | Component(s) | Algorithm / formula | Entity / diagram |
 |---|---|---|---|
 | REG-001..003 | Config/Scope-File, Placement Engine | catalogue validation; per-geography `distribution_model`; input modes | `PlacementPolicy`; T8 |
 | PLC-010a | Placement Engine, DR Orchestrator | two-region CVAL/DR co-location enforcement | `CVALEarmarkRecord`; T7 |
 | ENV-001..007 | Placement Engine, DR Orchestrator | env separation; role flip | `CustomerSeedRecord`; T7 |
-| CAP-001..019 | Inventory Collector, State Reconciler | `Allocated+Buffer` floor; zero-not-delete; over-alloc | `ReservationState`; T9, F5 |
+| CAP-001, CAP-001a | Inventory Collector, Config/Scope-File | environment classification; **core subscription = all-production** (CAP-001a) | `ReservationState`, `PlacementPolicy`; T2 |
+| CAP-001..019 | Inventory Collector, State Reconciler | `Allocated+Buffer` floor; auto right-size only (no auto zero/delete); over-alloc | `ReservationState`; T9, F5 |
+| CAP-008, CAP-010 | State Reconciler, Decommissioning Workflow | auto right-size to `Allocated+Buffer` vs **gated** reduce-to-zero/retire/delete | `ReservationState`, `OperationRecord`; Section 10, T9 |
+| CAP-020, CAP-021 | Placement Engine, Onboarding Validator | Availability-Set VM ineligibility; deallocate/redeploy-to-AZ precondition | `PlacementPolicy`, `CustomerSeedRecord`; Section 8.1 |
+| CAP-022 (extends CAP-009) | Inventory Collector, Config/Scope-File | **seed matrix** of count-0 reservations over eligible SKU×region×AZ; per-product-team budget governance | `ReservationState` (`seed`); Section 5.2 |
+| CAP-023 (extends CAP-011) | Inventory Collector, State Reconciler | **regional + per-AZ CRG structure** per environment | `ReservationState` (`1 regional + N per-AZ` CRGs); Section 5.2, T3 |
+| CAP-024 (reconciles CAP-019) | Inventory Collector, Governance & Audit | **reactive SKU/AZ discovery** auto-creates reservation + raises scope-file governance item | `ReservationState`, `AuditEvent`; Section 5.2, Section 12 |
+| PLC-011 | Placement Engine, State Reconciler | **even ≈1/zone_count** target; greatest-deficit-first zone pick; drift → `ZoneRebalanceAction` | `PlacementPolicy`; Section 8.5 |
+| OPS-006 | Config/Scope-File, Provisioning | deterministic RG/CRG/subscription **naming convention + counter** | `PlacementPolicy`; Section 5.1, Section 5.2 |
+| C-12, C-13 | Config Service | naming pattern config (C-12); zone target/tolerance config (C-13) | config; Section 8.5 |
 | QUA-001..014 | Quota-Pool Manager | Section 8.3 pool arithmetic; earmarks; quota-as-governor | `QuotaPoolState`; T4 |
 | RDY-001..004 | Readiness API | Section 11.3 gate logic; staleness; quota deficit | readiness states; T6 |
 | PLC-001..010 | Placement & Scoring Engine | `PS_Prod/NonProd/DR`; seed reuse; co-location guard | `CustomerSeedRecord`, `CVALEarmarkRecord`; T7, T8 |
@@ -740,7 +768,7 @@ Production reliance on max-not-sum DR sizing and single-pool consumer-quota beha
 | POC-001..011 | (gating) | consumer quota; DR topology; bootstrap; overcommit safety | Section 16 |
 | DEC-001..003 / DEP-001 | Config/Scope-File, Quota-Pool Manager | Middle East DR policy — **current position `DR_NOT_OFFERED`, pending legal review** (production allowed, no DR, Switzerland North path inactive until config flip); failback duration; geo-exception approver; groupQuotas maturity | `PlacementPolicy`; Section 2.2, Section 5.3 |
 
-*Every Baseline v2.3 requirement group resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD Section 9.*
+*Every Baseline v2.4 requirement group — including the reservation-model additions CAP-001a, CAP-020..024, PLC-011, OPS-006 and configuration items C-12/C-13 — resolves to at least one component, algorithm, and entity above. Functional-level traceability is in the FDD Section 9.*
 
 ---
 

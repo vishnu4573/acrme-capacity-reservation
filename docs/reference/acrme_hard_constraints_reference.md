@@ -5,6 +5,8 @@
 **Date:** August 2026  
 **Status:** Production Ready
 
+> **v2.4 reconciliation note (7 Sep 2026).** Requirements Baseline **v2.4** adds a new hard constraint **HC-11 AVAILABILITY_SET_INELIGIBLE** (**CAP-020**): Availability-Set VMs are ineligible for zonal on-demand capacity reservations and are rejected from the zonal reservation / per-AZ CRG path at onboarding. It pairs with the CAP-021 deallocate/redeploy-to-AZ onboarding precondition. See HC-11 in Part 1 and the summary table in Part 2; normative detail is in ADR-002 v2.4 and TDD §8.1. All prior hard constraints (HC-1..HC-10) are unchanged.
+>
 > **v2.2 reconciliation note (2 Sep 2026).** Under Requirements Baseline v2.2 and ADR-002 v2.2 the **single governed quota pool** is the **primary** model: one pool per region/quota family covers Prod + NonProd/CVAL + DR, with Prod and DR protected by **logical earmarks** (`Prod_Reserved_Floor`, `DR_Earmark_vCPU`) rather than physical group separation. The **Two-Group Quota Architecture** referenced by HC-3 and HC-7 below is retained as the sanctioned **exception topology** (used only when Azure Quota Group limits or a mandatory Prod-isolation boundary make one pool impossible). The HC-3/HC-7 arithmetic is unchanged and remains correct; in the single-pool model the terms map as `Effective_NonProd_Ceiling → Allocatable_NonProd`, `NonProd_DR_Group_Limit → Pool_Limit`, and `DR_Floor_vCPU → DR_Earmark_vCPU` (max-not-sum, DR-017). Also: the EU cross-geo DR extension region is **Switzerland North** (REG-002). See ADR-002 v2.2, the Calculation Logic Reference v2.2 (Scenario 8/9), the FDD Section 4.2, and the TDD Section 8.3.
 
 > **⚠️ Middle East DR — current legal position is `DR_NOT_OFFERED` (DEC-001, under legal review).** Baseline v2.2 records that **Legal has taken ownership of the Middle East programme** and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements — so DR is currently NOT offered in the Middle East** (baseline Section 2 Strategic Drivers, Section 5.2 Out of Scope, Section 6 Region Strategy, **DR-014**). This is a **pending legal/business decision (DEC-001)**, listed among the programme's remaining major architectural risks (baseline Section 25). Consequences for placement below:
@@ -16,7 +18,7 @@
 
 ## Overview
 
-This document consolidates all **Hard Constraints (HC-1 through HC-10)** governing regional placement decisions in the **Azure Capacity Reservation Management Engine (ACRME)**. Hard constraints are **binary pass/fail gates** — any region failing a hard constraint is excluded from scoring entirely, not penalized with a lower score.
+This document consolidates all **Hard Constraints (HC-1 through HC-11)** governing regional placement and reservation-eligibility decisions in the **Azure Capacity Reservation Management Engine (ACRME)**. Hard constraints are **binary pass/fail gates** — any region failing a region-level hard constraint is excluded from scoring entirely, not penalized with a lower score; the VM-level eligibility gate **HC-11** (v2.4) excludes ineligible VMs from the zonal reservation path at onboarding.
 
 ### Enforcement Architecture
 
@@ -718,6 +720,45 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
 
 ---
 
+### HC-11: AVAILABILITY_SET_INELIGIBLE [NEW — v2.4]
+
+**Category:** Reservation Eligibility  
+**Source:** Requirements Baseline v2.4 (**CAP-020**); ADR-002 v2.4 (*Capacity Reservation Model*)  
+**Status:** Stable
+
+#### Definition
+
+```
+A VM that is a member of an Availability Set is INELIGIBLE for a zonal on-demand
+capacity reservation and is rejected from the zonal reservation / per-AZ CRG path.
+Eligible(vm) ⇒ vm.availability_set == null  (i.e. the VM is zonal, not Availability-Set)
+```
+
+#### Rationale
+
+An **Availability Set** and a **zonal capacity reservation** are mutually exclusive Azure placement constructs — an Availability-Set VM is not zone-pinned and cannot be backed by a zonal on-demand capacity reservation. Admitting such VMs to the zonal path would create reservations that can never be consumed. This is a **binary pass/fail eligibility gate** applied at VM onboarding, complementary to the region-level gates HC-1..HC-10.
+
+#### Implementation
+
+- Evaluated by the Onboarding Validator **before** zonal scoring/placement (TDD §8.1).
+- **Reject** any VM where `availability_set` is set from the zonal reservation path; surface a structured onboarding error with remediation (migrate to a zonal deployment).
+- Pairs with **CAP-021**: a non-zone-pinned but non-Availability-Set VM must first be **deallocated and redeployed into a target AZ** before it can associate with a per-AZ CRG reservation.
+- **Applies to:** all environments (Prod, CVAL, DR) for the managed zonal reservation estate.
+
+#### Examples
+
+| VM placement construct | Eligible for zonal reservation? |
+|---|---|
+| Zone-pinned VM (zone 1/2/3) | ✅ Yes |
+| Non-zonal VM, no Availability Set | ⚠️ Not until deallocate/redeploy-to-AZ (CAP-021) |
+| Availability-Set member VM | ❌ No (HC-11 / CAP-020) |
+
+#### Evidence Tag
+
+`[Decided]` — Requirements Baseline v2.4 CAP-020.
+
+---
+
 ## Part 2 — Hard Constraint Summary Table
 
 | HC | Name | Type | Enforcement Stage | Primary Impact | Updated in Pass |
@@ -732,6 +773,7 @@ def validate_HC10_cross_geo_extension(customer_geography, dr_region):
 | **HC-8** | GEOGRAPHY_CONTAINMENT | Geography | Stage 1 | Prod region must be within customer's chosen geography (Scenario 1) | Implied |
 | **HC-9** | STANDARD_REGION_ONLY | Region Class | Stage 1 | Only Standard Capacity Regions eligible for automated placement | PRR Section 27 |
 | **HC-10** | CROSS_GEO_EXTENSION_PATH_APPROVED | Cross-Geo DR | Stage 2 | Cross-geography DR requires explicit approval path | PRR Section 27 |
+| **HC-11** | AVAILABILITY_SET_INELIGIBLE | Reservation Eligibility | Onboarding (VM-level) | Availability-Set VMs excluded from zonal reservations | Baseline v2.4 (CAP-020) |
 
 ---
 
