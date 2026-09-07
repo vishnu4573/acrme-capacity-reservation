@@ -254,25 +254,73 @@ class Preflight:
         )
 
     def pf09_primary_ne_dr(self) -> PreflightResult:
-        """PF-09 (HARD BLOCKER): primary region != DR region."""
-        ok = self.config.primary_region != self.config.dr_region
+        """PF-09 (HARD BLOCKER): geography-aware Prod/DR region rule (v2.4).
+
+        Three-region geography (US): Prod and DR must be DISTINCT regions.
+        Two-region geography (EU/AU/APAC/ME): CVAL and DR CO-LOCATE in the
+        single non-Prod region (PLC-010a), so DR must equal NonProd and only
+        needs to differ from Prod. Where DR is not offered (Middle East
+        DR_NOT_OFFERED, DEC-001) no DR region is assigned — the check passes.
+        """
+        cfg = self.config
+        if cfg.is_two_region:
+            if not cfg.dr_offered:
+                ok = (not cfg.dr_region) or cfg.dr_region == cfg.nonprod_region
+                detail = (
+                    f"two-region, DR_NOT_OFFERED (DEC-001): no DR region "
+                    f"assigned; nonprod={cfg.nonprod_region}"
+                )
+            else:
+                # DR must co-locate with NonProd and differ from Prod (PLC-010a).
+                ok = (
+                    cfg.dr_region == cfg.nonprod_region
+                    and cfg.dr_region != cfg.primary_region
+                )
+                detail = (
+                    f"two-region (PLC-010a): dr must co-locate with nonprod and "
+                    f"differ from prod — primary={cfg.primary_region}, "
+                    f"dr={cfg.dr_region}, nonprod={cfg.nonprod_region}"
+                )
+        else:
+            ok = cfg.primary_region != cfg.dr_region
+            detail = (
+                f"three-region: primary={cfg.primary_region}, dr={cfg.dr_region}"
+            )
         return PreflightResult(
-            "PF-09", "Primary != DR region",
+            "PF-09", "Prod/DR region rule (geography-aware)",
             "pass" if ok else "fail",
-            f"primary={self.config.primary_region}, dr={self.config.dr_region}",
+            detail,
             blocking=True,
         )
 
     def pf10_nonprod_distinct(self) -> PreflightResult:
-        """PF-10 (HARD BLOCKER): nonprod != primary and nonprod != dr."""
-        ok = self.config.nonprod_region not in (
-            self.config.primary_region, self.config.dr_region
-        )
+        """PF-10 (HARD BLOCKER): geography-aware NonProd region rule (v2.4).
+
+        NonProd must always differ from Prod. In a three-region geography it
+        must also differ from DR. In a two-region geography NonProd and DR
+        CO-LOCATE by design (PLC-010a), so equality with DR is expected, not a
+        failure.
+        """
+        cfg = self.config
+        if cfg.is_two_region:
+            ok = cfg.nonprod_region != cfg.primary_region
+            detail = (
+                f"two-region: nonprod must differ from prod (DR co-locates with "
+                f"nonprod, PLC-010a) — nonprod={cfg.nonprod_region}, "
+                f"primary={cfg.primary_region}, dr={cfg.dr_region}"
+            )
+        else:
+            ok = cfg.nonprod_region not in (
+                cfg.primary_region, cfg.dr_region
+            )
+            detail = (
+                f"three-region: nonprod={cfg.nonprod_region}, "
+                f"primary={cfg.primary_region}, dr={cfg.dr_region}"
+            )
         return PreflightResult(
-            "PF-10", "NonProd region distinct",
+            "PF-10", "NonProd region distinct (geography-aware)",
             "pass" if ok else "fail",
-            f"nonprod={self.config.nonprod_region}, "
-            f"primary={self.config.primary_region}, dr={self.config.dr_region}",
+            detail,
             blocking=True,
         )
 

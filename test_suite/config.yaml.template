@@ -7,9 +7,17 @@
 #   cp config.yaml.template config.yaml
 #   $EDITOR config.yaml
 #
-# HARD CONSTRAINT: regions.primary, regions.dr and regions.nonprod MUST be
-# three distinct Azure regions. The config loader (and pre-flight PF-09/PF-10)
-# will refuse to run if any two are identical.
+# HARD CONSTRAINT (GEOGRAPHY-AWARE, baseline REG-003 / PLC-010a):
+#   * three-region geography (US): regions.primary, regions.dr and
+#     regions.nonprod MUST be three DISTINCT Azure regions.
+#   * two-region geography (Europe / Australia / Asia Pacific / Middle East):
+#     Prod occupies one region; CVAL/NonProd and DR CO-LOCATE in the single
+#     remaining region — so regions.dr MUST equal regions.nonprod (both differ
+#     from regions.primary). This co-location is the required outcome, not an
+#     error. Where DR is not offered (Middle East DR_NOT_OFFERED, DEC-001) no
+#     DR region is assigned — leave regions.dr blank.
+# Set regions.distribution_model to select the model. The config loader and
+# pre-flight PF-09/PF-10 enforce the correct rule for the chosen model.
 # ============================================================================
 
 provider:
@@ -22,9 +30,14 @@ consumer:
   resource_group: ""       # Consumer resource group for consumer VMs
 
 regions:
-  primary: ""              # e.g. westeurope  (production region)
-  dr: ""                   # e.g. northeurope (must differ from primary)
-  nonprod: ""              # e.g. uksouth     (must differ from primary and dr)
+  distribution_model: "three-region"  # "three-region" (US) or "two-region" (EU/AU/APAC/ME)
+  dr_offered: true         # false for Middle East (DR_NOT_OFFERED, DEC-001)
+  primary: ""              # production region — e.g. westus3 (3-region) / westeurope (2-region)
+  # THREE-REGION example (US):  primary: westus3   dr: canadacentral   nonprod: centralus
+  # TWO-REGION example (EU):    primary: switzerlandnorth   dr: swedencentral   nonprod: swedencentral
+  #   (dr MUST equal nonprod — CVAL and DR co-locate, PLC-010a)
+  dr: ""                   # 3-region: distinct from primary & nonprod. 2-region: == nonprod (blank if DR not offered)
+  nonprod: ""              # CVAL/NonProd region — must differ from primary
 
 vm:
   sku: ""                  # e.g. Standard_D4s_v3

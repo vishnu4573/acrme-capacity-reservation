@@ -1,9 +1,10 @@
 """Configuration loader and validator for the ACRME POC test suite.
 
-Loads ``config.yaml``, validates every required field, enforces the hard
-region-distinctness constraint, and exposes a process-wide singleton
-:class:`Config` object with a number of derived convenience properties
-(resource IDs, ARM base URLs, etc.).
+Loads ``config.yaml``, validates every required field, enforces the
+GEOGRAPHY-AWARE region-distinctness constraint (three-region vs two-region
+distribution model per baseline REG-003 / PLC-010a), and exposes a
+process-wide singleton :class:`Config` object with a number of derived
+convenience properties (resource IDs, ARM base URLs, etc.).
 """
 
 from __future__ import annotations
@@ -58,6 +59,18 @@ class Config:
     primary_region: str = ""
     dr_region: str = ""
     nonprod_region: str = ""
+    # Distribution model per the v2.4 baseline region strategy (REG-003):
+    #   "three-region" — Prod, CVAL/NonProd and DR each occupy a DISTINCT region
+    #                    (currently the US geography only).
+    #   "two-region"   — Prod occupies one region; CVAL/NonProd and DR
+    #                    co-locate in the single remaining region (PLC-010a).
+    #                    Currently Europe, Australia, Asia Pacific, Middle East.
+    # Defaults to "three-region" for backward compatibility with existing configs.
+    distribution_model: str = "three-region"
+    # Whether DR is offered for this geography. Middle East carries
+    # DR_NOT_OFFERED (DR-014, DEC-001) until legal approval, in which case no
+    # DR region is assigned at all. Defaults to True.
+    dr_offered: bool = True
 
     # ----- vm -------------------------------------------------------------
     vm_sku: str = ""
@@ -132,6 +145,23 @@ class Config:
         self.primary_region = str(regions.get("primary", "") or "").strip()
         self.dr_region = str(regions.get("dr", "") or "").strip()
         self.nonprod_region = str(regions.get("nonprod", "") or "").strip()
+        self.distribution_model = (
+            str(regions.get("distribution_model", "three-region") or "three-region")
+            .strip()
+            .lower()
+        )
+        # Accept common synonyms so operator configs are forgiving.
+        if self.distribution_model in ("3", "3-region", "three", "us"):
+            self.distribution_model = "three-region"
+        elif self.distribution_model in ("2", "2-region", "two"):
+            self.distribution_model = "two-region"
+        dr_offered_raw = regions.get("dr_offered", True)
+        if isinstance(dr_offered_raw, str):
+            self.dr_offered = dr_offered_raw.strip().lower() not in (
+                "false", "no", "0", "dr_not_offered", "not_offered", "",
+            )
+        else:
+            self.dr_offered = bool(dr_offered_raw)
 
         self.vm_sku = str(vm.get("sku", "") or "").strip()
         self.vm_sku_family = str(vm.get("sku_family", "") or "").strip()
@@ -155,9 +185,28 @@ class Config:
         self.dry_run = bool(raw.get("dry_run", False))
         self.timeout_seconds = int(raw.get("timeout_seconds", 300) or 300)
 
+    @property
+    def is_two_region(self) -> bool:
+        """True when the geography runs the two-region distribution model."""
+        return self.distribution_model == "two-region"
+
+    @property
+    def dr_required(self) -> bool:
+        """A DR region is required unless the geography is two-region AND
+        DR is not offered (Middle East DR_NOT_OFFERED, DEC-001), in which case
+        no DR region is assigned at all."""
+        return not (self.is_two_region and not self.dr_offered)
+
     def validate(self) -> None:
         """Validate all required fields and hard constraints."""
         missing: List[str] = []
+
+        # Guard against an unknown distribution model early.
+        if self.distribution_model not in ("three-region", "two-region"):
+            raise ConfigError(
+                "regions.distribution_model must be 'three-region' or "
+                f"'two-region'; got '{self.distribution_model}'."
+            )
 
         required = {
             "provider.subscription_id": self.provider_subscription_id,
@@ -166,7 +215,6 @@ class Config:
             "consumer.subscription_id": self.consumer_subscription_id,
             "consumer.resource_group": self.consumer_resource_group,
             "regions.primary": self.primary_region,
-            "regions.dr": self.dr_region,
             "regions.nonprod": self.nonprod_region,
             "vm.sku": self.vm_sku,
             "vm.sku_family": self.vm_sku_family,
@@ -175,6 +223,11 @@ class Config:
             "crg.dr_crg_name": self.dr_crg_name,
             "crg.dr_reservation_name": self.dr_reservation_name,
         }
+        # DR region is required except in a two-region geography where DR is
+        # not offered (Middle East DR_NOT_OFFERED, DEC-001).
+        if self.dr_required:
+            required["regions.dr"] = self.dr_region
+
         for key, value in required.items():
             if not value:
                 missing.append(key)
@@ -183,28 +236,81 @@ class Config:
                 "Missing required config fields: " + ", ".join(missing)
             )
 
-        # HARD CONSTRAINT: three distinct regions.
-        regions = {
-            "primary": self.primary_region,
-            "dr": self.dr_region,
-            "nonprod": self.nonprod_region,
-        }
-        if self.primary_region == self.dr_region:
+        # ------------------------------------------------------------------
+        # HARD CONSTRAINT: region distinctness is GEOGRAPHY-AWARE (v2.4).
+        # Baseline REG-003 / PLC-010a:
+        #   * three-region (US): Prod, CVAL/NonProd and DR each in a DISTINCT
+        #     region — all three must differ.
+        #   * two-region (EU/AU/APAC/ME): Prod occupies one region; CVAL/NonProd
+        #     and DR CO-LOCATE in the single remaining region. Co-location is
+        #     the normal, required outcome — NOT an error. DR (when offered)
+        #     must therefore equal NonProd, and both must differ from Prod.
+        # ------------------------------------------------------------------
+        # Prod must always be distinct from the non-Prod region.
+        if self.nonprod_region == self.primary_region:
             raise ConfigError(
-                f"regions.primary ({self.primary_region}) must differ from "
-                f"regions.dr ({self.dr_region}) — Production and DR cannot share a region."
+                f"regions.nonprod ({self.nonprod_region}) must differ from "
+                f"regions.primary ({self.primary_region}) — Production and the "
+                f"non-Production region cannot be the same."
             )
-        if self.nonprod_region in (self.primary_region, self.dr_region):
-            raise ConfigError(
-                f"regions.nonprod ({self.nonprod_region}) must differ from both "
-                f"primary ({self.primary_region}) and dr ({self.dr_region})."
-            )
-        # Belt-and-braces uniqueness check.
-        if len(set(regions.values())) != 3:
-            raise ConfigError(
-                "regions.primary, regions.dr and regions.nonprod must be three "
-                f"distinct regions; got {regions}."
-            )
+
+        if self.is_two_region:
+            # Two-region model (PLC-010a): CVAL/NonProd and DR co-locate.
+            if not self.dr_offered:
+                # Middle East DR_NOT_OFFERED (DEC-001): no DR region assigned.
+                # A DR region may be omitted; if supplied it must not introduce
+                # a spurious third region — accept blank or == nonprod only.
+                if self.dr_region and self.dr_region not in (
+                    self.nonprod_region,
+                ):
+                    raise ConfigError(
+                        f"Two-region geography with DR not offered "
+                        f"(DR_NOT_OFFERED, DEC-001): regions.dr "
+                        f"({self.dr_region}) must be blank or co-located with "
+                        f"regions.nonprod ({self.nonprod_region}); no separate "
+                        f"DR region is assigned."
+                    )
+            else:
+                # DR must co-locate with the non-Prod (CVAL) region (PLC-010a).
+                if self.dr_region != self.nonprod_region:
+                    raise ConfigError(
+                        f"Two-region geography (PLC-010a): regions.dr "
+                        f"({self.dr_region}) must CO-LOCATE with regions.nonprod "
+                        f"({self.nonprod_region}) — CVAL and DR share the single "
+                        f"non-Production region. Set regions.dr == regions.nonprod, "
+                        f"or use distribution_model: three-region for a "
+                        f"three-region geography."
+                    )
+                if self.dr_region == self.primary_region:
+                    raise ConfigError(
+                        f"regions.dr ({self.dr_region}) must differ from "
+                        f"regions.primary ({self.primary_region})."
+                    )
+        else:
+            # Three-region model: Prod, DR and NonProd must all differ.
+            regions = {
+                "primary": self.primary_region,
+                "dr": self.dr_region,
+                "nonprod": self.nonprod_region,
+            }
+            if self.primary_region == self.dr_region:
+                raise ConfigError(
+                    f"regions.primary ({self.primary_region}) must differ from "
+                    f"regions.dr ({self.dr_region}) — in a three-region geography "
+                    f"Production and DR cannot share a region."
+                )
+            if self.nonprod_region == self.dr_region:
+                raise ConfigError(
+                    f"regions.nonprod ({self.nonprod_region}) must differ from "
+                    f"regions.dr ({self.dr_region}) in a three-region geography."
+                )
+            # Belt-and-braces uniqueness check.
+            if len(set(regions.values())) != 3:
+                raise ConfigError(
+                    "regions.primary, regions.dr and regions.nonprod must be "
+                    f"three distinct regions in a three-region geography; got "
+                    f"{regions}."
+                )
 
         if self.phase_gate not in VALID_PHASE_GATES:
             raise ConfigError(
@@ -276,6 +382,8 @@ class Config:
             "primary_region": self.primary_region,
             "dr_region": self.dr_region,
             "nonprod_region": self.nonprod_region,
+            "distribution_model": self.distribution_model,
+            "dr_offered": self.dr_offered,
             "vm_sku": self.vm_sku,
             "vm_sku_family": self.vm_sku_family,
             "vcpus_per_instance": self.vcpus_per_instance,

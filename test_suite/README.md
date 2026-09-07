@@ -40,10 +40,19 @@ cp config.yaml.template config.yaml
 $EDITOR config.yaml
 ```
 
-**Hard constraint:** `regions.primary`, `regions.dr`, and `regions.nonprod` must
-be **three distinct regions**. The config loader *and* pre-flight PF-09/PF-10
-refuse to run if any two are identical (Production, Non-Prod, and DR must never
-all share a region).
+**Hard constraint (geography-aware, baseline REG-003 / PLC-010a).** Region
+distinctness depends on `regions.distribution_model`:
+
+- **`three-region`** (US geography): `regions.primary`, `regions.dr`, and
+  `regions.nonprod` must be **three distinct regions**. The config loader *and*
+  pre-flight PF-09/PF-10 refuse to run if any two are identical.
+- **`two-region`** (Europe / Australia / Asia Pacific / Middle East): Prod
+  occupies one region; **CVAL/NonProd and DR co-locate** in the single
+  remaining region, so `regions.dr` **must equal** `regions.nonprod` (both
+  differing from `regions.primary`). This co-location is the **required**
+  outcome, not an error. Where DR is not offered (Middle East
+  `DR_NOT_OFFERED`, DEC-001), set `regions.dr_offered: false` and leave
+  `regions.dr` blank — no DR region is assigned.
 
 All resources created by the suite are prefixed with `acrme-poc-` to avoid
 collisions. Resource names you supply are auto-prefixed if the prefix is absent.
@@ -201,7 +210,8 @@ The authoritative mapping lives in `PHASE_GATE_REQUIREMENTS` in
 | Symptom | Likely cause / fix |
 |---|---|
 | `Config file not found` | Copy `config.yaml.template` → `config.yaml` and fill values. |
-| `regions … must be three distinct regions` | Set distinct `primary` / `dr` / `nonprod`. |
+| `regions ... must be three distinct regions in a three-region geography` | Three-region (US): set distinct `primary` / `dr` / `nonprod`. |
+| `Two-region geography (PLC-010a): regions.dr must CO-LOCATE with regions.nonprod` | Two-region geo: set `dr` == `nonprod`, or switch `distribution_model` to `three-region`. |
 | `az CLI not found on PATH` | Install the Azure CLI and ensure `az` is on `PATH`. |
 | POC-07/POC-16 fail with graph errors | `az extension add --name resource-graph`. |
 | POC-06 fails on all api-versions | Confirm the sharing Preview is enabled for the tenant/subscription. |
