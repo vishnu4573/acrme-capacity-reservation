@@ -110,6 +110,10 @@ def _register_all() -> None:
         g6_aks_vmss,
         g7_throttle,
         g8_ri_discount,
+        g9_reservation_eligibility,
+        g10_zone_distribution,
+        g11_seed_matrix,
+        g12_naming_convention,
     )
 
     for module in (
@@ -121,6 +125,10 @@ def _register_all() -> None:
         g6_aks_vmss,
         g7_throttle,
         g8_ri_discount,
+        g9_reservation_eligibility,
+        g10_zone_distribution,
+        g11_seed_matrix,
+        g12_naming_convention,
     ):
         module.register(REGISTRY)
 
@@ -138,12 +146,19 @@ PHASE_GATE_REQUIREMENTS: Dict[str, List[str]] = {
         "POC-30", "POC-13",
         "POC-15", "POC-16", "POC-17", "POC-20",
         "POC-THROTTLE-01", "POC-RI-01",
+        # v2.4 reservation-model coverage (offline logic validation — Phase 2 plan).
+        "POC-CAP-020", "POC-CAP-021", "POC-PLC-010a", "POC-CAP-001a",
+        "POC-PLC-011", "POC-PLC-011-ELIG",
+        "POC-CAP-022", "POC-CAP-024",
+        "POC-CAP-023", "POC-OPS-006",
     ],
     "phase2": [
         "POC-11", "POC-12", "POC-14",
         "POC-31", "POC-32",
         "POC-18", "POC-19",
         "POC-VMSS-DR", "POC-RI-02",
+        # v2.4 live/engine-dependent validation (blocked until engine deployed).
+        "POC-CAP-020-LIVE", "POC-PLC-011-LIVE", "POC-CAP-024-LIVE", "POC-CAP-023-LIVE",
     ],
     "production": [
         "POC-10", "POC-THROTTLE-02", "POC-THROTTLE-03",

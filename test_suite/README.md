@@ -2,9 +2,11 @@
 
 Production-quality Python test-automation suite for the **Azure Capacity
 Reservation Management Engine (ACRME)** proof-of-concept programme. It implements
-**35 test cases across 8 groups** plus a **10-item pre-flight checklist**, driving
-everything through the **Azure CLI (`az`) and `az rest`** — *no Azure SDK Python
-packages are required*.
+**49 test cases across 12 groups** plus a **10-item pre-flight checklist**, driving
+the live Azure cases through the **Azure CLI (`az`) and `az rest`** — *no Azure SDK
+Python packages are required*. Groups **G9–G12** add the Baseline **v2.4**
+reservation-model coverage (CAP-020…024, PLC-010a, PLC-011, OPS-006, CAP-001a),
+whose deterministic rule logic is validated **offline**.
 
 ---
 
@@ -180,6 +182,20 @@ The authoritative mapping lives in `PHASE_GATE_REQUIREMENTS` in
 | **G6** | POC-AKS-01/02, POC-VMSS-01/02/03, POC-VMSS-DR | AKS & VMSS behaviour |
 | **G7** | POC-THROTTLE-01/02/03 | API rate & throttle |
 | **G8** | POC-RI-01/02 | Reserved Instance discount scope |
+| **G9** | POC-CAP-020/021, POC-PLC-010a, POC-CAP-001a, POC-CAP-020-LIVE | **v2.4** reservation eligibility & subscription classification (CAP-020/HC-11, CAP-021, PLC-010a, CAP-001a) |
+| **G10** | POC-PLC-011, POC-PLC-011-ELIG, POC-PLC-011-LIVE | **v2.4** even ≈1/zone_count zone distribution & rebalancing (PLC-011 / Appendix A.9 — reproduces Calc-Logic **Scenario 21**) |
+| **G11** | POC-CAP-022, POC-CAP-024, POC-CAP-024-LIVE | **v2.4** seed-at-0 SKU/AZ matrix + budget gate (CAP-022) & reactive discovery auto-create + governance (CAP-024) |
+| **G12** | POC-CAP-023, POC-OPS-006, POC-CAP-023-LIVE | **v2.4** regional + per-AZ CRG structure (CAP-023) & deterministic RG/CRG/subscription naming (OPS-006 / C-12) |
+
+> **v2.4 coverage (Phase 2).** Groups **G9–G12** close the previously-empty v2.4
+> requirement coverage. Their deterministic rule logic (eligibility, zone
+> arithmetic, seed matrix, naming) is validated **offline** — the `POC-…` logic
+> cases run without Azure and PASS, while the `POC-…-LIVE` cases are **blocked**
+> until the engine / provider subscription is deployed (same convention as
+> G5/G6). The same pure functions are exercised by the standalone offline suite
+> `test_v24_reservation_model.py` (run `python test_v24_reservation_model.py` or
+> `pytest test_v24_reservation_model.py -q`), alongside `test_region_model.py`
+> for the geography-aware region model.
 
 ---
 
@@ -193,8 +209,12 @@ The authoritative mapping lives in `PHASE_GATE_REQUIREMENTS` in
 - **Destructive tests.** POC-12 deallocates the primary VM; POC-05/POC-14
   disassociate VMs; POC-10 mutates the sharing profile heavily. Run against a
   dedicated POC environment only.
-- **Engine-dependent tests.** POC-18/POC-19/POC-20 require the ACRME engine to be
-  deployed. They return **blocked** with an "engine required" note until then.
+- **Engine-dependent tests.** POC-18/POC-19/POC-20 and the v2.4 `POC-…-LIVE`
+  cases (POC-CAP-020-LIVE, POC-PLC-011-LIVE, POC-CAP-024-LIVE, POC-CAP-023-LIVE)
+  require the ACRME engine / provider subscription to be deployed. They return
+  **blocked** with an "engine required" note until then; their offline logic
+  counterparts (POC-CAP-020/021/022/023/024, POC-PLC-010a/011, POC-OPS-006,
+  POC-CAP-001a) validate the deterministic rules without Azure.
 - **Documentation-gathering tests.** POC-15, POC-VMSS-DR, POC-AKS-02 (and the
   VMSS model tests) pass as long as the command executed and the result was
   recorded — the outcome itself is the evidence, not a fixed pass/fail value.
@@ -244,7 +264,13 @@ acrme_test_suite/
 │       ├── g5_safety.py
 │       ├── g6_aks_vmss.py
 │       ├── g7_throttle.py
-│       └── g8_ri_discount.py
+│       ├── g8_ri_discount.py
+│       ├── g9_reservation_eligibility.py   # v2.4 CAP-020/021/001a, PLC-010a
+│       ├── g10_zone_distribution.py        # v2.4 PLC-011 (Calc-Logic Scenario 21)
+│       ├── g11_seed_matrix.py              # v2.4 CAP-022/024
+│       └── g12_naming_convention.py        # v2.4 CAP-023, OPS-006
+├── test_region_model.py               # offline pytest: two-region model
+├── test_v24_reservation_model.py      # offline pytest: v2.4 reservation model (G9-G12)
 └── reports/                       # HTML/MD/JSON reports + session logs
 ```
 
