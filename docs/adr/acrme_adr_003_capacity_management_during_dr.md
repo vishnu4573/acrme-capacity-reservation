@@ -1,11 +1,13 @@
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Principal Cloud Architect - Architecture Governance  
-**Version:** 2.2  
-**Date:** 27 August 2026  
-**Status:** Accepted - supersedes ADR-003 v1.2 fixed-ratio DR model  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.2.
+**Version:** 2.4  
+**Date:** 7 September 2026  
+**Status:** Accepted - supersedes ADR-003 v1.2 fixed-ratio DR model; reconciled to Baseline v2.4  
+**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
-> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This v2.2 ADR updates disaster-recovery capacity management to the lean bootstrap and distributed DR model. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+> **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR updates disaster-recovery capacity management to the lean bootstrap and distributed DR model. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
+>
+> **v2.4 reconciliation note.** The DR capacity model (max-not-sum sizing, `SourceDestinationDRIndex`, standby activation waves, CVAL earmark / no-double-count) is **unchanged** by Baseline v2.4. v2.4 adds the **even per-zone distribution target and rebalancing action (PLC-011, Appendix A.9)** and the **regional + per-AZ CRG structure (CAP-023)**; because DR sizing here is computed **per zone**, this ADR now cross-references PLC-011/A.9 at the sizing formula so per-zone DR floors and per-AZ CRG sizing stay balanced (see *DR Sizing Formula* below).
 
 ---
 
@@ -89,6 +91,8 @@ DR_Floor_vCPU(d, sku, zone)
 ```
 
 The old formula `prod_vm_count * dr_ratio_max` is superseded. It may appear only in legacy examples, never as the default production sizing rule. `[Decided]`
+
+**Zone-distribution interaction (PLC-011, Appendix A.9) — cross-reference.** Because the DR floor above is computed **per zone**, the per-zone `Workload_Portion(s → d)` values depend on how each source workload is spread across its availability zones. Under **PLC-011** placement targets an **even ≈ `1/zone_count` spread** of a workload's VMs across zones (≈ 33% each in a three-zone region), and raises a **rebalancing action** when a deployment or growth event skews distribution beyond the configured tolerance (C-13); see **Appendix A.9** of the baseline for the skew formula. Two consequences for DR sizing: (a) an **even source distribution** keeps the per-zone `Destination_DR_Requirement(d, sku, zone)` balanced, so no single destination zone carries a disproportionate max-not-sum floor; and (b) the resulting per-zone DR reservations are held in the destination's **per-AZ CRGs (CAP-023)** — the per-AZ CRG for each zone sizes to that zone's DR floor, and the regional CRG holds only SKUs without zonal reservation support. A skewed source distribution therefore inflates one destination zone's DR floor; the PLC-011 rebalancing action is the corrective control, and DR sizing consumes the (rebalanced) per-zone portions rather than re-deriving distribution. `[Derived]`
 
 ## DR Activation Sequence
 
