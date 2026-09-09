@@ -472,6 +472,42 @@ Remaining: 45 (available for new allocations)
 - Each consumer needs its own quota (QUA-013)
 - Sharing state tracked: provider, authorized consumers, consuming VMs, consumed/remaining quantities (CAP-014)
 
+### 5.3 CVAL/DR Shared-Reservation Model — Two CRG Groupings per Region
+
+> **See diagram:** `Architecture/diagrams/diagram_9_cval_dr_shared_reservation_model.png`
+
+Building on the provider/consumer model above, the **environment-grouping** view of a region resolves to **two CRG groupings** (justified by ENV-003):
+
+| CRG grouping | Environments | Sharing rule (ENV-003) |
+|---|---|---|
+| **Grouping 1 — Production** | Prod only | Prod **cannot** share with non-prod or DR → fully isolated |
+| **Grouping 2 — CVAL + DR** | CVAL + DR | DR **may** share with non-prod → CVAL and DR share one grouping |
+
+> **Reconciliation with CAP-023 (important).** "Two CRG groupings per region" is the **environment-separation abstraction**, not a literal count of two Azure CRGs. Each grouping still expands into the **regional + per-AZ CRG structure** (1 regional + one per AZ) for structural zone isolation (CAP-011/CAP-023). So a 3-zone region yields 4 CRGs *per grouping* (8 total), while the *environment* boundary is the two groupings above.
+
+#### 5.3.1 The steady-state ↔ DR-event consumer swap
+
+The CVAL+DR grouping holds **one shared reservation per SKU** (provider-owned) whose **consumer subscriptions swap** between steady state and a declared disaster — the reservation object itself is unchanged:
+
+**Steady state — CVAL keeps the pool warm:**
+- **CVAL consumer subscriptions** consume the shared reservation (e.g., 30 + 40 + 25 = 95 of 100 units).
+- The reservation is **not idle** — CVAL is "free while running" (**DR-005**) and CVAL is treated as a DR capacity source (**ENV-004**).
+- This is *why lean DR won*: an empty 30% DR reserve costs **millions/year**; keeping it warm with CVAL avoids that (**DR-003/DR-004**, cost rationale).
+
+**DR event — DR consumers replace CVAL on the SAME reservation** (staged sequence, **DR-006**):
+1. Shut down / disassociate eligible CVAL VMs (**DR-005/DR-006** step 3) → frees reserved capacity.
+2. Reserved capacity returns to "available" within the same reservation (quantity **unchanged**).
+3. Authorize **DR consumer subscriptions** (production failover from the failed region).
+4. Deploy prod-failover VMs against the **same** reservation (e.g., 80 of 100 units).
+
+**Sizing & accounting:**
+- **max-not-sum (DR-017):** because only one region fails at a time (**DR-001**), the pool is sized to absorb the **largest single source** it protects, not the sum → shared/overcommitted capacity.
+- **FIN-008:** the shared/overcommit reservation is costed **once**, not per-source; steady-state CVAL cost and DR overcommit are the *same single cost*.
+- **HC-6/HC-7:** co-located CVAL must not be double-counted as both live CVAL and available DR headroom.
+- **Reversible on failback (DR-013):** DR consumers released, CVAL resumes consumption of the pool.
+
+> **ENV-003 is not violated during DR.** The CVAL/DR pool lives in the **standby** region and is classified non-prod/DR. Production failover into that region's DR capacity is the pool's intended purpose. It never co-mingles with that region's *own* isolated Production grouping — the two groupings remain separate CRGs.
+
 ---
 
 ## 6. Reconciliation & Lifecycle
