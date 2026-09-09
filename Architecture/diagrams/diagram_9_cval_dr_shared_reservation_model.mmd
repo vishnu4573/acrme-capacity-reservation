@@ -1,0 +1,93 @@
+graph TB
+    TITLE["<b>ACRME — CVAL/DR Shared-Reservation Model (Steady State ↔ DR Event)</b><br/><span style='font-size:12px'>ONE shared reservation pool (100 units) stays fixed — only the CONSUMER subscriptions swap: CVAL (steady state) → DR (disaster)</span>"]
+
+    subgraph TOP["🌐 2 CRG Groupings per Region (ENV-003) — Region: West US 3"]
+        direction LR
+        G1["🟦 <b>CRG Grouping 1 — PRODUCTION (isolated)</b><br/>crg-prod-wus3-*<br/><i>Prod cannot share (ENV-003)</i>"]
+        G2["🟩🟥 <b>CRG Grouping 2 — CVAL + DR (shared)</b><br/>crg-cvaldr-wus3-*<br/><i>DR may share with non-prod (ENV-003)</i>"]
+        G1 -.-x G2
+    end
+    TOPNOTE["📝 Each grouping still expands into 1 regional + per-AZ CRGs (CAP-023) for zone isolation.<br/>This diagram follows CRG Grouping 2 (CVAL+DR) through its two operating states below."]
+
+    subgraph LEFT["🟢 STEADY STATE — CVAL consumes the shared pool"]
+        direction TB
+        LPROV["☁️ <b>Provider Sub:</b> sub-jda-cld-core-01<br/>🔷 <b>CRG:</b> crg-cvaldr-wus3-az1"]
+        LRES["📊 <b>Reservation: res-cvaldr-wus3-az1-StandardD16sv5</b><br/>Reserved Qty: <b>100</b> · Sharing: <b>ENABLED</b>"]
+        LPROV --> LRES
+        LC1["🟩 sub-cval-app-01 — 🖥️ 30 VMs"]
+        LC2["🟩 sub-cval-app-02 — 🖥️ 40 VMs"]
+        LC3["🟩 sub-cval-app-03 — 🖥️ 25 VMs"]
+        LRES -->|"shares capacity"| LC1
+        LRES -->|"shares capacity"| LC2
+        LRES -->|"shares capacity"| LC3
+        LTAG["🟢 <b>95 / 100 consumed by CVAL</b>"]
+        LC1 --- LTAG
+        LC3 --- LTAG
+        LCAP["💡 CVAL keeps the reservation <b>WARM</b> — capacity is used, not idle<br/>(DR-005: CVAL is 'free while running'; ENV-004: CVAL = DR capacity source).<br/>Avoids an empty DR reserve costing <b>millions/yr</b>."]
+        LTAG --- LCAP
+    end
+
+    subgraph RIGHT["🟥 DR EVENT — DR consumers replace CVAL on the SAME reservation"]
+        direction TB
+        RPROV["☁️ <b>Provider Sub:</b> sub-jda-cld-core-01<br/>🔷 <b>CRG:</b> crg-cvaldr-wus3-az1"]
+        RRES["📊 <b>Reservation: res-cvaldr-wus3-az1-StandardD16sv5</b><br/>Reserved Qty: <b>100 (UNCHANGED)</b> · Sharing: <b>ENABLED</b>"]
+        RPROV --> RRES
+        RXCVAL["🚫 <s>sub-cval-app-01 / -02 / -03</s><br/><i>CVAL VMs shut down / disassociated (DR-005/DR-006 step 3)</i>"]
+        RC1["🟥 sub-dr-failover-01 — 🖥️ 80 VMs<br/><i>(prod failover from Central US)</i>"]
+        RRES -.->|"CVAL released"| RXCVAL
+        RRES ==>|"shares capacity"| RC1
+        RTAG["🟥 <b>80 / 100 consumed by DR</b>"]
+        RC1 --- RTAG
+        RCAP["💡 Only <b>ONE</b> region fails at a time (DR-001) → reservation sized<br/><b>max-not-sum</b> (DR-017). Same pool absorbs the largest single source."]
+        RTAG --- RCAP
+    end
+
+    TRANS["➡️ <b>DR DECLARED → CVAL sacrificed, DR takes over</b> (DR-006 staged sequence)<br/>1️⃣ Shut down / disassociate CVAL VMs&nbsp;&nbsp;→&nbsp;&nbsp;2️⃣ Free reserved capacity&nbsp;&nbsp;→&nbsp;&nbsp;3️⃣ Authorize DR consumer subs&nbsp;&nbsp;→&nbsp;&nbsp;4️⃣ Deploy prod-failover VMs on SAME reservation<br/>🔁 Reversible on failback — DR consumers released, CVAL resumes (DR-013)"]
+
+    ACCT["🧮 <b>Accounting (CAP-015 / FIN-008)</b><br/>─────────────────────────────<br/>Shared reservation counted <b>ONCE</b> at provider; apportioned by actual consumer allocation.<br/>Steady-state CVAL cost and DR overcommit are the <b>SAME single cost</b>, not duplicated (FIN-008).<br/>Not double-counted as both live CVAL <b>and</b> available DR headroom (HC-6 / HC-7)."]
+
+    CONS["⚠️ <b>Constraints</b><br/>─────────────────────────────<br/>📍 Same region + same AZ only (CAP-011 / CAP-013)<br/>📊 Each consumer needs its own quota (QUA-013)<br/>🚫 Prod pool <b>NEVER</b> shares with CVAL/DR (ENV-003)<br/>🔁 Reversible on failback — DR released, CVAL resumes (DR-013)"]
+
+    TITLE --> TOP
+    TOP --> TOPNOTE
+    TOPNOTE --> LEFT
+    TOPNOTE --> RIGHT
+    LEFT ==>|"DR DECLARED"| TRANS
+    TRANS ==> RIGHT
+    LEFT --> ACCT
+    RIGHT --> CONS
+
+    classDef titleBox fill:#0078D4,stroke:#004578,stroke-width:2px,color:#FFF
+    classDef topBox fill:#F5F5F5,stroke:#424242,stroke-width:2px,color:#000
+    classDef g1Box fill:#E3F2FD,stroke:#0078D4,stroke-width:2px,color:#000
+    classDef g2Box fill:#E0F2F1,stroke:#00897B,stroke-width:2px,color:#000
+    classDef noteBox fill:#FFF9E6,stroke:#FFB74D,stroke-width:1px,color:#000
+    classDef provBox fill:#0078D4,stroke:#004578,stroke-width:2px,color:#FFF
+    classDef resBox fill:#FFB900,stroke:#C87E00,stroke-width:3px,color:#000
+    classDef cvalBox fill:#B2DFDB,stroke:#00897B,stroke-width:2px,color:#000
+    classDef drBox fill:#FFCDD2,stroke:#D32F2F,stroke-width:2px,color:#000
+    classDef xBox fill:#ECEFF1,stroke:#90A4AE,stroke-width:1px,color:#607D8B
+    classDef tealTag fill:#00897B,stroke:#00695C,stroke-width:2px,color:#FFF
+    classDef redTag fill:#D32F2F,stroke:#B71C1C,stroke-width:2px,color:#FFF
+    classDef capTeal fill:#E0F2F1,stroke:#00897B,stroke-width:1px,color:#000
+    classDef capRed fill:#FFEBEE,stroke:#D32F2F,stroke-width:1px,color:#000
+    classDef transBox fill:#FFF3E0,stroke:#E65100,stroke-width:3px,color:#000
+    classDef acctBox fill:#FFF8E1,stroke:#FFB300,stroke-width:2px,color:#000
+    classDef consBox fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#000
+
+    class TITLE titleBox
+    class G1 g1Box
+    class G2 g2Box
+    class TOPNOTE noteBox
+    class LPROV,RPROV provBox
+    class LRES,RRES resBox
+    class LC1,LC2,LC3 cvalBox
+    class RC1 drBox
+    class RXCVAL xBox
+    class LTAG tealTag
+    class RTAG redTag
+    class LCAP capTeal
+    class RCAP capRed
+    class TRANS transBox
+    class ACCT acctBox
+    class CONS consBox
