@@ -77,7 +77,7 @@ All managed resources follow deterministic, parseable patterns:
 
 ### 3.1 US — Three-Region Model (REG-003)
 
-**Distribution:** Prod, CVAL, and DR each in a **distinct region**.
+**Distribution:** For a US geography deployment, **select 3 distinct regions** and **distribute** Prod, CVAL, and DR across them. Each region can host any/all environments; the "3-region model" describes the deployment distribution strategy, not inherent region capabilities.
 
 **In-scope regions (current):**
 - West US 3 (westus3)
@@ -85,10 +85,12 @@ All managed resources follow deterministic, parseable patterns:
 - Canada Central (canadacentral)
 - East US 2 (eastus2) — restricted, exception-only
 
-**Example placement:**
-- **Prod:** West US 3
-- **CVAL:** Central US
-- **DR:** Canada Central
+**Example deployment distribution:**
+- **Prod → placed in:** West US 3
+- **CVAL → placed in:** Central US
+- **DR → placed in:** Canada Central
+
+> **Note:** Any of these regions can technically host all three environments simultaneously (each with separate subscriptions/RGs/CRGs per ENV-003). The distribution above shows a **deployment choice** for one customer, not a region capability limit.
 
 #### 3.1.1 Production Environment — West US 3 (3 zones)
 
@@ -202,7 +204,7 @@ Resource Group: rg-odcr-dr-cac-01
 
 ### 3.2 Europe — Two-Region Model with CVAL/DR Co-location (REG-003, PLC-010a)
 
-**Distribution:** Prod in one region; **CVAL + DR co-located** in the other.
+**Distribution:** For a Europe geography deployment, **select 2 regions** and **distribute** environments: Prod in one region, CVAL + DR co-located in the other. Each region can host any/all environments; co-location is the deployment strategy for 2-region geographies.
 
 **In-scope regions (current):**
 - Switzerland North (switzerlandnorth) — authoritative cross-geo DR extension region (REG-002)
@@ -210,9 +212,11 @@ Resource Group: rg-odcr-dr-cac-01
 - North Europe (northeurope) — restricted, exception-only
 - West Europe (westeurope) — restricted, exception-only
 
-**Example placement:**
-- **Prod:** Sweden Central
-- **CVAL + DR co-located:** Switzerland North
+**Example deployment distribution:**
+- **Prod → placed in:** Sweden Central
+- **CVAL + DR → co-located in:** Switzerland North
+
+> **Note:** Either region can technically host all three environments. The co-location pattern is required by PLC-010a for 2-region geographies (Prod isolation maintained; CVAL+DR share the second region to satisfy ENV-003 while delivering in-geo DR).
 
 #### 3.2.1 Production Environment — Sweden Central (3 zones)
 
@@ -302,9 +306,11 @@ Subscription: sub-jda-cld-dr-eu-01
 - Australia East (australiaeast)
 - Australia Southeast (australiasoutheast)
 
-**Example placement:**
-- **Prod:** Australia East
-- **CVAL + DR co-located:** Australia Southeast
+**Example deployment distribution:**
+- **Prod → placed in:** Australia East
+- **CVAL + DR → co-located in:** Australia Southeast
+
+> **Note:** Either region can host all three environments. Distribution follows the same 2-region co-location pattern as Europe.
 
 **Structure:** Identical to Europe example above (§3.2), substitute region codes.
 
@@ -317,9 +323,11 @@ Subscription: sub-jda-cld-dr-eu-01
 - Southeast Asia (southeastasia)
 - Japan East (japaneast) — **pending business confirmation before inclusion**
 
-**Example placement (current 2-region):**
-- **Prod:** East Asia
-- **CVAL + DR co-located:** Southeast Asia
+**Example deployment distribution (current 2-region):**
+- **Prod → placed in:** East Asia
+- **CVAL + DR → co-located in:** Southeast Asia
+
+> **Note:** Either region can host all three environments. Distribution follows the same 2-region co-location pattern as Europe.
 
 **Structure:** Identical to Europe example above (§3.2), substitute region codes.
 
@@ -333,10 +341,12 @@ Subscription: sub-jda-cld-dr-eu-01
 
 **Legal constraint:** DR strategy pending legal confirmation; data-sovereignty requirements mean cross-border DR cannot meet residency rules. Current status: **`DR_NOT_OFFERED`** (DEC-001).
 
-**Example placement:**
-- **Prod:** Saudi Arabia Central
-- **CVAL:** UAE North (or co-located with Prod)
+**Example deployment distribution:**
+- **Prod → placed in:** Saudi Arabia Central
+- **CVAL → placed in:** UAE North (or co-located with Prod)
 - **DR:** ❌ Not offered (no DR region assigned; seed record: `dr_region = null`, `DR_NOT_OFFERED` flag set)
+
+> **Note:** Both regions can technically host Prod and CVAL. DR environment CRGs are **not built** for Middle East due to legal constraints (DEC-001), unlike other 2-region geographies where DR is offered via co-location.
 
 ```
 ──────────────────────────────────────────────────────────────────────
