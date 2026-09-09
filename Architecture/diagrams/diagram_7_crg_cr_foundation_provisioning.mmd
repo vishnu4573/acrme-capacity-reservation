@@ -1,0 +1,75 @@
+graph TB
+    subgraph GEO["🌍 GEOGRAPHY MODELS"]
+        subgraph US["US (3-Region Model)"]
+            US1["West US 3<br/>(Prod)"]
+            US2["Central US<br/>(CVAL)"]
+            US3["Canada Central<br/>(DR)"]
+        end
+
+        subgraph EUR["Europe (2-Region Model)"]
+            EUR1["Sweden Central<br/>(Prod)"]
+            EUR2["Switzerland North<br/>(CVAL+DR Co-located)"]
+        end
+    end
+
+    subgraph ARCH["📐 FOUNDATION ARCHITECTURE - Example: Prod East US 2"]
+        SUB["☁️ Azure Subscription<br/>sub-jda-cld-core-01 (Prod)"]
+
+        SUB --> RG["📦 Resource Group<br/>rg-odcr-prod-eus2-01"]
+
+        RG --> CRGS["Capacity Reservation Groups"]
+
+        subgraph CRGS["🔷 CRG Structure (Per Region)"]
+            CRG_REG["🌐 crg-prod-eus2-reg<br/>(Regional - Non-Zonal)"]
+            CRG_AZ1["1️⃣ crg-prod-eus2-az1<br/>(Availability Zone 1)"]
+            CRG_AZ2["2️⃣ crg-prod-eus2-az2<br/>(Availability Zone 2)"]
+            CRG_AZ3["3️⃣ crg-prod-eus2-az3<br/>(Availability Zone 3)"]
+        end
+
+        CRG_AZ1 -.-> RES1["📊 res-prod-eus2-az1-StandardD16sv5-001<br/>qty: 0 (Seed)"]
+        CRG_AZ1 -.-> RES2["📊 res-prod-eus2-az1-StandardE32sv5-001<br/>qty: 0 (Seed)"]
+
+        CRG_AZ2 -.-> RES3["📊 res-prod-eus2-az2-StandardD16sv5-001<br/>qty: 0 (Seed)"]
+        CRG_AZ2 -.-> RES4["📊 res-prod-eus2-az2-StandardE32sv5-001<br/>qty: 0 (Seed)"]
+
+        CRG_AZ3 -.-> RES5["📊 res-prod-eus2-az3-StandardD16sv5-001<br/>qty: 0 (Seed)"]
+        CRG_AZ3 -.-> RES6["📊 res-prod-eus2-az3-StandardE32sv5-001<br/>qty: 0 (Seed)"]
+
+        CRG_REG -.-> RES7["📊 res-prod-eus2-reg-StandardD16sv5-001<br/>qty: 0 (Seed)"]
+    end
+
+    subgraph FLOW["⚙️ ORDER OF OPERATIONS (Canonical 7-Step Sequence)"]
+        STEP1["1️⃣ Pre-flight Checks ✓<br/>(Validate permissions, quotas)"]
+        STEP2["2️⃣ Set Subscription Context<br/>(az account set)"]
+        STEP3["3️⃣ Create Resource Group<br/>(rg-odcr-{env}-{region}-01)"]
+        STEP4["4️⃣ Create Regional CRG<br/>(crg-{env}-{region}-reg)"]
+        STEP5["5️⃣ Create Per-AZ CRGs (3x)<br/>(crg-{env}-{region}-az1/2/3)"]
+        STEP6["6️⃣ Create Seed Reservations<br/>(qty=0 for all SKUs)"]
+        STEP7["7️⃣ Validate & Activate<br/>(Update config, verify state)"]
+
+        STEP1 --> STEP2 --> STEP3 --> STEP4 --> STEP5 --> STEP6 --> STEP7
+    end
+
+    subgraph PRINCIPLES["🎯 KEY PRINCIPLES"]
+        P1["Azure-First<br/>(CAP-002)"]
+        P2["Seed at Zero<br/>(CAP-022)"]
+        P3["Zone Isolation<br/>(CAP-023)"]
+        P4["Environment Separation<br/>(ENV-003)"]
+        P5["Deterministic Naming<br/>(OPS-006)"]
+    end
+
+    classDef geoBox fill:#E1F5FE,stroke:#0078D4,stroke-width:2px,color:#000
+    classDef subBox fill:#0078D4,stroke:#005A9E,stroke-width:3px,color:#FFF
+    classDef rgBox fill:#50E6FF,stroke:#0078D4,stroke-width:2px,color:#000
+    classDef crgBox fill:#7FBA00,stroke:#5E8E00,stroke-width:2px,color:#000
+    classDef resBox fill:#FFB900,stroke:#C87E00,stroke-width:1px,color:#000
+    classDef stepBox fill:#F3F2F1,stroke:#8A8886,stroke-width:2px,color:#000
+    classDef principleBox fill:#FFF4CE,stroke:#FFAA44,stroke-width:2px,color:#000
+
+    class US1,US2,US3,EUR1,EUR2 geoBox
+    class SUB subBox
+    class RG rgBox
+    class CRG_REG,CRG_AZ1,CRG_AZ2,CRG_AZ3 crgBox
+    class RES1,RES2,RES3,RES4,RES5,RES6,RES7 resBox
+    class STEP1,STEP2,STEP3,STEP4,STEP5,STEP6,STEP7 stepBox
+    class P1,P2,P3,P4,P5 principleBox
