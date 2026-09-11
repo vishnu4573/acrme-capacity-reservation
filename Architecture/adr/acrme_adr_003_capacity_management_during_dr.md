@@ -17,7 +17,7 @@
 **Date:** 27 August 2026  
 **Deciders:** Principal Cloud Architect, DR Owner, Platform Engineering, Security, FinOps  
 **Related requirements:** ENV-003..ENV-006, DR-001..DR-019, PLC-010, DAT-002, DAT-003, OBS-001..OBS-004, OPS-001  
-**Related POCs/decisions:** POC-001, POC-006, POC-007, POC-011, DEC-001, DEC-002, DEP-001
+**Related POCs/decisions:** POC-001, POC-006, POC-007, POC-011, DEC-001 (**RESOLVED v2.4 amended: Middle East DR now cross-geo to Europe**), DEC-002, DEP-001
 
 ## Context
 
@@ -124,6 +124,8 @@ Capacity acquisition order:
 
 When CVAL and DR co-locate, ACRME must create a `CVALEarmarkRecord` that identifies which CVAL capacity is releasable for a customer's DR activation. Earmarked CVAL capacity counts toward DR headroom, not live CVAL headroom. It must never be credited as both live CVAL capacity and available DR capacity. `[Decided]`
 
+> **[Amended v2.4] Middle East exclusion — CVAL does not co-locate with DR.** Under the Middle East **cross-geo DR** model (DR-020, PLC-010b), CVAL co-locates with **Prod in a Middle East region**, while DR is placed cross-geo in a weighted-selected **Europe** region. Because CVAL and DR are **not** co-located for the Middle East, the CVAL-sacrifice bootstrap (DR-005/006) and the `CVALEarmarkRecord` release path **do not apply** to Middle East customers. The Europe DR standby for Middle East sources is provisioned as **dedicated reserved capacity** and sized with max-not-sum (DR-017), not bootstrapped by releasing CVAL. See ADR-005 *Middle East Cross-Geo DR Model*.
+
 `CVALEarmarkRecord` contains customer/realm, CVAL region, DR destination, SKU/zone/quantity, release action, approval policy, priority wave, expiry/review status, and audit references. `[Decided]`
 
 ## Engine State Machine
@@ -197,7 +199,7 @@ Runbooks must cover DR declaration, standby activation, CVAL release/shutdown/di
 
 | ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-003 Capacity Management during DR | ENV-003..006, DR-001..019, PLC-010, DAT-002, OBS-004 | POC-006 topology, POC-007 bootstrap sizing, POC-011 max-not-sum safety, DEC-001 Middle East DR, DEC-002 failback duration, DEP-001 sharing maturity |
+| ADR-003 Capacity Management during DR | ENV-003..006, DR-001..020, **DR-020**, PLC-010, **PLC-010b**, DAT-002, OBS-004 | POC-006 topology, POC-007 bootstrap sizing, POC-011 max-not-sum safety, ~~DEC-001~~ **RESOLVED — Middle East DR now cross-geo to Europe (v2.4 amended)**, DEC-002 failback duration, DEP-001 sharing maturity |
 
 ## Appendix - Status Legend
 
@@ -226,4 +228,4 @@ Runbooks must cover DR declaration, standby activation, CVAL release/shutdown/di
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After POC-006, POC-007, POC-011, DEC-001, DEC-002, and Capacity Reservation Sharing maturity review.
+**Next Review:** After POC-006, POC-007, POC-011, DEC-002, and Capacity Reservation Sharing maturity review. (DEC-001 resolved — Middle East DR now cross-geo to Europe, v2.4 amended 11 Sep 2026.)

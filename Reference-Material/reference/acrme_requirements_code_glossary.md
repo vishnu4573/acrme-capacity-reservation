@@ -60,8 +60,8 @@ It does not reproduce the full specification — it tells you exactly where to f
 | Code | Name | One-line definition |
 |------|------|---------------------|
 | **REG-001** | Configurable region catalogue | Region classification, eligibility, distribution model, and per-region flags are all configuration-driven and versioned; no hard-coded catalogue in engine code. |
-| **REG-002** | Cross-geo DR extension region | Switzerland North is the authoritative cross-geography DR extension region (Europe geography); cross-geo DR path requires explicit policy approval (HC-10). |
-| **REG-003** | Distribution model | US uses a three-region distribution model (Prod / CVAL / DR fully separated); all other geographies (Europe, Australia, Asia Pacific, Middle East) use a two-region model. |
+| **REG-002** | Cross-geo DR extension region | **[Amended v2.4]** The cross-geo DR destination for the Middle East is a **weighted-selected Europe Standard region** (Switzerland North is the default example, not a fixed region); cross-geo DR path requires explicit policy approval (HC-10). |
+| **REG-003** | Distribution model | **[Amended v2.4]** Three models: **US three-region** (Prod / CVAL / DR fully separated); **two-region co-located** (Europe, Australia, Asia Pacific — Prod isolated, CVAL+DR co-located); and **cross-geo DR** (Middle East — Prod+CVAL co-located in a weighted-selected Middle East region, DR placed cross-geo in a weighted-selected Europe region, DR-020). |
 | **REG-005** | Japan East pending | Japan East is pending business confirmation before inclusion as a Standard region in the Asia Pacific geography. |
 
 ---
@@ -72,7 +72,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
-| **DEC-001** | Middle East DR offering | Legal/business decision on Middle East DR (`DR_NOT_OFFERED` is the current default until this decision records an approval per country/geography). Highest-priority gating decision. |
+| **DEC-001** | ~~Middle East DR offering~~ **[RESOLVED v2.4]** | Legal/business decision on Middle East DR — **RESOLVED: Middle East DR is offered cross-geo into a weighted-selected Europe Standard region** (Prod+CVAL co-located in a Middle East region; DR reserved in Europe; weighted model; DR-020, PLC-010b, A-ME1). Per-country data-residency carve-outs are handled via configuration and are out of engine scope. |
 | **DEC-002** | DR drill duration & failback | Choice between extended ~1-year DR run and earlier ~30-day failback model. |
 | **DEC-003** | Geography exception approval | Who approves geography-only customer onboarding (exception path) and the format of binding customer acknowledgement. |
 
@@ -86,7 +86,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 |------|------|---------------------|
 | **ENV-001** | Production reservation coverage | Manage approved production VM SKUs with reservations to guarantee compute availability. |
 | **ENV-002** | Production-only initial enforcement | Production reservation coverage is mandatory; CVAL/DR reservation is a phased follow-on, not day-one scope. |
-| **ENV-003** | Hard separation constraints | Prod, CVAL, and DR must each be in a different region (US three-region); in two-region geographies CVAL and DR co-locate in the non-Prod region (PLC-010a — mandatory, not an exception). |
+| **ENV-003** | Hard separation constraints | Prod, CVAL, and DR must each be in a different region (US three-region); in two-region co-located geographies CVAL and DR co-locate in the non-Prod region (PLC-010a). **[Amended v2.4]** For the Middle East, Prod and CVAL co-locate in one Middle East region (separate CRGs — co-location ≠ capacity sharing) and DR is cross-geo in Europe (PLC-010b). |
 | **ENV-004** | CVAL treatment | CVAL is treated as a potential DR capacity source (its capacity can contribute to DR readiness). |
 | **ENV-005** | DR bootstrap, not full duplicate | DR capacity is a lean bootstrap (enough to start recovery orchestration), not a full production duplicate. |
 | **ENV-006** | DR bootstrap cannot be implicitly zero | A zero DR target must be an explicit approved configuration, not an accidental default. |
@@ -180,7 +180,8 @@ It does not reproduce the full specification — it tells you exactly where to f
 | **PLC-008** | Lowest suitable load | Select the lowest-risk suitable region; avoid regions at or near capacity ceiling. |
 | **PLC-009** | AEP-triggered pipeline | Region selection is the first step in every AEP provisioning call; the pipeline is synchronous for the recommendation, async for the reservation action. |
 | **PLC-010** | CVAL/DR co-location | A customer's CVAL and DR *may* share a region — this is the normal outcome in two-region geographies, not an exception. |
-| **PLC-010a** | Co-location mandatory in two-region geographies | In any two-region geography, CVAL and DR **must** co-locate in the non-Prod region — there is no third region available. |
+| **PLC-010a** | Co-location mandatory in two-region geographies | In a two-region co-located geography (Europe, Australia, Asia Pacific), CVAL and DR **must** co-locate in the non-Prod region — there is no third region available. |
+| **PLC-010b** **[New v2.4]** | Middle East cross-geo DR placement override | For the Middle East, PLC-010b **overrides** PLC-010a: Prod and CVAL co-locate in a weighted-selected Middle East Standard region (separate CRGs), and DR is placed **cross-geo** in a weighted-selected Europe Standard region. Both selections use the weighted capacity model (DR-020). |
 | **PLC-011** | Even zone-distribution target & rebalancing | Maintain an approximately even `≈ 1/zone_count` zone distribution for all placements; trigger rebalancing when skew exceeds the C-13 tolerance (formula A.9). |
 
 ---
@@ -204,7 +205,8 @@ It does not reproduce the full specification — it tells you exactly where to f
 | **DR-011** | Source region not a capacity source during outage | During a declared outage, the failed source region's capacity is unavailable and must not be counted in failover planning. |
 | **DR-012** | DR drill rotation | Support periodic DR drills with role-flip (source becomes destination and vice versa) and role restoration after the drill. |
 | **DR-013** | Failback policy (configurable) | Support extended-run failback (~1 year) and shorter failback (~30 days); configurable per customer/geography (C-5, DEC-002). |
-| **DR-014** | Middle East policy flag | Support `DR_NOT_OFFERED` per geography; when set, no DR region is assigned and cross-geo DR substitution does not apply. See DEC-001. |
+| **DR-014** | ~~Middle East policy flag~~ **[Superseded v2.4]** | The generic `DR_NOT_OFFERED` per-geography flag is retained for any future geography, **but no longer applies to the Middle East**: Middle East DR is now offered cross-geo into Europe (DR-020, DEC-001 RESOLVED). |
+| **DR-020** **[New v2.4]** | Middle East cross-geo DR | Middle East DR is provided cross-geo: Prod and CVAL are provisioned in a weighted-selected Middle East Standard region (separate CRGs per ENV-003), and DR is placed cross-geo in a weighted-selected **Europe** Standard region. Both selections use the weighted capacity model; the Europe destination sizes DR max-not-sum (DR-017). Supersedes the former Middle East `DR_NOT_OFFERED` position. See DEC-001 (RESOLVED), PLC-010b, REG-002/REG-003, A-ME1. |
 | **DR-015** | Future active-active consideration | Note that active-active DR is out of current baseline scope; architecture should not block its future addition. |
 | **DR-016** | Reciprocal multi-source hosting | Every region may simultaneously be a source (hosting live workloads) and a destination (hosting standby for another region). |
 | **DR-017** | Non-concurrent capacity sharing (max, not sum) | Because DR-001 assumes only one region fails at a time, a destination's DR capacity requirement is the **maximum** over its non-concurrent sources — not the sum (Appendix D). |
@@ -346,7 +348,7 @@ Hard constraints are **blocking rules** applied by the placement pipeline before
 | **HC-7** | DR_FLOOR_INTEGRITY | The engine must enforce the DR floor continuously; any reconciliation action that would bring available capacity below the floor is blocked. |
 | **HC-8** | GEOGRAPHY_CONTAINMENT | A derived Prod region must fall within the Standard Capacity Regions for the customer's chosen geography (not in a different geography). |
 | **HC-9** | STANDARD_REGION_ONLY | All automated placement paths (geography-based, Prod derivation, NonProd/DR selection) must use Standard Capacity Regions only; Restricted regions are exception-path only. |
-| **HC-10** | CROSS_GEO_EXTENSION_PATH_APPROVED | A cross-geography DR extension (e.g., Middle East Prod → Switzerland North DR) must be explicitly approved in the active PlacementPolicy before it is used. |
+| **HC-10** | CROSS_GEO_EXTENSION_PATH_APPROVED | A cross-geography DR extension (e.g., **[Amended v2.4]** Middle East Prod → weighted-selected Europe DR) must be explicitly approved in the active PlacementPolicy before it is used. |
 | **HC-11** | AVAILABILITY_SET_INELIGIBLE | VMs in an Azure Availability Set cannot be associated with a Capacity Reservation; they must be excluded from all reservation management (CAP-020). |
 
 ---
@@ -366,9 +368,9 @@ Validation rules are named enforcement checks that implement hard constraints in
 | **VR-5** | Automated paths use Standard regions only | All automated placement paths must use Standard Capacity Regions only. | HC-9 |
 | **VR-6** | CVAL/DR never in Restricted regions | CVAL and DR must not use Restricted Capacity Regions under any condition, including exception deployments. | HC-9 |
 | **VR-7** | Exhaustion handling | If all Standard regions for a geography are eliminated by HC-1..HC-10, the engine returns a capacity exhaustion error with an ops alert. | HC-1..HC-10 |
-| **VR-8** | Middle East DR default | For Middle East geography with `DR_NOT_OFFERED = true` (current legal position, DEC-001), the seed record **must** record `dr_region = NOT_OFFERED`; no auto-assignment of Switzerland North. | HC-10 |
-| **VR-8a** | Middle East conditional cross-geo | Only after a recorded DEC-001 approval clears `DR_NOT_OFFERED`: Switzerland North may be used as a cross-geo DR; if it then fails HC-1..HC-10, block with an ops alert (VR-9 applies). | HC-10 |
-| **VR-9** | Cross-geo fallback exhaustion | On the DEC-001-approved conditional path only: if Switzerland North fails HC-1..HC-10, block placement with an ops alert. | HC-1..HC-10 |
+| **VR-8** | ~~Middle East DR default~~ **[Amended v2.4]** Middle East cross-geo DR | For a Middle East geography, the seed record **must** record a cross-geo `dr_region` in a **weighted-selected Europe Standard region** (DR-020, PLC-010b); the former `DR_NOT_OFFERED` outcome no longer applies. | HC-10 |
+| **VR-8a** | **[Amended v2.4]** Middle East cross-geo destination selection | The Middle East cross-geo DR region is chosen by the **weighted capacity model** over Europe Standard regions (not a fixed Switzerland North); if the selected Europe region fails HC-1..HC-10, fall back to the next-best weighted Europe region, else block with an ops alert (VR-9). | HC-10 |
+| **VR-9** | Cross-geo fallback exhaustion | **[Amended v2.4]** If all weighted Europe Standard regions fail HC-1..HC-10 for a Middle East cross-geo DR placement, block placement with an ops alert. | HC-1..HC-10 |
 | **VR-10** | Restricted region exception path | A Restricted region requested by a customer triggers the Scenario 2 exception path only; it is never auto-selected. | HC-9 |
 | **VR-11** | Cross-geo extension approval | A cross-geography DR extension must be explicitly approved in the active PlacementPolicy before it can be used. | HC-10 |
 
@@ -407,7 +409,7 @@ These are items where the *capability* is required but the *specific value or po
 | **C-5** | Failback model | Prefer ~1-year run; ~30-day failback alternative | Business decision (DEC-002) |
 | **C-6** | Onboarding selection mode | Exact production region (default); geography (exception) | Configurable + exception policy (DEC-003) |
 | **C-7** | Quota grouping model | One governed pool preferred | Configurable |
-| **C-8** | Region catalogue & flags | Five geographies (US 3-region; Europe/Australia/Asia Pacific/Middle East 2-region); restricted/standard classes; `DR_NOT_OFFERED` | Configurable (REG-001) |
+| **C-8** | Region catalogue & flags | **[Amended v2.4]** Five geographies (US 3-region; Europe/Australia/Asia Pacific 2-region co-located; **Middle East cross-geo DR into Europe**, DR-020); restricted/standard classes; per-country residency carve-outs config-driven | Configurable (REG-001) |
 | **C-9** | Reservation over-allocation | Track allocated; allow over-association with alert | Configurable policy (CAP-018) |
 | **C-10** | DR drill duration/rotation | Annual drill; role flip | Business decision (DEC-002) |
 | **C-11** | DR sizing basis | **Max over non-concurrent sources** (DR-017); sum available as conservative per-scope override | Configurable — max is default (Appendix D) |
@@ -482,7 +484,7 @@ FR codes are the eight top-level functional capability areas; each expands to su
 | **R4** | Automatic zone resolution | Automatic zone resolution via stored zone mapping registry on VM deployment against a shared CRG. |
 | **R5** | Capacity-weighted distribution | Cost and capacity-weighted distribution prevent hotspots; uses demand units (vCPUs), not customer count. |
 | **R6** | DR floor enforcement | NonProd placement is blocked if it would encroach on the `dr_floor_vcpu` of the target region (HC-7). |
-| **R7** | Middle East special handling | `argmax(PS_Prod)` over Saudi Arabia Central + UAE North; cross-geo DR path conditional on DEC-001 clearance. |
+| **R7** | Middle East special handling | **[Amended v2.4]** Weighted `argmax(PS_Prod)` over Saudi Arabia Central + UAE North for Prod (CVAL co-located); DR placed cross-geo via weighted selection over Europe Standard regions (DR-020, DEC-001 RESOLVED). |
 | **R8** | Placement auditability | Placement is deterministic and auditable: all scores, candidate sets, and policy version are written to an OperationRecord for replay. |
 
 ---
@@ -609,7 +611,7 @@ Quick-scan index of every code in the corpus, in alphabetical/numerical order.
 | CAP-023 | Capacity | Regional and per-AZ CRG structure (v2.4) |
 | CAP-024 | Capacity | Reactive SKU/AZ discovery (v2.4) |
 | DAT-001..006 | Data | State store, entities, freshness, history, versioning |
-| DEC-001 | Decision | Middle East DR offering |
+| DEC-001 | Decision | Middle East DR offering — **RESOLVED v2.4 (cross-geo into Europe)** |
 | DEC-002 | Decision | DR drill duration and failback |
 | DEC-003 | Decision | Geography exception approval |
 | DEP-001 | Dependency | Azure feature maturity (CR Sharing Preview→GA) |
@@ -626,7 +628,8 @@ Quick-scan index of every code in the corpus, in alphabetical/numerical order.
 | DR-011 | DR | Source region unavailable during outage |
 | DR-012 | DR | DR drill rotation |
 | DR-013 | DR | Failback policy |
-| DR-014 | DR | Middle East DR_NOT_OFFERED flag |
+| DR-014 | DR | Generic DR_NOT_OFFERED flag (**superseded for Middle East** by DR-020) |
+| DR-020 | DR | Middle East cross-geo DR into Europe (**v2.4**) |
 | DR-015 | DR | Future active-active note |
 | DR-016 | DR | Reciprocal multi-source hosting |
 | DR-017 | DR | Non-concurrent max-not-sum sizing |
@@ -652,6 +655,7 @@ Quick-scan index of every code in the corpus, in alphabetical/numerical order.
 | R1..8 | Placement | Specific placement behaviours |
 | RDY-001..004 | Readiness | Deployment readiness gate and state model |
 | REG-001..005 | Region | Region catalogue, distribution model, cross-geo |
+| A-ME1 | Assumption | Europe is an approved cross-geo DR destination for the Middle East; per-country carve-outs config-driven, out of engine scope (**v2.4**) |
 | VR-1..11 + VR-8a | Validation | Named enforcement checks for hard constraints |
 
 ---

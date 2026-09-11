@@ -7,15 +7,21 @@
 #   cp config.yaml.template config.yaml
 #   $EDITOR config.yaml
 #
-# HARD CONSTRAINT (GEOGRAPHY-AWARE, baseline REG-003 / PLC-010a):
+# HARD CONSTRAINT (GEOGRAPHY-AWARE, baseline REG-003 / PLC-010a / PLC-010b):
 #   * three-region geography (US): regions.primary, regions.dr and
 #     regions.nonprod MUST be three DISTINCT Azure regions.
-#   * two-region geography (Europe / Australia / Asia Pacific / Middle East):
+#   * two-region geography (Europe / Australia / Asia Pacific):
 #     Prod occupies one region; CVAL/NonProd and DR CO-LOCATE in the single
 #     remaining region — so regions.dr MUST equal regions.nonprod (both differ
 #     from regions.primary). This co-location is the required outcome, not an
-#     error. Where DR is not offered (Middle East DR_NOT_OFFERED, DEC-001) no
-#     DR region is assigned — leave regions.dr blank.
+#     error. Where DR is not offered (legacy DR_NOT_OFFERED) no DR region is
+#     assigned — leave regions.dr blank.
+#   * [Amended v2.4] cross-geo geography (Middle East): Prod and CVAL/NonProd
+#     CO-LOCATE in a weighted-selected Middle East region (separate CRGs,
+#     ENV-003) — so regions.nonprod MUST equal regions.primary; DR is placed
+#     CROSS-GEO in a weighted-selected Europe region — so regions.dr MUST be
+#     set and differ from regions.primary (DR-020 / PLC-010b). Middle East DR
+#     is now offered into Europe (DEC-001 RESOLVED).
 # Set regions.distribution_model to select the model. The config loader and
 # pre-flight PF-09/PF-10 enforce the correct rule for the chosen model.
 # ============================================================================
@@ -30,14 +36,16 @@ consumer:
   resource_group: ""       # Consumer resource group for consumer VMs
 
 regions:
-  distribution_model: "three-region"  # "three-region" (US) or "two-region" (EU/AU/APAC/ME)
-  dr_offered: true         # false for Middle East (DR_NOT_OFFERED, DEC-001)
-  primary: ""              # production region — e.g. westus3 (3-region) / westeurope (2-region)
+  distribution_model: "three-region"  # "three-region" (US), "two-region" (EU/AU/APAC), or "cross-geo" (Middle East)
+  dr_offered: true         # cross-geo (ME) always true — DR offered into Europe (DEC-001 RESOLVED)
+  primary: ""              # production region — e.g. westus3 (3-region) / westeurope (2-region) / uaenorth (cross-geo)
   # THREE-REGION example (US):  primary: westus3   dr: canadacentral   nonprod: centralus
   # TWO-REGION example (EU):    primary: switzerlandnorth   dr: swedencentral   nonprod: swedencentral
   #   (dr MUST equal nonprod — CVAL and DR co-locate, PLC-010a)
-  dr: ""                   # 3-region: distinct from primary & nonprod. 2-region: == nonprod (blank if DR not offered)
-  nonprod: ""              # CVAL/NonProd region — must differ from primary
+  # CROSS-GEO example (ME):     primary: uaenorth   nonprod: uaenorth   dr: switzerlandnorth
+  #   (nonprod MUST equal primary — Prod+CVAL co-locate in-geo; dr is a Europe region distinct from primary, DR-020/PLC-010b)
+  dr: ""                   # 3-region: distinct from primary & nonprod. 2-region: == nonprod (blank if DR not offered). cross-geo: Europe region != primary
+  nonprod: ""              # CVAL/NonProd region — must differ from primary (EXCEPT cross-geo, where nonprod == primary)
 
 vm:
   sku: ""                  # e.g. Standard_D4s_v3

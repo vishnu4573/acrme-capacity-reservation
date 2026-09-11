@@ -1,8 +1,8 @@
 """Offline unit tests for the GEOGRAPHY-AWARE region-distinctness model (v2.4).
 
-Validates baseline REG-003 / PLC-010a in the config loader (``Config.validate``)
-and pre-flight checks PF-09/PF-10, WITHOUT touching Azure. These are pure
-in-memory checks on the config-validation logic.
+Validates baseline REG-003 / PLC-010a / PLC-010b in the config loader
+(``Config.validate``) and pre-flight checks PF-09/PF-10, WITHOUT touching Azure.
+These are pure in-memory checks on the config-validation logic.
 
 Run directly:      python test_region_model.py
 Run with pytest:   pytest test_region_model.py -q
@@ -12,8 +12,12 @@ Covers:
   * three-region with a duplicated region                      -> reject
   * two-region (EU/AU/APAC): CVAL and DR co-locate (dr==nonprod) -> pass  (PLC-010a)
   * two-region with dr != nonprod (spurious third region)      -> reject
-  * two-region, DR_NOT_OFFERED (Middle East, DEC-001), dr blank -> pass
-  * Prod == NonProd in any model                               -> reject
+  * cross-geo (Middle East) [Amended v2.4]: Prod+CVAL co-locate in-geo,
+    DR placed cross-geo in Europe (dr != primary)             -> pass  (PLC-010b/DR-020)
+  * cross-geo with dr == primary (DR not cross-geo)            -> reject
+  * cross-geo with nonprod != primary (Prod/CVAL not co-located) -> reject
+  * two-region, legacy DR_NOT_OFFERED, dr blank                -> pass
+  * Prod == NonProd in a non-cross-geo model                  -> reject
 """
 
 from __future__ import annotations
@@ -117,9 +121,25 @@ CASES = [
         "distribution_model": "two-region",
         "primary": "switzerlandnorth", "dr": "northeurope", "nonprod": "swedencentral",
     }),
-    ("two-region Middle East DR_NOT_OFFERED (dr blank)", "ok", {
+    ("cross-geo Middle East (Prod+CVAL in-geo, DR cross-geo in Europe)", "ok", {
+        "distribution_model": "cross-geo",
+        "primary": "uaenorth", "dr": "switzerlandnorth", "nonprod": "uaenorth",
+    }),
+    ("cross-geo dr == primary (DR not cross-geo)", "reject", {
+        "distribution_model": "cross-geo",
+        "primary": "uaenorth", "dr": "uaenorth", "nonprod": "uaenorth",
+    }),
+    ("cross-geo nonprod != primary (Prod/CVAL not co-located)", "reject", {
+        "distribution_model": "cross-geo",
+        "primary": "uaenorth", "dr": "switzerlandnorth", "nonprod": "qatarcentral",
+    }),
+    ("cross-geo dr missing", "reject", {
+        "distribution_model": "cross-geo",
+        "primary": "uaenorth", "dr": "", "nonprod": "uaenorth",
+    }),
+    ("two-region legacy DR_NOT_OFFERED (dr blank)", "ok", {
         "distribution_model": "two-region", "dr_offered": False,
-        "primary": "uaenorth", "dr": "", "nonprod": "saudiarabiacentral",
+        "primary": "brazilsouth", "dr": "", "nonprod": "brazilsoutheast",
     }),
     ("two-region dr==primary", "reject", {
         "distribution_model": "two-region",
@@ -151,24 +171,56 @@ def run() -> int:
 
 
 # --- pytest entry points ---------------------------------------------------
+def _case(label: str) -> tuple:
+    """Look a case up by label so tests are robust to list ordering."""
+    for lbl, kind, regions in CASES:
+        if lbl == label:
+            return lbl, kind, regions
+    raise KeyError(f"No test case labelled {label!r}")
+
+
 def test_three_region_distinct_valid():
-    assert _expect_ok(CASES[0][0], CASES[0][2])
+    lbl, _, regions = _case("three-region US distinct")
+    assert _expect_ok(lbl, regions)
 
 
 def test_two_region_colocated_valid():
-    assert _expect_ok(CASES[3][0], CASES[3][2])
+    lbl, _, regions = _case("two-region EU co-located dr==nonprod")
+    assert _expect_ok(lbl, regions)
+
+
+def test_cross_geo_middle_east_valid():
+    lbl, _, regions = _case(
+        "cross-geo Middle East (Prod+CVAL in-geo, DR cross-geo in Europe)"
+    )
+    assert _expect_ok(lbl, regions)
+
+
+def test_cross_geo_dr_equals_primary_rejected():
+    lbl, _, regions = _case("cross-geo dr == primary (DR not cross-geo)")
+    assert _expect_reject(lbl, regions)
+
+
+def test_cross_geo_nonprod_not_colocated_rejected():
+    lbl, _, regions = _case(
+        "cross-geo nonprod != primary (Prod/CVAL not co-located)"
+    )
+    assert _expect_reject(lbl, regions)
 
 
 def test_two_region_dr_not_offered_valid():
-    assert _expect_ok(CASES[6][0], CASES[6][2])
+    lbl, _, regions = _case("two-region legacy DR_NOT_OFFERED (dr blank)")
+    assert _expect_ok(lbl, regions)
 
 
 def test_two_region_spurious_third_region_rejected():
-    assert _expect_reject(CASES[5][0], CASES[5][2])
+    lbl, _, regions = _case("two-region dr != nonprod (spurious third region)")
+    assert _expect_reject(lbl, regions)
 
 
 def test_three_region_duplicate_rejected():
-    assert _expect_reject(CASES[1][0], CASES[1][2])
+    lbl, _, regions = _case("three-region duplicate dr==primary")
+    assert _expect_reject(lbl, regions)
 
 
 if __name__ == "__main__":

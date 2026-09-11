@@ -22,7 +22,7 @@ This document provides the **authoritative deployment layout** for Azure Capacit
 - Understand the structural organization of CRGs per environment and region
 - See how the regional + per-AZ CRG structure is implemented
 - Trace the naming convention for RGs, CRGs, and subscriptions
-- Visualize the difference between 3-region (US) and 2-region (Europe/Australia/Asia Pacific/Middle East) geographies
+- Visualize the difference between 3-region (US), 2-region co-located (Europe/Australia/Asia Pacific) and **[Amended v2.4]** cross-geo DR (Middle East → Europe) geographies
 - Understand provider/consumer subscription relationships for shared reservations
 
 ---
@@ -207,7 +207,7 @@ Resource Group: rg-odcr-dr-cac-01
 **Distribution:** For a Europe geography deployment, **select 2 regions** and **distribute** environments: Prod in one region, CVAL + DR co-located in the other. Each region can host any/all environments; co-location is the deployment strategy for 2-region geographies.
 
 **In-scope regions (current):**
-- Switzerland North (switzerlandnorth) — authoritative cross-geo DR extension region (REG-002)
+- Switzerland North (switzerlandnorth) — default example of the weighted cross-geo DR destination for the Middle East (REG-002) **[Amended v2.4: weighted-selected, not fixed]**
 - Sweden Central (swedencentral)
 - North Europe (northeurope) — restricted, exception-only
 - West Europe (westeurope) — restricted, exception-only
@@ -216,7 +216,7 @@ Resource Group: rg-odcr-dr-cac-01
 - **Prod → placed in:** Sweden Central
 - **CVAL + DR → co-located in:** Switzerland North
 
-> **Note:** Either region can technically host all three environments. The co-location pattern is required by PLC-010a for 2-region geographies (Prod isolation maintained; CVAL+DR share the second region to satisfy ENV-003 while delivering in-geo DR).
+> **Note:** Either region can technically host all three environments. The co-location pattern is required by PLC-010a for 2-region geographies (Prod isolation maintained; CVAL+DR share the second region to satisfy ENV-003 while delivering in-geo DR). **[Amended v2.4]** Europe is additionally a **cross-geo DR destination for the Middle East** (a weighted-selected Europe Standard region hosts ME DR CRGs); that Europe destination sizes DR **max-not-sum** across all sources failing over to it, including Middle East sources (DR-017, DR-020).
 
 #### 3.2.1 Production Environment — Sweden Central (3 zones)
 
@@ -333,57 +333,58 @@ Subscription: sub-jda-cld-dr-eu-01
 
 ---
 
-### 3.5 Middle East — Two-Region Model, `DR_NOT_OFFERED` (DEC-001, DR-014)
+### 3.5 Middle East — Cross-Geo DR Model (Prod+CVAL in ME, DR in Europe) — [Amended v2.4] (DR-020, PLC-010b, DEC-001 RESOLVED)
 
-**In-scope regions:**
+**In-scope regions (Prod + CVAL):**
 - Saudi Arabia Central (saudiarabiacentral)
 - UAE North (uaenorth)
 
-**Legal constraint:** DR strategy pending legal confirmation; data-sovereignty requirements mean cross-border DR cannot meet residency rules. Current status: **`DR_NOT_OFFERED`** (DEC-001).
+**DR destination:** a **weighted-selected Europe Standard region** (e.g., Switzerland North — default example, not fixed).
+
+**Legal position [Amended v2.4]:** DEC-001 is **RESOLVED** — DR is now **offered cross-geo** for the Middle East. Europe is an approved DR destination (assumption **A-ME1**); per-country data-residency carve-outs are handled via configuration and are out of engine scope.
 
 **Example deployment distribution:**
-- **Prod → placed in:** Saudi Arabia Central
-- **CVAL → placed in:** UAE North (or co-located with Prod)
-- **DR:** ❌ Not offered (no DR region assigned; seed record: `dr_region = null`, `DR_NOT_OFFERED` flag set)
+- **Prod → placed in:** a weighted-selected Middle East region (e.g., UAE North)
+- **CVAL → co-located with Prod** in the same Middle East region (separate CRG; co-location ≠ capacity sharing, ENV-003)
+- **DR → placed cross-geo** in a weighted-selected Europe Standard region (e.g., Switzerland North)
 
-> **Note:** Both regions can technically host Prod and CVAL. DR environment CRGs are **not built** for Middle East due to legal constraints (DEC-001), unlike other 2-region geographies where DR is offered via co-location.
+> **Note:** Prod and CVAL co-locate in one Middle East region (separate subs/CRGs). DR environment CRGs are built **cross-geo** in the selected Europe region. Because CVAL co-locates with Prod locally (not with DR), the CVAL-sacrifice DR bootstrap (DR-005/006) does not apply to the Middle East — ME DR uses dedicated reserved capacity in Europe.
 
 ```
-──────────────────────────────────────────────────────────────────────
-PRODUCTION ENVIRONMENT — Saudi Arabia Central
-──────────────────────────────────────────────────────────────────────
+PRODUCTION ENVIRONMENT — UAE North (weighted-selected ME region)
 Subscription: sub-jda-cld-core-me-01
-Region: Saudi Arabia Central (saudiarabiacentral)
+Region: UAE North (uaenorth)
+Resource Group: rg-odcr-prod-uan-01
+    ├── crg-pr-uan-reg
+    ├── crg-pr-uan-az1
+    ├── crg-pr-uan-az2
+    └── crg-pr-uan-az3
 
-Resource Group: rg-odcr-prod-sac-01
-    ├── crg-pr-sac-reg
-    ├── crg-pr-sac-az1
-    ├── crg-pr-sac-az2
-    └── crg-pr-sac-az3
-
-──────────────────────────────────────────────────────────────────────
-CVAL ENVIRONMENT — UAE North (optional, if non-prod is offered)
-──────────────────────────────────────────────────────────────────────
+CVAL ENVIRONMENT — UAE North (co-located with Prod, separate sub/CRGs)
 Subscription: sub-jda-cld-nonprod-me-01
 Region: UAE North (uaenorth)
-
 Resource Group: rg-odcr-cval-uan-01
     ├── crg-cv-uan-reg
     ├── crg-cv-uan-az1
     ├── crg-cv-uan-az2
     └── crg-cv-uan-az3
 
-──────────────────────────────────────────────────────────────────────
-DR ENVIRONMENT — ❌ Not offered
-──────────────────────────────────────────────────────────────────────
-No DR CRGs created.
-Seed record: dr_region = null, DR_NOT_OFFERED = true
+DR ENVIRONMENT — Switzerland North (weighted-selected Europe region, CROSS-GEO)
+Subscription: sub-jda-cld-dr-eu-01
+Region: Switzerland North (switzerlandnorth)   ← weighted-selected Europe Standard region (example)
+Resource Group: rg-odcr-dr-swn-01
+    ├── crg-dr-swn-reg
+    ├── crg-dr-swn-az1
+    ├── crg-dr-swn-az2
+    └── crg-dr-swn-az3
+Seed record: production_region = UAE North, cval_region = UAE North, dr_region = Switzerland North (cross-geo)
+Europe destination sizes DR max-not-sum (DR-017) across all sources failing over to it.
 ```
 
-**When legal approves DR for Middle East:**
-- Update region catalogue configuration (REG-001): remove `DR_NOT_OFFERED` flag
-- DR will then co-locate with CVAL per the 2-region model (PLC-010a)
-- Engine will auto-derive DR region = UAE North (or whichever region is not Prod)
+**Configuration notes (v2.4):**
+- The Middle East DR region is chosen by the **weighted capacity model** over Europe Standard regions (REG-002, DR-020, PLC-010b) — Switzerland North is the default example, not a fixed region
+- Changing the Europe destination set is a config change, no code change (REG-001)
+- The generic `DR_NOT_OFFERED` flag (DR-014) remains available for any future geography but is **not** set for the Middle East
 
 ---
 
@@ -567,7 +568,7 @@ IF (new allocated VM detected for SKU/AZ not in seed matrix):
 | **Europe** | 2-region | 1 | 1 (co-located with DR) | 1 (co-located with CVAL) | 4 per env | 8 (Prod: 4, CVAL+DR co-located: 4+4 same region) |
 | **Australia** | 2-region | 1 | 1 (co-located with DR) | 1 (co-located with CVAL) | 4 per env | 8 |
 | **Asia Pacific** | 2-region | 1 | 1 (co-located with DR) | 1 (co-located with CVAL) | 4 per env | 8 |
-| **Middle East** | 2-region | 1 | 1 (optional) | ❌ Not offered | 4 (Prod), 4 (CVAL) | 8 (or 4 if CVAL not deployed) |
+| **Middle East** | **[v2.4]** cross-geo DR | 1 (ME) | 1 (ME, co-located w/ Prod) | ✅ Cross-geo in weighted Europe region | 4 (Prod), 4 (CVAL), 4 (DR in Europe) | 12 |
 
 **Note:** 4 CRGs per environment assumes 3 availability zones per region (1 regional + 3 per-AZ). Adjust for regions with different zone counts.
 
@@ -626,6 +627,7 @@ rg-odcr-dr-swn-01
 | Version | Date | Change Summary |
 |---------|------|----------------|
 | 1.0 | 9 Sep 2026 | Initial deployment layout reference; all geographies (US 3-region, Europe/Australia/Asia Pacific 2-region co-located, Middle East DR_NOT_OFFERED); CRG structure per CAP-023; naming per OPS-006; sharing model; seed matrix; reconciliation lifecycle. |
+| 1.1 | 11 Sep 2026 | **[Amended v2.4]** Middle East changed from `DR_NOT_OFFERED` to **cross-geo DR**: Prod+CVAL co-located in a weighted-selected ME region, DR placed cross-geo in a weighted-selected Europe Standard region (DR-020, PLC-010b, DEC-001 RESOLVED, A-ME1); Europe destination sizes DR max-not-sum. |
 
 ---
 

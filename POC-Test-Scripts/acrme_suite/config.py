@@ -64,12 +64,18 @@ class Config:
     #                    (currently the US geography only).
     #   "two-region"   — Prod occupies one region; CVAL/NonProd and DR
     #                    co-locate in the single remaining region (PLC-010a).
-    #                    Currently Europe, Australia, Asia Pacific, Middle East.
+    #                    Currently Europe, Australia, Asia Pacific.
+    #   "cross-geo"    — [Amended v2.4] Prod and CVAL/NonProd CO-LOCATE in a
+    #                    weighted-selected in-geo region; DR is placed CROSS-GEO
+    #                    in a weighted-selected region of a different geography
+    #                    (DR-020, PLC-010b). Currently the Middle East, whose DR
+    #                    is provisioned in a Europe Standard region.
     # Defaults to "three-region" for backward compatibility with existing configs.
     distribution_model: str = "three-region"
-    # Whether DR is offered for this geography. Middle East carries
-    # DR_NOT_OFFERED (DR-014, DEC-001) until legal approval, in which case no
-    # DR region is assigned at all. Defaults to True.
+    # Whether DR is offered for this geography. [Amended v2.4] Middle East DR is
+    # now OFFERED cross-geo into Europe (DR-020, DEC-001 RESOLVED); dr_offered
+    # therefore defaults to True and cross-geo geographies always require a DR
+    # region.
     dr_offered: bool = True
 
     # ----- vm -------------------------------------------------------------
@@ -155,6 +161,11 @@ class Config:
             self.distribution_model = "three-region"
         elif self.distribution_model in ("2", "2-region", "two"):
             self.distribution_model = "two-region"
+        elif self.distribution_model in (
+            "cross-geo", "crossgeo", "cross_geo", "cross-geo-dr",
+            "crossgeodr", "cross-region-dr", "middle-east", "me",
+        ):
+            self.distribution_model = "cross-geo"
         dr_offered_raw = regions.get("dr_offered", True)
         if isinstance(dr_offered_raw, str):
             self.dr_offered = dr_offered_raw.strip().lower() not in (
@@ -191,10 +202,21 @@ class Config:
         return self.distribution_model == "two-region"
 
     @property
+    def is_cross_geo(self) -> bool:
+        """[Amended v2.4] True when the geography runs the cross-geo DR model:
+        Prod and CVAL/NonProd co-locate in an in-geo region while DR is placed
+        in a region of a DIFFERENT geography (Middle East -> Europe, DR-020,
+        PLC-010b)."""
+        return self.distribution_model == "cross-geo"
+
+    @property
     def dr_required(self) -> bool:
         """A DR region is required unless the geography is two-region AND
-        DR is not offered (Middle East DR_NOT_OFFERED, DEC-001), in which case
-        no DR region is assigned at all."""
+        DR is not offered (legacy DR_NOT_OFFERED), in which case no DR region is
+        assigned at all. [Amended v2.4] cross-geo geographies ALWAYS require a
+        (cross-geo) DR region — Middle East DR is now offered into Europe."""
+        if self.is_cross_geo:
+            return True
         return not (self.is_two_region and not self.dr_offered)
 
     def validate(self) -> None:
@@ -202,10 +224,12 @@ class Config:
         missing: List[str] = []
 
         # Guard against an unknown distribution model early.
-        if self.distribution_model not in ("three-region", "two-region"):
+        if self.distribution_model not in (
+            "three-region", "two-region", "cross-geo",
+        ):
             raise ConfigError(
-                "regions.distribution_model must be 'three-region' or "
-                f"'two-region'; got '{self.distribution_model}'."
+                "regions.distribution_model must be 'three-region', "
+                f"'two-region' or 'cross-geo'; got '{self.distribution_model}'."
             )
 
         required = {
@@ -224,7 +248,8 @@ class Config:
             "crg.dr_reservation_name": self.dr_reservation_name,
         }
         # DR region is required except in a two-region geography where DR is
-        # not offered (Middle East DR_NOT_OFFERED, DEC-001).
+        # not offered (legacy DR_NOT_OFFERED). [Amended v2.4] The Middle East
+        # now runs the cross-geo model and DOES require a (cross-geo) DR region.
         if self.dr_required:
             required["regions.dr"] = self.dr_region
 
@@ -238,26 +263,59 @@ class Config:
 
         # ------------------------------------------------------------------
         # HARD CONSTRAINT: region distinctness is GEOGRAPHY-AWARE (v2.4).
-        # Baseline REG-003 / PLC-010a:
+        # Baseline REG-003 / PLC-010a / PLC-010b:
         #   * three-region (US): Prod, CVAL/NonProd and DR each in a DISTINCT
         #     region — all three must differ.
-        #   * two-region (EU/AU/APAC/ME): Prod occupies one region; CVAL/NonProd
+        #   * two-region (EU/AU/APAC): Prod occupies one region; CVAL/NonProd
         #     and DR CO-LOCATE in the single remaining region. Co-location is
         #     the normal, required outcome — NOT an error. DR (when offered)
         #     must therefore equal NonProd, and both must differ from Prod.
+        #   * cross-geo (ME) [Amended v2.4]: Prod and CVAL/NonProd CO-LOCATE in
+        #     one in-geo region (nonprod == primary is EXPECTED — separate CRGs,
+        #     ENV-003, no capacity sharing); DR is placed CROSS-GEO in a region
+        #     of a DIFFERENT geography and must differ from the in-geo region
+        #     (DR-020, PLC-010b).
         # ------------------------------------------------------------------
-        # Prod must always be distinct from the non-Prod region.
-        if self.nonprod_region == self.primary_region:
+        # Prod must be distinct from the non-Prod region EXCEPT in the cross-geo
+        # model, where Prod and CVAL/NonProd intentionally co-locate (PLC-010b).
+        if not self.is_cross_geo and self.nonprod_region == self.primary_region:
             raise ConfigError(
                 f"regions.nonprod ({self.nonprod_region}) must differ from "
                 f"regions.primary ({self.primary_region}) — Production and the "
                 f"non-Production region cannot be the same."
             )
 
-        if self.is_two_region:
+        if self.is_cross_geo:
+            # Cross-geo DR model (DR-020 / PLC-010b): Prod and CVAL/NonProd
+            # co-locate in-geo; DR lives in a different geography.
+            if self.nonprod_region != self.primary_region:
+                raise ConfigError(
+                    f"Cross-geo geography (PLC-010b): regions.nonprod "
+                    f"({self.nonprod_region}) must CO-LOCATE with regions.primary "
+                    f"({self.primary_region}) — Prod and CVAL share the single "
+                    f"in-geo region (separate CRGs, ENV-003). Set regions.nonprod "
+                    f"== regions.primary."
+                )
+            if not self.dr_region:
+                raise ConfigError(
+                    "Cross-geo geography (DR-020): regions.dr is required — DR "
+                    "is placed cross-geo (Middle East -> Europe). Middle East DR "
+                    "is now offered (DEC-001 RESOLVED)."
+                )
+            if self.dr_region == self.primary_region:
+                raise ConfigError(
+                    f"Cross-geo geography (DR-020): regions.dr ({self.dr_region}) "
+                    f"must differ from the in-geo region regions.primary "
+                    f"({self.primary_region}) — DR is placed in a DIFFERENT "
+                    f"geography (Middle East -> Europe)."
+                )
+        elif self.is_two_region:
             # Two-region model (PLC-010a): CVAL/NonProd and DR co-locate.
             if not self.dr_offered:
-                # Middle East DR_NOT_OFFERED (DEC-001): no DR region assigned.
+                # Legacy DR_NOT_OFFERED: no DR region assigned. [Amended v2.4]
+                # This is no longer the Middle East position (ME is now cross-geo);
+                # the branch is retained for any geography that legitimately runs
+                # two-region with DR not offered.
                 # A DR region may be omitted; if supplied it must not introduce
                 # a spurious third region — accept blank or == nonprod only.
                 if self.dr_region and self.dr_region not in (
@@ -265,7 +323,7 @@ class Config:
                 ):
                     raise ConfigError(
                         f"Two-region geography with DR not offered "
-                        f"(DR_NOT_OFFERED, DEC-001): regions.dr "
+                        f"(legacy DR_NOT_OFFERED): regions.dr "
                         f"({self.dr_region}) must be blank or co-located with "
                         f"regions.nonprod ({self.nonprod_region}); no separate "
                         f"DR region is assigned."

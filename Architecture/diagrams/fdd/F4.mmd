@@ -10,7 +10,7 @@ flowchart TD
     DerP --> Ok
     Ok -- No --> Reason[Readiness reason state]
     Ok -- Yes --> CVAL[Select/validate CVAL - env separation]
-    CVAL --> DR[Select DR or DR_NOT_OFFERED]
+    CVAL --> DR[Select DR: cross-geo weighted Europe region for Middle East; co-located otherwise]
     DR --> Idx[Contribute to SourceDestinationDRIndex]
     Idx --> Hold[Atomic placement hold]
     Hold --> Write[Write CustomerSeedRecord]

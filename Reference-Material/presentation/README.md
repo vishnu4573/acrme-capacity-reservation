@@ -21,7 +21,7 @@ into a boardroom-ready narrative. Every slide is traceable to a specific section
 | 4 | The Three Types of Capacity | Section 3 What ACRME Does |
 | 5 | The Automation Engine — Safety Before Automation | Section 3 |
 | 6 | How Placement Decisions Are Made | Section 6 |
-| 7 | Middle East — Cross-Geo DR Extension | Section 6 |
+| 7 | Middle East — Cross-Geo DR into Europe (weighted model, DR-020, v2.4) | Section 6 |
 | 8 | How Disaster Recovery Works | Section 5 |
 | 9 | What Is Working Well | Section 8 |
 | 10 | What Is Still Being Validated | Section 9 |

@@ -10,7 +10,7 @@
 >
 > **Version:** 1.1 — reconciled to Requirements Baseline **v2.4** (7 September 2026); originally authored 2 September 2026 from the ACRME Q&A design walkthrough session.
 >
-> **v2.4 reconciliation note.** The geography-aware region model (US three-region; EU/Australia/Asia Pacific/Middle East two-region with CVAL+DR co-located per PLC-010a; Middle East `DR_NOT_OFFERED` per DEC-001) is unchanged and already reflected below. v2.4 adds the reservation-model concepts folded from the architecture diagrams — reservation **eligibility** (CAP-020/CAP-021), the **seed-at-0** SKU/AZ matrix (CAP-022), the explicit **regional + per-AZ CRG** structure (CAP-023), **reactive SKU/AZ discovery** (CAP-024), and the **even zone-distribution** target + rebalancing (PLC-011, Appendix A.9). These are explained in plain language in the new Section 5.11.
+> **v2.4 reconciliation note.** **[Amended v2.4]** The geography-aware region model now has **three distribution models**: US three-region (Prod/CVAL/DR distinct); EU/Australia/Asia Pacific two-region co-located (CVAL+DR co-located per PLC-010a); and the **Middle East cross-geo DR model** — Prod+CVAL co-located in a weighted-selected Middle East region, DR placed cross-geo in a weighted-selected **Europe** Standard region (PLC-010b, DR-020, DEC-001 RESOLVED, A-ME1). The Middle East example in Section 3.6a reflects this. v2.4 adds the reservation-model concepts folded from the architecture diagrams — reservation **eligibility** (CAP-020/CAP-021), the **seed-at-0** SKU/AZ matrix (CAP-022), the explicit **regional + per-AZ CRG** structure (CAP-023), **reactive SKU/AZ discovery** (CAP-024), and the **even zone-distribution** target + rebalancing (PLC-011, Appendix A.9). These are explained in plain language in the new Section 5.11.
 
 ---
 
@@ -78,7 +78,7 @@ Each domain section follows the same pattern:
 Geography-specific examples use the authoritative Standard Capacity region sets (Requirements Baseline
 v2.4 Section 6, ADR-001). **Five geographies are in scope. US is the only three-region geography; all
 others use a two-region distribution model** — Prod in one region, CVAL + DR co-located in the other
-(PLC-010a). The catalogue is a configurable item (REG-001), so this table is the current example, not
+(PLC-010a). **[Amended v2.4]** The **Middle East is the exception**: it uses a **cross-geo DR model** — Prod+CVAL co-locate in a weighted-selected Middle East region and DR is placed cross-geo in a weighted-selected Europe region (PLC-010b, DR-020). The catalogue is a configurable item (REG-001), so this table is the current example, not
 a hard-coded set:
 
 | Geography | Distribution model | Standard Capacity Regions (engine-selectable) | Restricted Regions (exception only) |
@@ -89,11 +89,11 @@ a hard-coded set:
 | **Asia Pacific** | 2-region | East Asia · Southeast Asia | Japan East *(pending confirmation)* |
 | **Middle East** | 2-region | UAE North · Saudi Arabia Central | — |
 
-The two-region walkthrough below uses **EU** as the worked example; **Australia, Asia Pacific, and
-Middle East follow the exact same 2-region pattern** (Prod in one region, CVAL + DR co-located in the
-other). The only geography-specific difference is Middle East, which currently carries
-`DR_NOT_OFFERED` (a legal override pending DEC-001) — there, no DR region is assigned at all until
-Legal clears it.
+The two-region walkthrough below uses **EU** as the worked example; **Australia and Asia Pacific
+follow the exact same 2-region co-located pattern** (Prod in one region, CVAL + DR co-located in the
+other). **[Amended v2.4] The Middle East is different**: Prod and CVAL co-locate in a weighted-selected
+Middle East region, but **DR is placed cross-geo in a weighted-selected Europe Standard region**
+(PLC-010b, DR-020, DEC-001 RESOLVED) — see Section 3.6a.
 
 Representative SKU examples throughout: **E16ads\_v5** (16 vCPU per VM) and **E8ads\_v5** (8 vCPU
 per VM).
@@ -512,26 +512,32 @@ CustomerSeedRecord:
   dr_region         = "East Asia"   ← co-located with CVAL
 ```
 
-**Middle East** (Standard: UAE North, Saudi Arabia Central) — the **one** difference: DR is currently
-`DR_NOT_OFFERED` (legal override, DR-014, DEC-001). Prod and CVAL place normally, but **no DR region
-is assigned**:
+**Middle East** (Standard: UAE North, Saudi Arabia Central) — **[Amended v2.4] the cross-geo DR
+exception**: Prod and CVAL co-locate in a weighted-selected Middle East region (separate CRGs), and
+**DR is placed cross-geo in a weighted-selected Europe Standard region** (PLC-010b, DR-020, DEC-001
+RESOLVED). Both selections use the weighted capacity model:
 
 ```
-Candidate regions: { UAE North, Saudi Arabia Central }
+Prod/CVAL candidate regions (Middle East): { UAE North, Saudi Arabia Central }
+DR candidate regions (Europe Standard):    { Switzerland North, Sweden Central, ... }  ← weighted-selected
 
-Step 1 (Prod):  argmax(PS_Prod) → say UAE North scores highest → Prod = UAE North
-Step 2 (CVAL):  only Saudi Arabia Central remains → CVAL = Saudi Arabia Central (deterministic)
-Step 3 (DR):    DR_NOT_OFFERED → dr_region = NOT_OFFERED   ← NO DR assigned (legal), not co-location
+Step 1 (Prod):  weighted argmax(PS_Prod) over ME → say UAE North scores highest → Prod = UAE North
+Step 2 (CVAL):  co-located with Prod in ME → CVAL = UAE North (separate CRG; co-location ≠ sharing)
+Step 3 (DR):    weighted selection over Europe Standard regions → say Switzerland North → DR = Switzerland North (cross-geo)
 
 CustomerSeedRecord:
   production_region = "UAE North"
-  cval_region       = "Saudi Arabia Central"
-  dr_region         = "NOT_OFFERED"   ← legal override pending DEC-001
+  cval_region       = "UAE North"          ← co-located with Prod locally (separate CRG)
+  dr_region         = "Switzerland North"  ← cross-geo, weighted-selected Europe region (example)
 ```
 
-If and only if Legal clears DEC-001, the Middle East reverts to the standard 2-region co-location
-pattern (or activates the pre-configured Switzerland North cross-geo DR extension) via a config flip
-— no code change (REG-001, HC-10).
+The Europe DR destination sizes DR **max-not-sum** (DR-017) across all sources that fail over to it,
+including Middle East sources. The specific Europe region is weighted-selected (Switzerland North is
+the default example, not fixed); changing the Europe destination set is a config change, no code
+change (REG-001, REG-002, HC-10). Because CVAL now co-locates with Prod locally (not with DR), the
+CVAL-sacrifice DR bootstrap (DR-005/006) does not apply to the Middle East — ME DR uses dedicated
+reserved capacity in Europe. Per-country data-residency carve-outs are config-driven and out of engine
+scope (A-ME1).
 
 ### 3.7 Worked Example — E16ads\_v5 (16 vCPU) at US Scale
 
@@ -1543,8 +1549,8 @@ This table combines all key values (configurable and fixed) for quick lookup:
 | Asia Pacific Standard Capacity Regions (2-region) | East Asia · Southeast Asia | All domains |
 | Middle East Standard Capacity Regions (2-region) | UAE North · Saudi Arabia Central | All domains |
 | Japan East (Asia Pacific) | Pending business confirmation — not selectable until added to config | Region Selection |
-| Middle East DR status | `DR_NOT_OFFERED` (DEC-001 pending) | Region Selection |
-| CVAL + DR co-location | Mandatory (PLC-010a) in all 2-region geographies (EU, Australia, Asia Pacific, Middle East) | Region Selection |
+| Middle East DR status | **[Amended v2.4]** Cross-geo DR into a weighted-selected Europe Standard region (PLC-010b, DR-020, DEC-001 RESOLVED) | Region Selection |
+| CVAL + DR co-location | Mandatory (PLC-010a) in EU/Australia/Asia Pacific 2-region geographies. **[Amended v2.4]** In the **Middle East**, CVAL co-locates with **Prod** locally and DR is cross-geo in Europe (PLC-010b) | Region Selection |
 | Region catalogue | Configurable & versioned (REG-001) — geographies, regions, class, distribution model | All domains |
 
 ---

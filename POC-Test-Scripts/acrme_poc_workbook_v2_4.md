@@ -16,7 +16,7 @@
 > **What this document is.** This is the single **POC workbook of record**. It consolidates the manual runbook/tracker content previously held only in the binary `acrme_poc_workbook_v2.docx`/`.pdf` (574 paragraphs, 140 tables) into a Markdown source that follows the repo's md-source convention, and it is kept in lock-step with the executable `POC-Test-Scripts/`. Expected results are hypotheses until executed with retained evidence. Preview features are not Microsoft contractual commitments; Tier 3 and VMSS emergency automation remain blocked in Phase 1.
 >
 > **v2.4 reconciliation (what changed from v2.0).**
-> - **Region model — two-region-aware (PLC-010a).** The former "three distinct regions" hard rule (old §3.1, PF-09/PF-10) is now **geography-aware**: three distinct regions are required **only** for three-region geographies (US is the only one today); **two-region geographies co-locate CVAL + DR in the non-prod region** while the other region hosts Prod (ENV-003 / PLC-010a). **Middle East** is the sole `DR_NOT_OFFERED` case, on legal grounds (DR-014 / DEC-001) — not a general two-region outcome. This mirrors the Phase 1 rework of `POC-Test-Scripts/acrme_suite/config.py` and `preflight.py`.
+> - **Region model — geography-aware (PLC-010a / PLC-010b).** The former "three distinct regions" hard rule (old §3.1, PF-09/PF-10) is now **geography-aware**: three distinct regions are required **only** for three-region geographies (US is the only one today); **two-region geographies co-locate CVAL + DR in the non-prod region** while the other region hosts Prod (ENV-003 / PLC-010a). **[Amended v2.4] Middle East now runs the `cross-geo` DR model (DR-020 / PLC-010b): Prod and CVAL co-locate in a weighted-selected Middle East region (separate CRGs, ENV-003) and DR is placed CROSS-GEO in a weighted-selected Europe Standard region.** This supersedes the earlier `DR_NOT_OFFERED` position for Middle East (DR-014 / DEC-001 **RESOLVED**). This mirrors the Phase 1 rework of `POC-Test-Scripts/acrme_suite/config.py` and `preflight.py` (which now carry a `cross-geo` `distribution_model`).
 > - **New v2.4 coverage — Groups G9–G12.** Added test groups for CAP-020/CAP-021/CAP-001a, PLC-010a (positive), PLC-011 (even zone distribution + rebalance, reproducing Calc-Logic Scenario 21), CAP-022/CAP-024 (seed-at-0 matrix + reactive discovery), and CAP-023/OPS-006 (regional + per-AZ CRG structure and deterministic naming). Inventory total: **49** cases across **12** groups (was 35 across 8).
 > - **Numbering unified** to the executable suite's POC IDs (see §4.3). Where the earlier research workbook used a divergent POC-01…51 scheme, a cross-reference is provided rather than a second numbering.
 
@@ -84,7 +84,7 @@ Each executed POC must retain the following evidence fields (architecture §42):
 
 # 2. Environment Details
 
-Complete this table before any POC execution. Region placement must conform to the geography's `distribution_model` (see §3.1): Prod is always separated from Non-Prod/CVAL; DR is a distinct region only in **three-region** geographies (US), **co-located with CVAL** in the non-prod region in **two-region** geographies (PLC-010a), and `DR_NOT_OFFERED` for Middle East (DEC-001).
+Complete this table before any POC execution. Region placement must conform to the geography's `distribution_model` (see §3.1): Prod is separated from Non-Prod/CVAL in **three-region** (US) and **two-region** (EU/AU/APAC) geographies; DR is a distinct region only in **three-region** geographies (US), **co-located with CVAL** in the non-prod region in **two-region** geographies (PLC-010a); and **[Amended v2.4] for Middle East (`cross-geo`) Prod and CVAL co-locate in a weighted-selected Middle East region while DR is placed cross-geo in a weighted-selected Europe region (DR-020 / PLC-010b)** — superseding the earlier `DR_NOT_OFFERED` position (DEC-001 RESOLVED).
 
 | **Field**                                                       | **Value (fill at start)** |
 |-----------------------------------------------------------------|---------------------------|
@@ -130,29 +130,29 @@ Every item must be Verified = Y before Group 1 begins. Paste command output into
 | PF-06    | Consumer subscription has sufficient quota for the SKU under test                                  | az account set --subscription \<CONSUMER_SUB\> && az vm list-usage --location \<PRIMARY_REGION\> --query "\[?contains(name.value, '\<SKU_FAMILY\>')\]" -o table                                            |                  |           |
 | PF-07    | RBAC role verified on provider CRG scope (after CRG exists) or planned role assignments documented | az role assignment list --scope \<CRG_RESOURCE_ID\> -o table                                                                                                                                               |                  |           |
 | PF-08    | No existing CRGs that could conflict with test names                                               | az capacity reservation group list --resource-group \<PROVIDER_RG\> -o table                                                                                                                               |                  |           |
-| PF-09    | **Geography-aware** region model confirmed for the geography under test (see §3.1). Prod region ≠ non-prod/CVAL region in **all** geographies. | echo Prod=\<PRIMARY_REGION\> NonProd=\<NONPROD_REGION\>; test "\<PRIMARY_REGION\>" != "\<NONPROD_REGION\>" && echo PASS \|\| echo FAIL |                  |           |
-| PF-10    | DR placement confirmed per `distribution_model`: **three-region** geographies (US) → DR region distinct from both Prod and non-prod; **two-region** geographies → DR **co-located** with CVAL in the non-prod region (PLC-010a); **Middle East** → `DR_NOT_OFFERED` (DEC-001). | echo Model=\<DISTRIBUTION_MODEL\> Prod=\<PRIMARY_REGION\> NonProd=\<NONPROD_REGION\> DR=\<DR_REGION\>; # three-region: DR != Prod && DR != NonProd; two-region: DR == NonProd; middle-east: DR == NOT_OFFERED |                  |           |
+| PF-09    | **Geography-aware** region model confirmed for the geography under test (see §3.1). Prod region ≠ non-prod/CVAL region in three-region and two-region geographies; **[Amended v2.4] in the Middle East `cross-geo` model Prod and CVAL co-locate in-geo (Prod == NonProd is expected) and DR ≠ Prod (DR-020 / PLC-010b)**. | echo Model=\<DISTRIBUTION_MODEL\> Prod=\<PRIMARY_REGION\> NonProd=\<NONPROD_REGION\> DR=\<DR_REGION\>; # non-cross-geo: Prod != NonProd; cross-geo: Prod == NonProd && DR != Prod |                  |           |
+| PF-10    | DR placement confirmed per `distribution_model`: **three-region** geographies (US) → DR region distinct from both Prod and non-prod; **two-region** geographies → DR **co-located** with CVAL in the non-prod region (PLC-010a); **[Amended v2.4] Middle East (`cross-geo`)** → Prod and CVAL co-located in-geo, DR placed **cross-geo** in a Europe region distinct from the in-geo region (DR-020 / PLC-010b). | echo Model=\<DISTRIBUTION_MODEL\> Prod=\<PRIMARY_REGION\> NonProd=\<NONPROD_REGION\> DR=\<DR_REGION\>; # three-region: DR != Prod && DR != NonProd; two-region: DR == NonProd; cross-geo: NonProd == Prod && DR != Prod (DR in Europe) |                  |           |
 
 ## 3.1 Geography-aware region placement check (v2.4)
 
-> **v2.4 change.** The former "three distinct regions" absolute rule is **superseded**. Region separation is now **geography-aware**, driven by each geography's `distribution_model` (PLC-010a / ENV-003). Production is always separated from non-prod/CVAL; DR placement depends on how many Standard regions the geography offers.
+> **v2.4 change.** The former "three distinct regions" absolute rule is **superseded**. Region separation is now **geography-aware**, driven by each geography's `distribution_model` (PLC-010a / PLC-010b / ENV-003). Production is separated from non-prod/CVAL except in the Middle East `cross-geo` model where they co-locate in-geo; DR placement depends on the geography's model.
 
 **Rules by `distribution_model`:**
 
 - **Three-region geography** (today **US** is the only one): Prod, Non-Prod/CVAL, and DR each in a **distinct** region. All three of Prod≠NonProd, DR≠Prod, DR≠NonProd must hold.
 - **Two-region geography** (e.g. EU with Switzerland North + Sweden Central; APAC pairs): one region hosts **Prod**; the other region hosts **CVAL + DR co-located** (PLC-010a). Here **DR == NonProd/CVAL region is valid and expected** — it is not a violation. Prod≠NonProd still holds.
-- **Middle East**: **`DR_NOT_OFFERED`** — DR is not placed in-geo, on legal grounds (DR-014 / DEC-001). This is Middle-East-specific and must **not** be generalised to other two-region geographies.
+- **[Amended v2.4] Middle East (`cross-geo`)**: **Prod and CVAL/Non-Prod CO-LOCATE** in a weighted-selected Middle East Standard region (separate CRGs, ENV-003 — no capacity sharing), so **Prod == NonProd is expected and valid**. **DR is placed CROSS-GEO** in a weighted-selected **Europe** Standard region (DR-020 / PLC-010b), so **DR ≠ Prod** must hold and DR is a distinct region in a different geography. Both selections use the weighted capacity placement model. This **supersedes** the earlier `DR_NOT_OFFERED` position (DR-014 / DEC-001 **RESOLVED**). Data-residency: Europe is an approved cross-geo DR destination for Middle East (A-ME1); per-country carve-outs, where required, are handled by configuration and are out of engine scope.
 
 PF-09/PF-10 are blocking against the **applicable** rule above. Record the geography model and regions below and obtain DR Architect countersignature.
 
 | **Role** | **Region name** | **Conforms to `distribution_model`?** | **Sign-off** |
 |---|---|---|---|
-| Geography / `distribution_model` (three-region / two-region / DR_NOT_OFFERED) |                 | Y / N                   |              |
+| Geography / `distribution_model` (three-region / two-region / cross-geo) |                 | Y / N                   |              |
 | Prod (Primary)                                                               |                 | Y / N                   |              |
-| Non-Prod / CVAL                                                              |                 | Y / N                   |              |
-| DR (or `NOT_OFFERED`)                                                        |                 | Y / N                   |              |
+| Non-Prod / CVAL (co-located with Prod in `cross-geo`)                        |                 | Y / N                   |              |
+| DR (cross-geo in Europe for Middle East)                                     |                 | Y / N                   |              |
 
-*Reference: this mirrors the Phase 1 rework of `POC-Test-Scripts/acrme_suite/config.py` (per-geography `distribution_model`) and `preflight.py` (geography-aware PF-09/PF-10), and the positive two-region case POC-PLC-010a in Group 9.*
+*Reference: this mirrors the Phase 1 rework of `POC-Test-Scripts/acrme_suite/config.py` (per-geography `distribution_model`, incl. `cross-geo`) and `preflight.py` (geography-aware PF-09/PF-10), and the positive cases POC-PLC-010a (two-region) and POC-PLC-010b (cross-geo) in Group 9.*
 
 # 4. POC Test Groups
 
@@ -2074,17 +2074,18 @@ Where a v2.4 group case has both an **offline-logic** case and a **-LIVE** case 
 
 ---
 
-## Group 9: Reservation Eligibility & Two-Region Model (CAP-020 / CAP-021 / CAP-001a / PLC-010a)
+## Group 9: Reservation Eligibility & Region Distribution Model (CAP-020 / CAP-021 / CAP-001a / PLC-010a / PLC-010b)
 
-Validates reservation **eligibility** gating (Availability-Set exclusion and the onboarding placement precondition), the **core-subscription = production** classification, and the **positive** two-region CVAL+DR co-location case that the pre-v2.4 pre-flight wrongly blocked. Implemented in `POC-Test-Scripts/acrme_suite/tests/g9_reservation_eligibility.py`.
+Validates reservation **eligibility** gating (Availability-Set exclusion and the onboarding placement precondition), the **core-subscription = production** classification, the **positive** two-region CVAL+DR co-location case that the pre-v2.4 pre-flight wrongly blocked, and **[Amended v2.4] the positive Middle East `cross-geo` DR case** (Prod+CVAL co-located in-geo, DR placed cross-geo in Europe). Implemented in `POC-Test-Scripts/acrme_suite/tests/g9_reservation_eligibility.py`.
 
 > **Normative basis (Baseline v2.4).**
 > - **CAP-020 — Availability-Set VMs are ineligible for reservations.** Capacity Reservations cannot be associated with VMs in an Availability Set — the two placement constructs are mutually exclusive. The engine (a) **excludes** AV-Set VMs from eligibility and from the `allocated`/`associated` counts that drive reservation targets (CAP-003); (b) surfaces any managed-scope AV-Set VM as a **non-eligible exception** carrying the CAP-021 remediation action; and (c) never creates/associates/sizes a reservation for such a VM. Eligibility requires **zonal (AZ) placement**, or regional placement only where the SKU lacks zonal reservation support (per the CAP-022 matrix). Maps hard constraint **HC-11 (AVAILABILITY_SET_INELIGIBLE)**.
 > - **CAP-021 — Deallocate-or-migrate-to-AZ onboarding precondition.** Before onboarding, a VM must occupy a reservation-eligible placement (AZ preferred; regional only where the SKU has no zonal support). An AV-Set (or otherwise ineligible) VM must first be **deallocated and redeployed into an AZ** (or migrated per the approved runbook). The engine **records the required remediation** and treats the reservation as manageable only once the VM is confirmed eligible; it **does not auto-migrate running workloads** (redeployment is service-impacting and owned by the workload team).
 > - **CAP-001a — Core subscription = all production.** VMs in a shared **core** subscription are classified **production** for reservation, buffer, and seed-matrix purposes regardless of any per-workload label, because the core subscription underpins production service. Production buffer (C-2) and production reservation coverage (ENV-001) apply to every managed SKU/AZ in a core subscription. Non-production must not run in the core subscription (ENV-003).
 > - **PLC-010a — Two-region CVAL/DR co-location (positive).** In a two-region geography one region hosts Prod and the other hosts **CVAL + DR co-located**; this is a **supported, normative** configuration, not an error. Co-location accounting (HC-6, HC-7, PLC-010) must ensure co-located CVAL is not double-counted as available DR headroom.
+> - **[Amended v2.4] PLC-010b / DR-020 — Middle East cross-geo DR (positive).** In the Middle East `cross-geo` model **Prod and CVAL co-locate in a weighted-selected Middle East region** (separate CRGs, ENV-003 — co-location ≠ capacity sharing) and **DR is placed cross-geo in a weighted-selected Europe Standard region**. Both selections use the weighted capacity placement model. This is a **supported, normative** configuration (`Prod == NonProd` in-geo is expected; `DR ≠ Prod` and cross-geo). It **supersedes** the earlier Middle East `DR_NOT_OFFERED` position (DR-014 / DEC-001 **RESOLVED**). CVAL co-locates with Prod locally, so the CVAL-sacrifice DR bootstrap (DR-005/006) does **not** apply to the Middle East — ME DR uses dedicated reserved capacity in Europe (DR-017 max-not-sum applies at the Europe destination).
 
-*Group contains 5 POC entries (4 offline-logic + 1 LIVE). Offline-logic cases run via `python test_v24_reservation_model.py` with no Azure. Complete result capture before signing the group roll-up.*
+*Group contains 6 POC entries (5 offline-logic + 1 LIVE). Offline-logic cases run via `python test_v24_reservation_model.py` and `python test_region_model.py` with no Azure. Complete result capture before signing the group roll-up.*
 
 ### POC-CAP-020: Availability-Set VMs ineligible & uncounted (HC-11)
 
@@ -2152,7 +2153,7 @@ Validates reservation **eligibility** gating (Availability-Set exclusion and the
 2. Assert validation succeeds and DR==NonProd region is **not** flagged as a violation.
 3. Negative control: a single-region config (Prod==NonProd) must still fail.
 
-**Expected result** — Two-region co-location config validates cleanly; Prod≠NonProd enforced; DR==NonProd accepted under `distribution_model = two-region`. Middle East geography remains `DR_NOT_OFFERED` (DEC-001) and is asserted separately as not-a-general-outcome.
+**Expected result** — Two-region co-location config validates cleanly; Prod≠NonProd enforced; DR==NonProd accepted under `distribution_model = two-region`. **[Amended v2.4]** The Middle East is now the `cross-geo` model (asserted separately as **POC-PLC-010b**), superseding the earlier `DR_NOT_OFFERED` position (DEC-001 RESOLVED).
 
 **Result capture**
 
@@ -2161,6 +2162,36 @@ Validates reservation **eligibility** gating (Availability-Set exclusion and the
 | Executed by / date |  |
 | Two-region validation result |  |
 | Negative control result |  |
+| Status (Pass/Fail/Blocked) |  |
+
+### POC-PLC-010b: Middle East cross-geo DR is valid (positive) — [Amended v2.4]
+
+| Attribute | Value |
+|---|---|
+| POC ID | POC-PLC-010b (offline-logic) |
+| Requirement | PLC-010b / DR-020 / ENV-003 / REG-002 / REG-003 / A-ME1 |
+| Objective | Assert a Middle East `cross-geo` config (Prod + CVAL co-located in a weighted-selected Middle East region; DR placed cross-geo in a weighted-selected Europe region) **passes** validation and pre-flight — the positive case for the amended Middle East DR position. |
+| Phase Gate | Phase 1 Pilot (logic) |
+| Prerequisites | none (offline; builds an in-memory `cross-geo` `Config`) |
+
+**Test steps**
+1. Build a `cross-geo` `Config` (Prod=ME region, NonProd/CVAL=**same** ME region, DR=Europe region) and run `_populate()`/`validate()`.
+2. Assert validation succeeds: `Prod == NonProd` (in-geo co-location) is **not** flagged as a violation, and `DR != Prod` (cross-geo) is required.
+3. Run PF-09/PF-10 and assert both **pass** for the cross-geo model.
+4. Negative control A: `cross-geo` with `DR == Prod` (DR not cross-geo) must **fail**.
+5. Negative control B: `cross-geo` with `NonProd != Prod` (Prod/CVAL not co-located) must **fail**.
+
+**Expected result** — Cross-geo config validates cleanly and PF-09/PF-10 pass: Prod and CVAL co-locate in-geo (separate CRGs, ENV-003 — no capacity sharing) while DR is a distinct region cross-geo in Europe (DR-020 / PLC-010b). Both negative controls are correctly rejected. Confirms the Middle East cross-geo DR model end-to-end in the config/pre-flight logic (mirrors `test_region_model.py` cross-geo cases and `plc_010b_positive` in Group 9).
+
+**Result capture**
+
+| Field | Value |
+|---|---|
+| Executed by / date |  |
+| Cross-geo validation result |  |
+| PF-09 / PF-10 result |  |
+| Negative control A (DR==Prod) result |  |
+| Negative control B (NonProd!=Prod) result |  |
 | Status (Pass/Fail/Blocked) |  |
 
 ### POC-CAP-001a: Core subscription classified all-production
@@ -2581,8 +2612,8 @@ All items must be Pass before pilot customers are onboarded. Scope: discovery, i
 | POC-THROTTLE-01 baselines recorded for target subscriptions                         | POC-THROTTLE-01             | \[Not Started\] | SRE                            |                   |
 | G-14 permissions model security reviewed (Tier 3 remains disabled if unresolved)    | POC-20 + Security review    | \[Not Started\] | Security                       |                   |
 | POC-RI-01 discount scope validated before customer cost modelling                   | POC-RI-01                   | \[Not Started\] | FinOps                         |                   |
-| Geography-aware region model confirmed per `distribution_model` (three-region distinct; two-region CVAL/DR co-location; Middle East `DR_NOT_OFFERED`) | PF-09, PF-10, POC-PLC-010a | \[Not Started\] | DR Architect                   |                   |
-| v2.4 reservation-model offline logic passes (G9–G12: CAP-020/021/001a, PLC-010a/011, CAP-022/023/024, OPS-006) | `python test_v24_reservation_model.py` + POC-CAP-020/021/001a, POC-PLC-010a/011, POC-CAP-022/023/024, POC-OPS-006 | \[Not Started\] | Capacity Architect |                   |
+| Geography-aware region model confirmed per `distribution_model` (three-region distinct; two-region CVAL/DR co-location; **[Amended v2.4] Middle East `cross-geo` — Prod+CVAL co-located in-geo, DR cross-geo in Europe, DR-020/PLC-010b**) | PF-09, PF-10, POC-PLC-010a, POC-PLC-010b | \[Not Started\] | DR Architect                   |                   |
+| v2.4 reservation-model offline logic passes (G9–G12: CAP-020/021/001a, PLC-010a/**010b**/011, CAP-022/023/024, OPS-006) | `python test_v24_reservation_model.py` + `python test_region_model.py` + POC-CAP-020/021/001a, POC-PLC-010a/**010b**/011, POC-CAP-022/023/024, POC-OPS-006 | \[Not Started\] | Capacity Architect |                   |
 | POC-20 Tier 3 rejection confirmed in Phase 1 mode                                   | POC-20                      | \[Not Started\] | DR Owner + Security            |                   |
 | Preview risk formally accepted for bounded pilot                                    | PG-10 governance            | \[Not Started\] | Product Owner / Board          |                   |
 
@@ -2809,7 +2840,7 @@ Carry-forward constraints from the finalized architecture. Do not weaken during 
 | FC-18  | AKS node pool CRG change requires recreation                         | POC-AKS-02 documents disruption                     |
 | G-14   | Consumer credential model unresolved                                 | Tier 3 blocked; POC-20 must reject                  |
 | G-15   | Engine mode state machine incomplete                                 | DR automation blocked until implemented             |
-| D-REG  | Geography-aware region model (v2.4): Prod ≠ NonProd always; DR distinct only in three-region geos (US); DR co-located with CVAL in two-region geos (PLC-010a); Middle East `DR_NOT_OFFERED` (DEC-001) | PF-09/PF-10 evaluate against the geography's `distribution_model`; POC-PLC-010a is the positive two-region case |
+| D-REG  | Geography-aware region model (v2.4): Prod ≠ NonProd in three-region and two-region geos; DR distinct only in three-region geos (US); DR co-located with CVAL in two-region geos (PLC-010a); **[Amended v2.4] Middle East `cross-geo` — Prod+CVAL co-located in-geo, DR cross-geo in Europe (DR-020 / PLC-010b), superseding the earlier `DR_NOT_OFFERED` position (DEC-001 RESOLVED)** | PF-09/PF-10 evaluate against the geography's `distribution_model`; POC-PLC-010a is the positive two-region case, POC-PLC-010b the positive cross-geo case |
 | T3     | Tier 3 human-only in Phase 1                                         | No automation; VMSS Tier 3 rejected                 |
 
 # Appendix D — Cleanup Procedure

@@ -235,9 +235,9 @@ Grounded in the deployment-layout reference and the region catalogue (REG-001). 
 | **Europe** | 2-region | Prod; CVAL+DR co-located | Sweden Central (Prod) / Switzerland North (CVAL+DR) | 12 total (4 Prod + 4 CVAL + 4 DR; CVAL & DR share region, **separate subs/CRGs**) | Co-location mandatory (PLC-010a); `cval_region == dr_region` |
 | **Australia** | 2-region | Prod; CVAL+DR co-located | Australia East (Prod) / Australia Southeast (CVAL+DR) | 12 total | Same co-location pattern as EU |
 | **Asia Pacific** | 2-region | Prod; CVAL+DR co-located | East Asia (Prod) / Southeast Asia (CVAL+DR) | 12 total | Japan East pending (REG-001) — not built until confirmed |
-| **Middle East** | 2-region | Prod; CVAL (optional) | Saudi Arabia Central (Prod) / UAE North (CVAL) | 8 total (4 Prod + 4 CVAL); **no DR** | `DR_NOT_OFFERED` (DEC-001) — build **no DR CRGs**; seed record `dr_region = null` |
+| **Middle East** | **[Amended v2.4]** cross-geo DR | Prod+CVAL co-located in a weighted-selected ME region; DR cross-geo in a weighted-selected Europe region | 12 total (4 Prod + 4 CVAL in ME, **separate subs/CRGs**; 4 DR in Europe) | Cross-geo DR (PLC-010b, DR-020, DEC-001 RESOLVED); Prod+CVAL `region == ME region`, DR `region ∈ Europe`; Europe destination sizes DR max-not-sum (DR-017) |
 
-> **Two-region reminder (memory-checked).** In EU/Australia/Asia Pacific, one region hosts **Prod** and the other hosts **CVAL + DR co-located** — DR **is** offered in-geo. `DR_NOT_OFFERED` is **Middle-East-specific** (legal/residency), not a general two-region outcome. Do not skip DR CRGs for EU/AU/APAC.
+> **Distribution-model reminder (memory-checked).** In EU/Australia/Asia Pacific, one region hosts **Prod** and the other hosts **CVAL + DR co-located** — DR **is** offered in-geo (PLC-010a). **[Amended v2.4]** The **Middle East** is the exception: Prod+CVAL co-locate in one ME region and **DR is built cross-geo in a weighted-selected Europe region** (PLC-010b, DR-020, DEC-001 RESOLVED) — build ME Prod+CVAL CRGs locally and DR CRGs in the selected Europe region. Do not skip DR CRGs for any geography.
 
 ---
 
@@ -279,7 +279,7 @@ Every relevant creation-phase requirement mapped to a plan step and its validati
 | QUA-002/007 quota present | §3 PRE-07 | V8 |
 | REG-001/003 catalogue + distribution | §3 PRE-05, §9 inventory | inventory review |
 | PLC-010a co-location (2-region) | §9 notes | Phase 2 co-location check |
-| DEC-001 Middle East DR_NOT_OFFERED | §9 (no DR CRGs for ME) | inventory review |
+| **[Amended v2.4]** DEC-001 RESOLVED — Middle East cross-geo DR | §9 (ME Prod+CVAL local; DR CRGs in weighted Europe region) | inventory review |
 | DR-003/004 lean DR (seed at 0/bootstrap) | §7.1 seed at 0 | V4 |
 | HC-6/HC-7 co-location capacity floor | Phase 2 exit criteria | Phase 2 check |
 

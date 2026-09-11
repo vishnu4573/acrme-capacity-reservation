@@ -13,7 +13,7 @@ flowchart TD
       USR["Restricted (exception path only):<br/>East US 2"]
     end
 
-    subgraph EU["Europe Geography — 2-region model"]
+    subgraph EU["Europe Geography — 2-region model + cross-geo DR destination for ME"]
       direction TB
       EUS["Standard (automated placement):<br/>Switzerland North · Sweden Central"]
       EUR["Restricted (exception path only):<br/>North Europe · West Europe"]
@@ -30,18 +30,18 @@ flowchart TD
       APP["Pending confirmation:<br/>Japan East (not selectable until added to config)"]
     end
 
-    subgraph ME["Middle East Geography — 2-region model"]
+    subgraph ME["Middle East Geography — cross-geo DR model [Amended v2.4]"]
       direction TB
-      MES["Standard (automated placement):<br/>UAE North · Saudi Arabia Central"]
-      MEDR["DR status: DR_NOT_OFFERED<br/>(DR-014, DEC-001 — under legal review)"]
-      MEX["Conditional cross-geo DR → Switzerland North<br/>INACTIVE until DEC-001 legal clearance"]
+      MES["Standard (Prod + CVAL, co-located):<br/>UAE North · Saudi Arabia Central"]
+      MEDR["DR status: OFFERED cross-geo into Europe<br/>(DR-020, PLC-010b, DEC-001 RESOLVED)"]
+      MEX["DR = weighted-selected Europe Standard region<br/>(Switzerland North = default example, not fixed)"]
       MES --> MEDR --> MEX
     end
 
     STD["Standard Capacity Regions →<br/>eligible for automated placement of<br/>Prod, CVAL/NonProd & DR<br/>(PS scoring via HC-8 / HC-9)"]
     RES["Restricted Regions →<br/>Prod-only exception path<br/>(Scenario 2, operator approval;<br/>CVAL/DR never allowed — VR-6)"]
-    COLO["2-region distribution (all geos except US):<br/>Prod in one region;<br/>CVAL + DR co-located in the other<br/>(mandatory & deterministic — PLC-010a)"]
-    XGEO["Cross-geo extension →<br/>conditional only<br/>(DEC-001 required for Middle East)"]
+    COLO["2-region co-located distribution (EU · Australia · Asia Pacific):<br/>Prod in one region;<br/>CVAL + DR co-located in the other<br/>(mandatory & deterministic — PLC-010a)"]
+    XGEO["Cross-geo DR (Middle East) [Amended v2.4]:<br/>Prod + CVAL co-located in a weighted-selected ME region;<br/>DR placed cross-geo in a weighted-selected Europe region<br/>(weighted model; DR-020, PLC-010b; Europe sizes DR max-not-sum, DR-017)"]
 
     USS -.-> STD
     EUS -.-> STD
@@ -55,7 +55,7 @@ flowchart TD
     EUS -.-> COLO
     AUS -.-> COLO
     APS -.-> COLO
-    MES -.-> COLO
+    EUS -.-> XGEO
 
-    NOTE["Regions are canonical examples from the Requirements Baseline v2.3 Section 6,<br/>Hard Constraints Reference and Calculation Logic Reference. Actual Azure region<br/>inventory may differ; the authoritative Standard/Restricted lists and each<br/>geography's distribution model live in PlacementPolicy (HC-8 / HC-9 / REG-001)."]
+    NOTE["Regions are canonical examples from the Requirements Baseline v2.4 Section 6,<br/>Hard Constraints Reference and Calculation Logic Reference. Actual Azure region<br/>inventory may differ; the authoritative Standard/Restricted lists and each<br/>geography's distribution model live in PlacementPolicy (HC-8 / HC-9 / REG-001)."]
     ROOT -.-> NOTE

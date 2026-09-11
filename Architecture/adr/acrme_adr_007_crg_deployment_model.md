@@ -104,7 +104,7 @@ The following requirements constrain this ADR. All are mandatory unless tagged [
 
 `[Baseline Requirement — NFR-004]` The engine operates across **hundreds** of subscriptions, multiple regions/zones, VM families, products, and seed records.
 
-`[Baseline Requirement — PLC-010a]` In a two-region geography (Europe, Australia, Asia Pacific, Middle East), CVAL and DR co-locate deterministically in the non-Prod region. This is mandatory, not optional. HC-6 and HC-7 combined-capacity checks apply to the shared co-located pool.
+`[Baseline Requirement — PLC-010a]` In a two-region **co-located** geography (Europe, Australia, Asia Pacific), CVAL and DR co-locate deterministically in the non-Prod region. This is mandatory, not optional. HC-6 and HC-7 combined-capacity checks apply to the shared co-located pool. **[Amended v2.4 — PLC-010b]** The **Middle East is no longer a two-region co-located geography**: it uses the **cross-geo DR** model (Prod+CVAL co-located in a Middle East region, DR in a weighted-selected Europe region — DR-020), so its CVAL and DR are **not** co-located and the CVAL-sacrifice bootstrap does not apply to it.
 
 `[Baseline Requirement — CAP-020]` Availability-Set VMs are ineligible for zonal on-demand capacity reservations. They are rejected from the zonal reservation / per-AZ CRG path at onboarding.
 
@@ -626,7 +626,7 @@ The 90-subscription alert threshold provides a 10-subscription runway for shard 
 - **Warming role:** CVAL VMs keep the CVAL CRs warm (allocated, not merely associated) so the capacity pool remains exercised and the AZ slot is proven available (DR-005).
 - **HC-7 enforcement:** NonProd allocation is bounded by `effective_nonprod_ceiling = NonProd_DR_Group_Limit − DR_Floor_vCPU`. Engine rejects CVAL allocation requests that would breach the DR floor.
 - **CVAL sacrifice:** On DR declaration (DR-006 Stage 3), eligible CVAL VMs are shut down and disassociated. Their reservation slots are released to DR consumers. The engine records the sacrifice event and reacquires CVAL CRs post-failback.
-- **Two-region geographies (PLC-010a):** In Europe, Australia, Asia Pacific, and Middle East, CVAL and DR mandatory co-locate in the single non-Prod region. This is the default outcome, not an exception. HC-6/HC-7 apply to the combined pool.
+- **Two-region co-located geographies (PLC-010a):** In Europe, Australia, and Asia Pacific, CVAL and DR mandatory co-locate in the single non-Prod region. This is the default outcome, not an exception. HC-6/HC-7 apply to the combined pool. **[Amended v2.4]** The **Middle East is excluded** — it uses cross-geo DR (PLC-010b, DR-020), so CVAL co-locates with Prod locally and DR is a dedicated reserved standby in a weighted-selected Europe region (no CVAL sacrifice).
 
 ### 11.3 DR
 
@@ -644,7 +644,7 @@ The 90-subscription alert threshold provides a 10-subscription runway for shard 
   6. Request additional Azure quota/capacity if required.
   7. Report unrecoverable capacity gaps.
 - **Failback:** CVAL CRs are re-provisioned post-failback; the DR bootstrap state is restored.
-- **Middle East:** DR track is `DR_NOT_OFFERED` per DR-014/DEC-001 until legal approval. No DR consumer subscriptions are granted access in Middle East geographies under current legal status.
+- **Middle East [Amended v2.4]:** DR is now **offered as cross-geo DR** (DR-020, PLC-010b; supersedes DR-014/DEC-001 `DR_NOT_OFFERED`). Prod+CVAL co-locate in a selected Middle East region (separate CRGs, ENV-003); DR is a **dedicated reserved standby in a weighted-selected Europe region**, provisioned via a DR consumer/provider subscription in the **Europe** destination (not in the Middle East). No CVAL-sacrifice bootstrap applies to the Middle East. Per-country data-residency carve-outs (A-ME1) may still flag specific countries `DR_NOT_OFFERED` by config.
 - **POC-006:** Dedicated DR subscription vs shared production subscription remains open. This ADR recommends a dedicated DR subscription in the CVAL/DR track (separate from CVAL consumer subscriptions) to maintain sub-level audit separation. `[Architecture Recommendation — POC-gated]`
 
 ### 11.4 Annual Mock DR
@@ -963,7 +963,8 @@ The baseline has no requirement governing the provider subscription model. This 
 | GOV-001–003 | ✅ Compatible | Least-privilege RBAC; MG-scoped grants; automation scoped by domain. |
 | CAP-016/017 | ✅ Compatible | Pre-deploy validation includes consumer-subscription authorisation check. |
 | CAP-020/021 | ✅ Compatible | Heritage AS VMs excluded from shared CRG path until remediated. |
-| PLC-010a | ✅ Compatible | CVAL/DR co-location in shared CVAL/DR provider sub per track. |
+| PLC-010a | ✅ Compatible | CVAL/DR co-location in shared CVAL/DR provider sub per track (Europe, Australia, Asia Pacific). |
+| PLC-010b **[Amended v2.4]** | ✅ Compatible | Middle East cross-geo DR: Prod+CVAL co-located in a Middle East region (separate CRGs); DR as a dedicated reserved CRG in a weighted-selected Europe region. No CVAL-sacrifice path. |
 | HC-6/HC-7 | ✅ Compatible | Combined capacity checks applied to shared CVAL/DR CRGs. |
 | POC-001 | ⚠️ Dependency | Quota in consumer sub — must be validated before production reliance. |
 | POC-006 | ⚠️ Dependency | Dedicated DR sub recommendation is POC-gated. |

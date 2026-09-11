@@ -305,7 +305,7 @@ classDiagram
 - **All entities**: Cosmos DB partition keys, indexes, TTL settings TBD
 
 ### Relationships (cardinality/constraints TBD):
-- CustomerRegionAssignment → CRG: geography-aware region-distinctness constraint — three-region geography (US) requires Prod, CVAL, DR distinct; two-region geography requires Prod distinct with **CVAL + DR co-located** (PLC-010a); `DR_NOT_OFFERED` geography (Middle East, DEC-001) has Prod + CVAL only (enforced in placement validation / PlacementPolicy)
+- CustomerRegionAssignment → CRG: geography-aware region-distinctness constraint — three-region geography (US) requires Prod, CVAL, DR distinct; two-region geography (EU/Australia/Asia Pacific) requires Prod distinct with **CVAL + DR co-located** (PLC-010a); **[Amended v2.4]** the **Middle East is a cross-geo DR geography** (PLC-010b, DR-020, DEC-001 RESOLVED) — Prod + CVAL co-located in a weighted-selected Middle East region (separate CRGs) with **DR placed cross-geo in a weighted-selected Europe region** (enforced in placement validation / PlacementPolicy)
 - QuotaGroup → CRG: One group can contain multiple CRGs in same region, exact cardinality TBD
 - SharingRelationship: 100-consumer hard limit per CRG (enforced in entity or service layer?)
 

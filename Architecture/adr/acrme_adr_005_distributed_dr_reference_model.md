@@ -7,7 +7,9 @@
 
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR consolidates the distributed DR reference model (Section 12A of the requirements baseline) that was previously distributed across ADR-003 and the calculation logic reference. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 >
-> **v2.4 reconciliation note — no DR-model change.** The distributed, reciprocal DR reference model, max-not-sum destination sizing (DR-017), the `SourceDestinationDRIndex` (DR-018), the reference topology and the Middle East `DR_NOT_OFFERED` carve-out (DR-014, DEC-001) are **unchanged** by Baseline v2.4. v2.4 folds in only the *reservation-model* gaps (seed matrix CAP-022, per-AZ CRG structure CAP-023, reactive discovery CAP-024, Availability-Set ineligibility CAP-020/021, even zone distribution PLC-011, naming OPS-006/C-12), none of which alter this reference model. Where DR sizing is applied **per zone**, the per-zone floors are held in the destination's per-AZ CRGs (CAP-023) and are kept balanced by the PLC-011 even-distribution target — see ADR-003 *DR Sizing Formula* for that cross-reference.
+> **v2.4 reconciliation note — reservation-model gaps.** The distributed, reciprocal DR reference model, max-not-sum destination sizing (DR-017), the `SourceDestinationDRIndex` (DR-018) and the reference topology are **unchanged** by the *reservation-model* gaps folded into Baseline v2.4 (seed matrix CAP-022, per-AZ CRG structure CAP-023, reactive discovery CAP-024, Availability-Set ineligibility CAP-020/021, even zone distribution PLC-011, naming OPS-006/C-12). Where DR sizing is applied **per zone**, the per-zone floors are held in the destination's per-AZ CRGs (CAP-023) and are kept balanced by the PLC-011 even-distribution target — see ADR-003 *DR Sizing Formula* for that cross-reference.
+>
+> **v2.4 (amended) note — Middle East DR now offered (cross-geo to Europe).** As of the 11 Sep 2026 amendment to baseline v2.4, the Middle East `DR_NOT_OFFERED` carve-out (former DR-014/DEC-001) is **superseded**. Middle East DR **is now offered** as a **cross-geo DR** model (DR-020, PLC-010b): **Prod and CVAL co-locate in a selected Middle East Standard region** and **DR is placed cross-geo in a weighted-selected Europe Standard region**. Middle East regions are **sources** in this reference model (they emit `source → Europe destination` index rows); the DR standby is sized and earmarked in the Europe destination using dedicated reserved capacity. The CVAL-sacrifice bootstrap (DR-005/006) does **not** apply to the Middle East (CVAL co-locates with Prod locally, not with DR). Europe Standard regions become cross-geo DR destinations that absorb Middle East DR load in addition to their own two-region co-located role. The affected sections below carry inline **[Amended v2.4]** markers.
 
 ---
 
@@ -16,8 +18,8 @@
 **Status:** Accepted  
 **Date:** 2 September 2026  
 **Deciders:** Principal Cloud Architect, DR Owner, Platform Engineering, FinOps, Capacity Planning  
-**Related requirements:** DR-006, DR-007, DR-009, DR-013, DR-016, DR-017, DR-018, DR-019, PLC-003..PLC-005, PLC-010, DAT-002, DAT-003, OBS-001..OBS-004  
-**Related POCs/decisions:** POC-006 (DR topology), POC-007 (bootstrap sizing), POC-011 (max-not-sum overcommit safety), DEC-001 (Middle East DR), DEC-002 (failback duration)  
+**Related requirements:** DR-006, DR-007, DR-009, DR-013, DR-016, DR-017, DR-018, DR-019, **DR-020**, PLC-003..PLC-005, PLC-010, **PLC-010b**, DAT-002, DAT-003, OBS-001..OBS-004, **A-ME1**  
+**Related POCs/decisions:** POC-006 (DR topology), POC-007 (bootstrap sizing), POC-011 (max-not-sum overcommit safety), DEC-001 (Middle East DR — **RESOLVED v2.4 amended: cross-geo DR to Europe**), DEC-002 (failback duration)  
 **Related ADRs:** ADR-001 (seed record), ADR-002 (single governed quota pool, DR earmark), ADR-003 (lean bootstrap, activation, CVAL earmark, state machine)
 
 ## Context
@@ -48,25 +50,29 @@ Adopt the **distributed, reciprocal DR reference model** with the following norm
 
 8. **Activation is source-specific and wave-ordered.** A declared source-region failure activates only that source's mapped standby set, in business-priority waves, via the ADR-003 staged acquisition sequence, and is reversible on failback. `[Decided]`
 
-9. **`DR_NOT_OFFERED` geographies are excluded from the reciprocal model (DR-014, DEC-001).** Where legal/data-sovereignty prevents an acceptable DR design, the geography is flagged `DR_NOT_OFFERED` and **does not participate** in the distributed, reciprocal, max-not-sum model at all: its customers get `dr_region = NOT_OFFERED` in the seed, contribute **no** entries to the `SourceDestinationDRIndex`, and are **never** sized, earmarked, or activated as a source or destination. The **current legal position for the Middle East is `DR_NOT_OFFERED`** (see the carve-out below). `[Decided]`
+9. **`DR_NOT_OFFERED` geographies are excluded from the reciprocal model (DR-014).** Where legal/data-sovereignty prevents an acceptable DR design, the geography is flagged `DR_NOT_OFFERED` and **does not participate** in the distributed, reciprocal, max-not-sum model at all: its customers get `dr_region = NOT_OFFERED` in the seed, contribute **no** entries to the `SourceDestinationDRIndex`, and are **never** sized, earmarked, or activated as a source or destination. **[Amended v2.4] The Middle East is no longer `DR_NOT_OFFERED`** — it now participates via the cross-geo DR model (DR-020, see the Middle East section below). The flag remains available for any future geography/country Legal declares no-DR. `[Decided]`
 
-## Middle East DR Carve-Out (DR-014, DEC-001) — currently `DR_NOT_OFFERED`
+10. **Cross-geo DR participation (Middle East → Europe) [Amended v2.4] (DR-020, PLC-010b).** A cross-geo DR geography participates as a **source only within its own regions** and as a **destination in the paired geography**. For the Middle East: Middle East Standard regions (e.g., Saudi Arabia Central, UAE North) are **DR sources** whose mapped **destinations are weighted-selected Europe Standard regions**. The Europe destination sizes the Middle East DR standby using **max-not-sum** across all sources it serves (DR-017) and holds it as **dedicated reserved capacity**; the Middle East CVAL is **not** sacrificed for bootstrap (DR-005/006 do not apply). The `source → destination` rows are cross-geo and subject to sovereignty/zone-alignment constraints (HC-10) and the data-residency assumption A-ME1. `[Decided]`
 
-> **As it stands, DR is NOT offered in the Middle East.** The baseline (current v2.4) records that Legal has taken ownership of the Middle East programme and that, because a large share of Middle East customers are government/medical-associated, **data-sovereignty / data-residency laws mean cross-border DR cannot meet residency requirements** (baseline Section 2 Strategic Drivers, Section 5.2 Out of Scope "Final Middle East DR offering (pending legal/business direction)", Section 6 "Middle East is legal-owned with no DR", and **DR-014**). This is an open **legal/business decision, DEC-001**, and one of the programme's remaining major architectural risks (baseline Section 25).
+## Middle East Cross-Geo DR Model [Amended v2.4] (DR-020, PLC-010b — supersedes DR-014/DEC-001 `DR_NOT_OFFERED`)
+
+> **DR is now offered in the Middle East as a cross-geo DR model.** Per the 11 Sep 2026 amendment to baseline v2.4, the former `DR_NOT_OFFERED` position (DR-014/DEC-001) is **superseded**. **Prod and CVAL co-locate in a selected Middle East Standard region** (separate CRGs — co-location in a region is not capacity sharing, ENV-003) and **DR is placed cross-geo in a weighted-selected Europe Standard region**. Both the Middle East (Prod+CVAL) source selection and the Europe (DR) destination selection run the **weighted capacity placement model** (baseline Section 6, REG-002/REG-003). Data residency of the DR copy is governed by assumption **A-ME1** (Europe as the approved cross-geo destination); per-country legal carve-outs remain possible but are out of scope of the automated engine (baseline Section 5).
+
+> **Historical note.** Prior to v2.4 (amended), the Middle East was `DR_NOT_OFFERED` (DR-014/DEC-001): Legal owned the programme and cross-border DR was held to be incompatible with data-residency laws for a largely government/medical customer base. That position has been reversed — Europe is now an approved cross-geo DR destination for the Middle East.
 
 Normative consequences for this reference model:
 
-1. **No reciprocal DR topology in the Middle East.** The many-to-many Prod/CVAL/DR reciprocal roles (Decision 2) and max-not-sum sizing (Decision 5) **do not apply** to Middle East regions (Saudi Arabia Central, UAE North) while `DR_NOT_OFFERED = true`. Middle East regions carry Prod (and may carry CVAL) but hold **no DR standby** and are **not** DR destinations for any source. `[Decided]`
+1. **Middle East regions are DR sources, Europe regions are their destinations.** Middle East Standard regions (Saudi Arabia Central, UAE North) carry **Prod + CVAL co-located** and are **DR sources**. Their mapped **destinations are weighted-selected Europe Standard regions** (not a single fixed region). The many-to-many reciprocal roles (Decision 2) apply **across the geography pair**: a Middle East source maps to a Europe destination; the Europe region continues to serve its own two-region co-located role in addition. `[Decided]`
 
-2. **No index entries, no earmark, no activation.** Middle East customers produce `dr_region = NOT_OFFERED` seeds (ADR-001), so they add **no** `source → destination` rows, consume **no** `DR_Earmark_vCPU`, and are **never** included in a standby activation set. Middle East **production may still exist** without any DR obligation (DR-014). `[Decided]`
+2. **Index entries, earmark and activation at the Europe destination.** Middle East customers produce `dr_region = <Europe region>` seeds (ADR-001), adding cross-geo `source → destination` rows to the `SourceDestinationDRIndex`. The DR standby is **sized with max-not-sum (DR-017) and earmarked as `DR_Earmark_vCPU` in the Europe destination**, held as **dedicated reserved capacity**. A declared Middle East source-region failure activates only that source's mapped Europe standby set, wave-ordered (Decision 8). `[Decided]`
 
-3. **Switzerland North is a pre-configured, conditional extension only.** Switzerland North is held in `PlacementPolicy` as the Middle East's cross-geo DR extension so DR *can* be enabled quickly **if and only if** Legal records a DEC-001 approval that clears `DR_NOT_OFFERED`. Until then the path is **inactive** and the engine must **not** auto-assign it. If DEC-001 later approves ME DR, the Switzerland North destination joins the reciprocal/max-not-sum model under the standard cross-geo constraints (sovereignty/zone alignment, HC-10). `[Decided]`
+3. **No CVAL-sacrifice bootstrap for the Middle East (DR-005/006 do not apply).** Because CVAL co-locates with **Prod locally** in the Middle East (not with DR), the CVAL-sacrifice DR bootstrap does not apply. The Europe DR standby is provisioned as dedicated reserved capacity from the start; this is the key contrast with the two-region co-located geographies. `[Decided]`
 
-4. **DEC-001 is the single switch.** Turning ME DR on is a configuration change to `dr_not_offered["Middle East"] = false`, gated by a recorded legal approval; no code change is required (FIN-002, C-8). Reversible if the legal position changes. `[Decided]`
+4. **Cross-geo constraints apply.** The Middle East → Europe mapping is a cross-geo case and is subject to sovereignty/zone-alignment constraints (HC-10) and the data-residency assumption A-ME1. If Legal changes the approved destination geography or adds per-country carve-outs, the affected Middle East regions revert to `DR_NOT_OFFERED` for those countries (config change, no code change; FIN-002, C-8). Reversible. `[Decided]`
 
 ## Reference Topology
 
-> **Scope note.** The three-region reciprocal footprint below is illustrative of a **DR-offered geography** (e.g., North America or Europe under the current NA+Europe focus). It is **not** the Middle East: per the carve-out above, Middle East regions are excluded from this reciprocal model while `DR_NOT_OFFERED` holds.
+> **Scope note.** The three-region reciprocal footprint below is illustrative of a **three-region DR-offered geography** (e.g., North America). It is **not** the Middle East: **[Amended v2.4]** the Middle East now uses the **cross-geo DR** model (Prod+CVAL in a Middle East region, DR in a weighted-selected Europe region — see the Middle East Cross-Geo DR Model section above), so its topology is a source→destination geography pair rather than an in-geo three-region footprint.
 
 The reference footprint used in the Section 12A worked example spans three regions (R1, R2, R3). Each region carries its own production and CVAL workloads and hosts distributed DR standby for the *other* regions' production. The `src Rn` tag on each standby cell identifies the source region whose production that standby protects.
 
@@ -176,7 +182,8 @@ The distributed model is auditable only if the following are exposed:
 - Under-protects genuinely concurrent multi-source failures unless SUM override or extra earmark is configured. `[Derived]`
 - Requires the `SourceDestinationDRIndex` to be kept fresh and consistent with seeds. `[Decided]`
 - Overcommit visibility and safety ceilings depend on POC-011 evidence. `[Assumed]`
-- Cross-geo cases add sovereignty/zone-alignment constraints to the mapping — and where sovereignty forbids DR entirely (the **Middle East, currently `DR_NOT_OFFERED` pending DEC-001**), the geography is excluded from the model altogether (see the Middle East DR Carve-Out above); the Switzerland North extension is pre-configured but inactive until legal approval. `[Derived]`
+- Cross-geo cases add sovereignty/zone-alignment constraints to the mapping. **[Amended v2.4]** The **Middle East** now participates as a cross-geo DR source whose destinations are weighted-selected **Europe** Standard regions (DR-020, PLC-010b; see the Middle East Cross-Geo DR Model above), governed by data-residency assumption A-ME1. `DR_NOT_OFFERED` remains available for any future geography/country Legal declares no-DR. `[Derived]`
+- **[Amended v2.4]** Europe Standard regions now absorb Middle East DR load in addition to their own two-region co-located DR, increasing the max-not-sum earmark those regions must hold. `[Derived]`
 
 ## Alternatives Considered
 
@@ -194,7 +201,7 @@ The distributed model is auditable only if the following are exposed:
 
 | ADR | Requirements Applied | Key Open Items |
 |---|---|---|
-| ADR-005 Distributed DR Reference Model | DR-006/007/009/013/016..019, PLC-003..005/010, DAT-002/003, OBS-001..004 | POC-006 topology; POC-007 bootstrap sizing; POC-011 overcommit safety ceiling; DEC-001 Middle East DR |
+| ADR-005 Distributed DR Reference Model | DR-006/007/009/013/016..020, **DR-020**, PLC-003..005/010, **PLC-010b**, DAT-002/003, OBS-001..004, **A-ME1** | POC-006 topology; POC-007 bootstrap sizing; POC-011 overcommit safety ceiling; ~~DEC-001~~ **RESOLVED — Middle East DR now offered (cross-geo to Europe, v2.4 amended)**; per-country ME data-residency carve-outs (Legal) |
 
 ## Appendix - Status Legend
 
@@ -224,4 +231,4 @@ The distributed model is auditable only if the following are exposed:
 ---
 
 **Document Status:** Accepted  
-**Next Review:** After POC-006, POC-007, POC-011, DEC-001, and first `SourceDestinationDRIndex` implementation test.
+**Next Review:** After POC-006, POC-007, POC-011, and first `SourceDestinationDRIndex` implementation test. (DEC-001 resolved — Middle East DR now offered as cross-geo DR to Europe, v2.4 amended 11 Sep 2026.)

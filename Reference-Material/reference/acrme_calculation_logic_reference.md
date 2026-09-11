@@ -4,7 +4,7 @@
 > This revision folds in the Baseline v2.4 reservation-model gaps. It adds **Scenario 21 — Even Per-Zone Distribution & Rebalancing** with the new **Appendix A.9** formulas (`zone_target_share = 1/zone_count`, greatest-deficit-first zone selection, drift-based rebalancing, config **C-13**) and a worked three-zone example, and records the naming-convention config (**C-12**, OPS-006) in the constant table. The reservation-eligibility (CAP-020/021), seed-matrix (CAP-022), reactive-discovery (CAP-024), per-AZ CRG structure (CAP-023), core-subscription classification (CAP-001a) and decommissioning-boundary (CAP-008/010) decisions are captured in ADR-002, the FDD, the TDD, and the requirements baseline; the arithmetic new in v2.4 is A.9. All other calculation logic is unchanged.
 >
 > **Revision v2.3 — 7 September 2026.**
-> This revision reconciles the reference to the **five-geography region model** (baseline Section 6): the **US** is the only **three-region** geography (West US 3, Central US, Canada Central; East US 2 Restricted); **EU** (Switzerland North + Sweden Central; North Europe & West Europe Restricted), **Australia** (Australia East + Australia Southeast), **Asia Pacific** (East Asia + Southeast Asia; Japan East **pending**) and the **Middle East** (UAE North + Saudi Arabia Central) are **two-region** geographies. In every two-region geography, **CVAL and DR co-locate** in the non-production region (**PLC-010a**), except the Middle East where DR is `DR_NOT_OFFERED` (DEC-001). Scenario 4 is retitled a **two-region** deployment accordingly; all other calculation logic is unchanged.
+> This revision reconciles the reference to the **five-geography region model** (baseline Section 6): the **US** is the only **three-region** geography (West US 3, Central US, Canada Central; East US 2 Restricted); **EU** (Switzerland North + Sweden Central; North Europe & West Europe Restricted), **Australia** (Australia East + Australia Southeast), **Asia Pacific** (East Asia + Southeast Asia; Japan East **pending**) and the **Middle East** (UAE North + Saudi Arabia Central) are **two-region** geographies. In every two-region co-located geography (EU/Australia/Asia Pacific), **CVAL and DR co-locate** in the non-production region (**PLC-010a**). **[Amended v2.4]** The **Middle East uses a cross-geo DR model**: Prod+CVAL co-locate in a weighted-selected Middle East region and DR is placed cross-geo in a weighted-selected **Europe** Standard region (PLC-010b, DR-020, DEC-001 RESOLVED). Scenario 4 reflects this; all other calculation logic is unchanged.
 >
 > **Revision v2.2 — 27 August 2026.**
 > This document supersedes the previous calculation logic reference. Key changes in v2.2:
@@ -46,7 +46,7 @@ evidence tag:
 | 1 | Prod region derivation — customer picks a **geography** (**exception path**; explicit approval + customer acknowledgement required) | `argmax(PS_Prod)` over Standard regions | Current |
 | 2 | Prod region validation — customer supplies the **exact region** (**default input**; ACRME validates, does not derive) | HC-1..HC-10 gate + `PS_Prod` post-validation | Current |
 | 3 | Restricted region request | Exception workflow (no scoring) | Current |
-| 4 | Middle East two-region deployment | `argmax(PS_Prod)` in-geo; **DR currently `NOT_OFFERED`** (DR-014, DEC-001 under legal review) — Switzerland North cross-geo DR is pre-configured but **inactive**, conditional on DEC-001 | **Updated** |
+| 4 | Middle East cross-geo DR deployment | **[Amended v2.4]** weighted `argmax(PS_Prod)` in-geo for Prod+CVAL (co-located); **DR placed cross-geo in a weighted-selected Europe Standard region** (DR-020, PLC-010b, DEC-001 RESOLVED) | **Updated (v2.4)** |
 | 5 | CVAL / NonProd region selection | `argmax(PS_NonProd)` | Current |
 | 6 | DR region selection | `argmax(PS_DR)` | Current |
 | 7 | Hard-constraint eligibility gate | HC-3, HC-6, HC-7 arithmetic | Current |
@@ -248,48 +248,36 @@ never enter the scoring pipeline. `[Decided]`
 
 ---
 
-## Scenario 4 — Middle East Two-Region Deployment (Current position: `DR_NOT_OFFERED`)
+## Scenario 4 — Middle East Cross-Geo DR Deployment (v2.4 — DEC-001 RESOLVED)
 
-**Trigger:** a Middle East deployment requiring Prod + CVAL (and, subject to legal, DR). The Middle East is a **two-region** geography (UAE North + Saudi Arabia Central); with DR `NOT_OFFERED`, production is placed in one region and CVAL in the other.
+**Trigger:** a Middle East deployment requiring Prod + CVAL + DR. **[Amended v2.4]** The Middle East now uses a **cross-geo DR model**: Prod and CVAL are placed (co-located, separate CRGs) in a weighted-selected Middle East region, and DR is placed cross-geo in a weighted-selected **Europe** Standard region.
 
-> **⚠️ Current legal position — no DR is offered in the Middle East (DR-014, DEC-001).** The Middle East
+> **✅ [Amended v2.4] DEC-001 RESOLVED — Middle East DR is offered cross-geo into Europe.** The Middle East
 > programme is legal-owned and serves government/medical customers under data-residency/sovereignty
-> laws; cross-border DR cannot meet residency requirements. The geography is therefore flagged
-> **`DR_NOT_OFFERED = true` today**, and the DR offering is **under legal review (DEC-001, pending)**.
-> Middle East **production may still be placed and governed** — DR simply does not exist for it.
-> The Switzerland North cross-geo path below is **pre-configured but inactive**, and activates **only
-> if and when Legal clears DEC-001** (a config flip `dr_not_offered["Middle East"] = false`, no code change).
+> laws. Per the latest legal update, **DR is now provided** cross-geo: Prod and CVAL are provisioned in a
+> weighted-selected **Middle East** region (separate CRGs per ENV-003), and **DR is placed cross-geo in a
+> weighted-selected Europe Standard region** (Europe is an approved DR destination, assumption **A-ME1**;
+> per-country carve-outs are config-driven and out of engine scope). Both selections use the **weighted
+> capacity model** (DR-020, PLC-010b). Because CVAL co-locates with Prod locally (not with DR), the
+> CVAL-sacrifice DR bootstrap (DR-005/006) does not apply to the Middle East; ME DR uses dedicated
+> reserved capacity in Europe.
 
-**Logic — default (current position, `DR_NOT_OFFERED = true`):**
-
-```
-1. Candidate in-geo Standard regions = { Saudi Arabia Central, UAE North }   (both Standard)
-2. Score both with PS_Prod.
-3. Prod  = argmax(PS_Prod) over the two.
-4. CVAL  = the remaining in-geo region (deterministic — only one candidate left).
-5. DR    = BYPASSED. Because DR_NOT_OFFERED = true for the geography, no DR region is derived;
-           the seed record records dr_region = NOT_OFFERED. No SourceDestinationDRIndex entry,
-           no DR earmark, and no cross-geo activation are created.
-```
-
-`DR_NOT_OFFERED` is evaluated **before** any cross-geo extension: the engine never reaches the
-Switzerland North path while the flag is `true`. `[Documented]`
-
-**Logic — conditional (only if Legal clears DEC-001, `DR_NOT_OFFERED = false`):**
+**Logic (v2.4 — cross-geo DR into Europe):**
 
 ```
-5'. DR   = cross-geo extension region: Switzerland North (Europe)
-           because no third in-geo Standard region exists to satisfy region separation.
+1. Prod/CVAL candidate in-geo Standard regions = { Saudi Arabia Central, UAE North }   (both Standard)
+2. Score both with PS_Prod (weighted capacity model).
+3. Prod  = weighted argmax(PS_Prod) over the two.
+4. CVAL  = co-located with Prod in the same Middle East region (separate CRG; co-location ≠ sharing, ENV-003).
+5. DR    = weighted selection over Europe Standard regions { Switzerland North, Sweden Central, ... };
+           seed record records dr_region = <selected Europe region>. A SourceDestinationDRIndex entry
+           and a DR_Earmark_vCPU are created AT THE EUROPE DESTINATION, which sizes DR max-not-sum (DR-017).
 ```
 
-> **v2.2 correction (REG-002):** In the conditional path, the cross-geo DR extension region was
-> incorrectly cited as "Belgium Central" in earlier material. The authoritative placement configuration
-> specifies **Switzerland North** as the cross-geo extension for the Middle East. All references to
-> Belgium Central are superseded by Switzerland North. This correction concerns *which* region would be
-> used **if** DR is ever approved; it does **not** imply DR is currently offered.
+The Europe DR region is weighted-selected (Switzerland North is the default example, not fixed). Changing
+the Europe destination set is a config change, no code change (REG-001/REG-002). `[Documented]`
 
-Cross-geo extension constraints from ADR-001 apply to the DR region (Switzerland North) **when and if
-the conditional path is activated**. `[Decided]`
+Cross-geo extension constraints from ADR-001 apply to the selected Europe DR region (HC-10, VR-11). `[Decided]`
 
 ---
 
@@ -328,15 +316,14 @@ the reviewer-recommended refinement. Neither is empirically validated yet.
 region. When co-located, CVAL capacity earmarked for DR activation must **not** be double-counted as both
 live CVAL headroom and available DR headroom. The `CVALEarmarkRecord` tracks this. `[Decided]`
 
-**Two-region co-location is mandatory (PLC-010a):** in a two-region geography (EU, Australia, Asia Pacific, Middle East) there is only one non-production region, so CVAL selection is **deterministic** — the remaining in-geo region — and DR **must** co-locate there with CVAL (except the Middle East, where DR is `DR_NOT_OFFERED`, so that region hosts CVAL only). The `argmax` above is only exercised in the three-region US geography, where CVAL and DR each have a distinct candidate region. `[Decided]`
+**Two-region co-location is mandatory (PLC-010a):** in a two-region co-located geography (EU, Australia, Asia Pacific) there is only one non-production region, so CVAL selection is **deterministic** — the remaining in-geo region — and DR **must** co-locate there with CVAL. **[Amended v2.4]** In the **Middle East** (PLC-010b), CVAL co-locates with **Prod** in the Middle East region and DR is placed cross-geo in a weighted-selected Europe region. The `argmax` for a distinct DR region is exercised in the three-region US geography and, cross-geo, when weighted-selecting the Middle East's Europe DR region. `[Decided]`
 
 ---
 
 ## Scenario 6 — DR Region Selection
 
 **Trigger:** final sequential step. Selects `argmax(PS_DR)` over eligible Standard regions (or the
-cross-geo region for the Middle East **only if** its `DR_NOT_OFFERED` flag is `false` — see Scenario 4;
-while the flag is `true` (current legal position, DEC-001) this step is skipped and `dr_region = NOT_OFFERED`).
+**[Amended v2.4]** cross-geo Europe region for the Middle East, weighted-selected over Europe Standard regions — see Scenario 4 (DR-020, PLC-010b, DEC-001 RESOLVED)).
 
 ### `PS_DR(r)` `[Decided]`
 
@@ -1044,8 +1031,8 @@ Rebalancing never violates capacity, quota, restriction, or zone-alignment const
 | DR bootstrap target | Configurable per product/workload — no fixed % | 17 | **Replaces ratio** |
 | Max-not-sum default | `MAX(source portions)` | 17 | Current |
 | SUM override (C-11) | `SUM(source portions)` — per-scope opt-in | 17 | Current |
-| EU cross-geo DR extension region (Middle East) | **Switzerland North** — pre-configured but **inactive**; conditional on DEC-001 (current position `DR_NOT_OFFERED`) | 4 | **Updated (was Belgium Central; now gated by DEC-001)** |
-| Geography distribution model | US = three-region; EU / Australia / Asia Pacific / Middle East = two-region (CVAL+DR co-located, PLC-010a) | 4, 5, 6 | **New (v2.3)** |
+| Cross-geo DR destination (Middle East) | **[Amended v2.4]** Weighted-selected **Europe** Standard region (Switzerland North = default example, not fixed); DR-020, PLC-010b, DEC-001 RESOLVED | 4 | **Updated (v2.4 — cross-geo DR active)** |
+| Geography distribution model | **[Amended v2.4]** US = three-region; EU / Australia / Asia Pacific = two-region co-located (PLC-010a); **Middle East = cross-geo DR** (Prod+CVAL in ME, DR in weighted Europe region, PLC-010b/DR-020) | 4, 5, 6 | **Updated (v2.4)** |
 | `zone_target_share` | `1 / zone_count` (≈0.333 for 3 zones) — config C-13 | 21 | **New (v2.4)** |
 | `zone_balance_tolerance` | 0.10 (±10 pp) — config C-13 | 21 | **New (v2.4)** |
 | RG/CRG/subscription naming pattern + counter | config C-12 (OPS-006) — e.g. `rg-odcr-<env>-<region>-<NN>`, `crg-<env>-<region>-<az\|reg>`, `sub-<org>-<domain>-<purpose>-<NN>` | — | **New (v2.4)** |

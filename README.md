@@ -65,7 +65,7 @@ acrme-capacity-reservation/
 
 | Artifact | Description |
 |---|---|
-| **Requirements Baseline v2.4** ([`Requirements/acrme_requirements_baseline_v2_4.md`](Requirements/acrme_requirements_baseline_v2_4.md)) | The single source of truth (v2.4). Five geographies: US (three-region) plus Europe / Australia / Asia Pacific / Middle East (two-region, with ENV-003 CVAL/DR co-location; Middle East is the sole `DR_NOT_OFFERED` case). |
+| **Requirements Baseline v2.4** ([`Requirements/acrme_requirements_baseline_v2_4.md`](Requirements/acrme_requirements_baseline_v2_4.md)) | The single source of truth (v2.4). Five geographies: US (three-region); Europe / Australia / Asia Pacific (two-region co-located, ENV-003 CVAL/DR co-location); **[Amended v2.4]** Middle East uses **cross-geo DR** — Prod+CVAL co-located in a weighted-selected ME region, DR in a weighted-selected Europe region (DR-020, PLC-010b, DEC-001 RESOLVED). |
 | **Complete Requirements Reference** | Consolidates all requirements (FR/NFR/R/Must/Should/Could) with evidence of design coverage, maturity ratings, critical POC blockers, and backlog cross-reference — the traceable source of record for ACRME requirements. |
 
 ---
@@ -124,9 +124,10 @@ The single home for the executable suite **and** its spec of record.
 - **Azure CLI only** — all commands execute via `az` and `az rest`; no Azure Python SDK.
 - **Geography-aware region model (v2.4, PLC-010a)** — configuration validation is per-geography:
   three distinct regions are required **only** for three-region geographies (US is the only one
-  today); **two-region geographies co-locate CVAL + DR** in the non-prod region while the other
-  region hosts Production (ENV-003 / PLC-010a). Middle East is the sole `DR_NOT_OFFERED` case
-  (DEC-001). A configuration that co-locates DR in a two-region geography **passes** pre-flight.
+  today); **two-region co-located geographies co-locate CVAL + DR** in the non-prod region while the other
+  region hosts Production (ENV-003 / PLC-010a). **[Amended v2.4]** The **Middle East uses cross-geo DR** —
+  Prod+CVAL co-located in a weighted-selected ME region, DR in a weighted-selected Europe region
+  (DR-020, PLC-010b, DEC-001 RESOLVED). A configuration that co-locates DR in a two-region geography **passes** pre-flight.
 - **Dry-run mode** — every command can be logged without live execution for review.
 - **Phase-gate evaluation** — gate reports block progression until required tests pass.
 - **Resume support** — results persist to JSON; interrupted runs resume without re-running passes.
@@ -197,7 +198,7 @@ All carry explicit archive/supersede banners.
 1. **Geography-aware region placement (PLC-010a).** Production, the non-Production region, and DR
    must be placed per the geography's `distribution_model`: three distinct regions for
    three-region geographies (US only today); CVAL + DR co-located in the single non-Production
-   region for two-region geographies. This is enforced programmatically in the suite's
-   configuration loader and pre-flight gates. Middle East is the sole `DR_NOT_OFFERED` case (DEC-001).
+   region for two-region co-located geographies. This is enforced programmatically in the suite's
+   configuration loader and pre-flight gates. **[Amended v2.4]** The Middle East uses **cross-geo DR** into a weighted-selected Europe region (DR-020, PLC-010b, DEC-001 RESOLVED).
 2. **Azure CLI (`az` / `az rest`) only** — no Azure Python SDK.
 3. **All POC resource names are prefixed `acrme-poc-`** for isolation and safe cleanup.

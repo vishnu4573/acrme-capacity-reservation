@@ -42,6 +42,8 @@ REQ_CAP_020 = "CAP-020"
 REQ_CAP_021 = "CAP-021"
 REQ_HC_11 = "HC-11"
 REQ_PLC_010A = "PLC-010a"
+REQ_PLC_010B = "PLC-010b"
+REQ_DR_020 = "DR-020"
 REQ_CAP_001A = "CAP-001a"
 
 
@@ -280,6 +282,76 @@ def plc_010a_positive(config: Config, az: AzClient) -> TestResult:  # noqa: ARG0
     )
 
 
+def _build_cross_geo_config() -> Config:
+    """Construct a valid cross-geo DR Config in memory (no Azure) — Middle East.
+
+    [Amended v2.4] Prod and CVAL/NonProd co-locate in a weighted-selected
+    Middle East region; DR is placed cross-geo in a weighted-selected Europe
+    region (DR-020, PLC-010b).
+    """
+    raw = {
+        "provider": {"subscription_id": "00000000-0000-0000-0000-000000000001",
+                     "resource_group": "acrme-poc-rg",
+                     "tenant_id": "00000000-0000-0000-0000-0000000000aa"},
+        "consumer": {"subscription_id": "00000000-0000-0000-0000-000000000002",
+                     "resource_group": "acrme-poc-rg-consumer"},
+        "vm": {"sku": "Standard_D4s_v3", "sku_family": "standardDSv3Family"},
+        "crg": {"name": "crg", "reservation_name": "res",
+                "dr_crg_name": "dr-crg", "dr_reservation_name": "dr-res"},
+        "regions": {"distribution_model": "cross-geo",
+                    "primary": "uaenorth",
+                    "nonprod": "uaenorth", "dr": "switzerlandnorth"},
+    }
+    cfg = Config(raw=raw, path="<memory>")
+    cfg._populate(raw)
+    cfg.validate()
+    return cfg
+
+
+def plc_010b_positive(config: Config, az: AzClient) -> TestResult:  # noqa: ARG001
+    """PLC-010b / DR-020 (positive): a cross-geo DR config (Middle East Prod+CVAL
+    co-located in-geo, DR cross-geo in Europe) validates and pre-flight passes."""
+    evidence: Dict[str, Any] = {"requirement": [REQ_PLC_010B, REQ_DR_020]}
+    try:
+        cfg = _build_cross_geo_config()
+    except ConfigError as exc:
+        evidence["error"] = str(exc)
+        return TestResult(
+            poc_id="POC-PLC-010b", status="fail",
+            actual_result=f"Valid cross-geo DR config was rejected: {exc}",
+            evidence=evidence,
+        )
+    pf = Preflight(cfg, az=None)  # type: ignore[arg-type]
+    r9, r10 = pf.pf09_primary_ne_dr(), pf.pf10_nonprod_distinct()
+    evidence.update({
+        "distribution_model": cfg.distribution_model,
+        "primary_region": cfg.primary_region,
+        "cval_region": cfg.nonprod_region, "dr_region": cfg.dr_region,
+        "prod_cval_colocated": cfg.primary_region == cfg.nonprod_region,
+        "dr_cross_geo": cfg.dr_region != cfg.primary_region,
+        "PF-09": {"status": r9.status, "detail": r9.detail},
+        "PF-10": {"status": r10.status, "detail": r10.detail},
+    })
+    if (
+        cfg.primary_region == cfg.nonprod_region
+        and cfg.dr_region not in ("", cfg.primary_region)
+        and r9.status == "pass" and r10.status == "pass"
+    ):
+        return TestResult(
+            poc_id="POC-PLC-010b", status="pass",
+            actual_result="Cross-geo config accepted: Prod and CVAL co-locate in the "
+                          "in-geo region (primary == nonprod) while DR is placed "
+                          "cross-geo in a different geography (Middle East -> Europe); "
+                          "pre-flight PF-09/PF-10 pass (DR-020, PLC-010b).",
+            evidence=evidence,
+        )
+    return TestResult(
+        poc_id="POC-PLC-010b", status="fail",
+        actual_result="Cross-geo DR placement not confirmed as a valid, passing outcome.",
+        evidence=evidence,
+    )
+
+
 def cap_001a_logic(config: Config, az: AzClient) -> TestResult:  # noqa: ARG001
     """CAP-001a: core-subscription VMs classified production regardless of label."""
     evidence: Dict[str, Any] = {"requirement": [REQ_CAP_001A]}
@@ -333,6 +405,9 @@ def register(registry: Registry) -> None:
     registry.add(TestCase("POC-PLC-010a", GROUP,
                           "PLC-010a: two-region CVAL/DR co-location valid (positive)",
                           ["phase1"], [], plc_010a_positive))
+    registry.add(TestCase("POC-PLC-010b", GROUP,
+                          "PLC-010b/DR-020: cross-geo DR (ME Prod+CVAL in-geo, DR in Europe) valid (positive)",
+                          ["phase1"], [], plc_010b_positive))
     registry.add(TestCase("POC-CAP-001a", GROUP,
                           "CAP-001a: core subscription classified all-production",
                           ["phase1"], [], cap_001a_logic))

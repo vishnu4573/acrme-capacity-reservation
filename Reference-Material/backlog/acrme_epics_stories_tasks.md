@@ -578,7 +578,7 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 
 ### ACRME-E07 — Region Selection & Placement Engine
 
-**Goal.** Production-ready region selection: classification model, two-stage eligibility filter, Scenario 1/2 input modes, Middle East cross-geo extension, and the restricted-region exception workflow.
+**Goal.** Production-ready region selection: classification model, two-stage eligibility filter, Scenario 1/2 input modes, **[Amended v2.4]** Middle East cross-geo DR (Prod+CVAL in a weighted-selected ME region, DR in a weighted-selected Europe region), and the restricted-region exception workflow.
 
 **PRR references.** §27, §43 Region selection, HC-1..HC-10, VR-1..VR-11  
 **Rollup.** 8 stories · 49 points
@@ -590,7 +590,7 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 | ACRME-S0703 | Scenario 1 — geography-based Prod region derivation | Highest | 8 | P1 | ACRME-S0702, ACRME-S0801 |
 | ACRME-S0704 | Scenario 2 — specific region input validation | Highest | 5 | P1 | ACRME-S0702 |
 | ACRME-S0705 | Sequential CVAL then DR selection from Prod anchor | Highest | 5 | P1 | ACRME-S0703, ACRME-S0704 |
-| ACRME-S0706 | Middle East two-region placement (DR_NOT_OFFERED; Switzerland North cross-geo path pre-configured but inactive) | High | 5 | P1 | ACRME-S0705 |
+| ACRME-S0706 | Middle East cross-geo DR placement (Prod+CVAL co-located in weighted ME region; DR cross-geo in weighted Europe region — DR-020, PLC-010b, DEC-001 RESOLVED) | High | 5 | P1 | ACRME-S0705 |
 | ACRME-S0707 | Exception-based placement workflow for Restricted regions (EC-1..EC-4) | High | 5 | P1 | ACRME-S0704 |
 | ACRME-S0708 | Validation Rule Framework (VR-1..VR-11) and governance controls | Medium | 5 | P1 | ACRME-S0701 |
 
@@ -624,7 +624,7 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 
 **Acceptance criteria**
 
-- Stage 2 applies HC-1..HC-10 (capacity, quota, zone, separation, freshness, geo, DR floor, NonProd/DR integrity, ME cross-geo, extension-path approval).
+- Stage 2 applies HC-1..HC-10 (capacity, quota, zone, separation, freshness, geo, DR floor, NonProd/DR integrity, ME cross-geo DR to Europe, extension-path approval).
 - Regions failing any HC are excluded from scoring with a recorded reason.
 - HC-9 STANDARD_REGION_ONLY and HC-10 CROSS_GEO_EXTENSION_PATH_APPROVED enforced.
 
@@ -694,26 +694,26 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 - [ ] `ACRME-T070501` Implement sequential CVAL selection (PS_NonProd)
 - [ ] `ACRME-T070502` Implement sequential DR selection (PS_DR)
 
-#### ACRME-S0706 — Middle East two-region placement (DR_NOT_OFFERED; Switzerland North cross-geo path pre-configured but inactive)
+#### ACRME-S0706 — Middle East cross-geo DR placement (Prod+CVAL co-located in ME; DR cross-geo in Europe) [Amended v2.4]
 
-> **As a** placement owner, **I want** Middle East to place Prod + CVAL across its two in-geo regions with DR set to NOT_OFFERED, and the Switzerland North cross-geo path pre-configured but inactive until DEC-001 clears, **so that** Middle East deployments comply with the current DR_NOT_OFFERED legal position (DEC-001) while a compliant DR path is ready to enable by config if approved.
+> **As a** placement owner, **I want** Middle East to place Prod + CVAL co-located in a weighted-selected Middle East region (separate CRGs) and DR cross-geo in a weighted-selected Europe Standard region, both via the weighted capacity model, **so that** Middle East deployments get compliant cross-geo DR (DEC-001 RESOLVED) while the Europe destination sizes DR max-not-sum.
 
 - **Priority:** High · **Points:** 5 · **Phase:** P1
-- **PRR refs:** §27 Middle East, HC-10, R-12, DR-014, DEC-001, PLC-010a
+- **PRR refs:** §27 Middle East, HC-10, R-12, DR-020, PLC-010b, DEC-001 (RESOLVED), A-ME1
 - **Depends on:** ACRME-S0705
 
 **Acceptance criteria**
 
-- Prod = argmax(PS_Prod) over UAE North/Saudi Arabia Central; CVAL = the other in-geo region.
-- DR = NOT_OFFERED by default (DR-014, DEC-001): no SourceDestinationDRIndex entry, no DR earmark, no cross-geo activation.
-- Switzerland North cross-geo extension is pre-configured but inactive; it activates only via config flip (dr_not_offered['Middle East'] = false) after DEC-001, with no code change, and is then validated against HC-1..HC-10 incl. DR floor.
-- The engine never silently substitutes another region; DR_NOT_OFFERED is evaluated before any cross-geo extension.
+- Prod = weighted argmax(PS_Prod) over UAE North/Saudi Arabia Central; CVAL = co-located with Prod in the same ME region (separate CRG; co-location ≠ sharing, ENV-003).
+- DR = weighted-selected Europe Standard region (Switzerland North = default example, not fixed): a SourceDestinationDRIndex entry is created and a DR earmark reserved **at the Europe destination**, which sizes DR max-not-sum (DR-017).
+- The Europe DR destination set is config-driven (REG-001/REG-002); changing it is a config change, no code change. The generic DR_NOT_OFFERED flag (DR-014) is not set for the Middle East.
+- The engine never silently substitutes a region outside the approved extension paths (HC-10, VR-11); if all weighted Europe regions fail HC-1..HC-10, block with an ops alert (VR-9).
 
 **Tasks**
 
-- [ ] `ACRME-T070601` Implement Middle East Prod/CVAL in-geo assignment (two-region)
-- [ ] `ACRME-T070602` Implement DR_NOT_OFFERED handling + pre-configured (inactive) Switzerland North cross-geo path gated on DEC-001
-- [ ] `ACRME-T070603` Block + alert on degraded extension path when active (no substitution)
+- [ ] `ACRME-T070601` Implement Middle East Prod/CVAL co-located assignment (weighted-selected ME region, separate CRGs)
+- [ ] `ACRME-T070602` Implement cross-geo DR weighted selection over Europe Standard regions + earmark/index at Europe destination (DR-020, PLC-010b)
+- [ ] `ACRME-T070603` Block + alert on degraded extension path (no substitution outside approved Europe paths)
 
 #### ACRME-S0707 — Exception-based placement workflow for Restricted regions (EC-1..EC-4)
 

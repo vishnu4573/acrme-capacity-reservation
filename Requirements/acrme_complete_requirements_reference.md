@@ -100,7 +100,7 @@ Manages pre-positioned DR capacity pairs, failover triggering, and failback orch
 | **FR-5.4** | Support failback trigger: deallocate DR VMs, restore primary CRG to pre-failover config, record failback metadata | ✅ COVERED | E06-S04 (Failback Trigger); state transition FAILBACK_PENDING → STEADY_STATE |
 | **FR-5.5** | Monitor DR CRG capacity continuously; alert if DR reserved capacity consumed in steady-state | ✅ COVERED | E05-S01 (Reconciliation Engine); alert `UnauthorizedDRConsumption` (Critical) |
 | **FR-5.6** | Enforce minimum DR capacity buffers per DR pair as percentage of primary; alert when quota changes would violate | ✅ COVERED | E03-S11 (DR Floor Enforcement); HC-6, HC-7; `dr_ratio_min=0.30`, `dr_ratio_max=0.40` |
-| **FR-5.7** | Support cross-region DR pair definitions with separate CRGs per region, independent sharing profiles and zone mappings | ✅ COVERED | E06-S01, E06-S05 (Cross-Region DR); Middle East cross-geo extension |
+| **FR-5.7** | Support cross-region DR pair definitions with separate CRGs per region, independent sharing profiles and zone mappings | ✅ COVERED | E06-S01, E06-S05 (Cross-Region DR); **[v2.4]** Middle East cross-geo DR into Europe (DR-020, PLC-010b) |
 
 **FR-5 Verdict:** ✅ **7/7 covered — Fully Implemented**
 
@@ -299,7 +299,7 @@ Derived from multi_region_placement_design.md Section 27–28.
 | **R4** | Automatic zone resolution via stored zone mapping registry on VM deployment against shared CRG | ✅ COVERED |
 | **R5** | Cost and capacity-weighted distribution prevent hotspots; uses demand units not customer count | ✅ COVERED |
 | **R6** | DR floor enforcement (HC-7): NonProd placement blocked if would encroach on dr_floor_vcpu | ✅ COVERED |
-| **R7** | Middle East special handling: `argmax(PS_Prod)` over Saudi Arabia + UAE North; cross-geo DR | ✅ COVERED |
+| **R7** | Middle East special handling: weighted `argmax(PS_Prod)` over Saudi Arabia + UAE North (Prod+CVAL co-located); **[v2.4]** DR cross-geo in a weighted-selected Europe region (DR-020, PLC-010b, DEC-001 RESOLVED) | ✅ COVERED |
 | **R8** | Placement deterministic and auditable: all scores, candidate sets, policy version written to OperationRecord for replay | ✅ COVERED |
 
 **Placement Requirements Verdict:** ✅ **8/8 covered — Fully Implemented**

@@ -257,17 +257,27 @@ class Preflight:
         """PF-09 (HARD BLOCKER): geography-aware Prod/DR region rule (v2.4).
 
         Three-region geography (US): Prod and DR must be DISTINCT regions.
-        Two-region geography (EU/AU/APAC/ME): CVAL and DR CO-LOCATE in the
+        Two-region geography (EU/AU/APAC): CVAL and DR CO-LOCATE in the
         single non-Prod region (PLC-010a), so DR must equal NonProd and only
-        needs to differ from Prod. Where DR is not offered (Middle East
-        DR_NOT_OFFERED, DEC-001) no DR region is assigned — the check passes.
+        needs to differ from Prod. Where DR is not offered (legacy
+        DR_NOT_OFFERED) no DR region is assigned — the check passes.
+        Cross-geo geography (ME) [Amended v2.4]: DR is placed cross-geo
+        (Middle East -> Europe, DR-020); DR must be present and differ from the
+        in-geo Prod region.
         """
         cfg = self.config
-        if cfg.is_two_region:
+        if cfg.is_cross_geo:
+            ok = bool(cfg.dr_region) and cfg.dr_region != cfg.primary_region
+            detail = (
+                f"cross-geo (DR-020): dr placed cross-geo and must differ from "
+                f"prod — primary={cfg.primary_region}, dr={cfg.dr_region} "
+                f"(Middle East -> Europe)"
+            )
+        elif cfg.is_two_region:
             if not cfg.dr_offered:
                 ok = (not cfg.dr_region) or cfg.dr_region == cfg.nonprod_region
                 detail = (
-                    f"two-region, DR_NOT_OFFERED (DEC-001): no DR region "
+                    f"two-region, legacy DR_NOT_OFFERED: no DR region "
                     f"assigned; nonprod={cfg.nonprod_region}"
                 )
             else:
@@ -299,10 +309,22 @@ class Preflight:
         NonProd must always differ from Prod. In a three-region geography it
         must also differ from DR. In a two-region geography NonProd and DR
         CO-LOCATE by design (PLC-010a), so equality with DR is expected, not a
-        failure.
+        failure. In a cross-geo geography (ME) [Amended v2.4] Prod and CVAL/
+        NonProd CO-LOCATE in-geo by design (PLC-010b), so NonProd == Prod is
+        expected; NonProd must differ from the cross-geo DR region.
         """
         cfg = self.config
-        if cfg.is_two_region:
+        if cfg.is_cross_geo:
+            ok = (
+                cfg.nonprod_region == cfg.primary_region
+                and cfg.nonprod_region != cfg.dr_region
+            )
+            detail = (
+                f"cross-geo (PLC-010b): nonprod co-locates with prod in-geo and "
+                f"differs from cross-geo dr — nonprod={cfg.nonprod_region}, "
+                f"primary={cfg.primary_region}, dr={cfg.dr_region}"
+            )
+        elif cfg.is_two_region:
             ok = cfg.nonprod_region != cfg.primary_region
             detail = (
                 f"two-region: nonprod must differ from prod (DR co-locates with "

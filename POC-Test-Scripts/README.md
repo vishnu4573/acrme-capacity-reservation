@@ -48,12 +48,13 @@ distinctness depends on `regions.distribution_model`:
 - **`three-region`** (US geography): `regions.primary`, `regions.dr`, and
   `regions.nonprod` must be **three distinct regions**. The config loader *and*
   pre-flight PF-09/PF-10 refuse to run if any two are identical.
-- **`two-region`** (Europe / Australia / Asia Pacific / Middle East): Prod
+- **`two-region`** (Europe / Australia / Asia Pacific): Prod
   occupies one region; **CVAL/NonProd and DR co-locate** in the single
   remaining region, so `regions.dr` **must equal** `regions.nonprod` (both
   differing from `regions.primary`). This co-location is the **required**
-  outcome, not an error. Where DR is not offered (Middle East
-  `DR_NOT_OFFERED`, DEC-001), set `regions.dr_offered: false` and leave
+  outcome, not an error. **[Amended v2.4]** The **Middle East** uses **cross-geo DR**
+  (`distribution_model: cross-geo`): Prod+CVAL co-located in a weighted-selected ME region,
+  DR in a weighted-selected Europe region (DR-020, PLC-010b, DEC-001 RESOLVED); leave
   `regions.dr` blank — no DR region is assigned.
 
 All resources created by the suite are prefixed with `acrme-poc-` to avoid
