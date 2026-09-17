@@ -6,11 +6,11 @@
 - Requirements: `Requirements/acrme_requirements_baseline_v2_4.md` — **v2.4 (amended), 11 September 2026** (the newest baseline in the repo).
 - Formulas & constants: `Reference-Material/reference/acrme_calculation_logic_reference.md`.
 
-**Bottom line.** The repo is internally consistent. The audit found **two** issues: one that requires your decision (a stale *uploaded* baseline vs. the repo baseline), and one internal typo that has been fixed in this change.
+**Bottom line.** The repo is internally consistent. The audit found **two** issues, both now **RESOLVED**: (1) the uploaded "source of truth" baseline was stale vs. the repo baseline — now synchronized to the amended 11-Sep version; (2) one internal typo (5-min vs. 6-min reconciliation interval) — corrected. All documents now reconcile to the authoritative baseline v2.4 (amended), 11 September 2026.
 
 ---
 
-## Finding 1 — HIGH — The uploaded "source of truth" baseline is STALE vs. the repo baseline
+## Finding 1 — HIGH — The uploaded "source of truth" baseline was STALE vs. the repo baseline [RESOLVED]
 
 The standing instruction points at the uploaded file as the single source of truth, but it is an **older revision** than the baseline committed in the repo, and **every other document in the repo reconciles to the newer repo baseline, not the uploaded one.**
 
@@ -29,9 +29,7 @@ The standing instruction points at the uploaded file as the single source of tru
 
 So the repo is coherent **against the amended repo baseline**; the divergence is only against the **uploaded** file the standing instruction names.
 
-**Action needed from you (cannot be auto-resolved — it's a question of which document is authoritative):**
-1. If the amended 11-Sep baseline is authoritative → **re-upload it** to `/home/ubuntu/Uploads/…` so the designated source of truth matches the repo. (Recommended — the whole repo already assumes it.)
-2. If the 7-Sep uploaded file is authoritative → the Middle East cross-geo work across the repo would need to be reverted, which is a large change; confirm before any such action.
+**Resolution (confirmed by user):** The amended 11-Sep baseline is authoritative. The uploaded file at `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` has been **synchronized** with the repo baseline — both now carry **v2.4 (amended), 11 September 2026** with Middle East cross-geo DR, DEC-001 RESOLVED, DR-020, PLC-010b, A-ME1. The standing instruction source of truth and the repo are now aligned.
 
 ---
 
