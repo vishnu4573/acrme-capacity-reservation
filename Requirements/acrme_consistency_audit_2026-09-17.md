@@ -1,0 +1,61 @@
+# ACRME Repo Consistency Audit — 17 September 2026
+
+**Scope.** Full sweep of the ACRME documentation set (`Requirements/`, `Architecture/adr/`, `Design/`, `Reference-Material/`, `POC-Test-Scripts/`) checked against (a) the requirements baseline and (b) the canonical calculation formulas & constants. `Archive/` excluded (historical). Auto-generated `.docx`/`.pdf` twins excluded (they regenerate from their `.md`).
+
+**Authority sources used for the audit**
+- Requirements: `Requirements/acrme_requirements_baseline_v2_4.md` — **v2.4 (amended), 11 September 2026** (the newest baseline in the repo).
+- Formulas & constants: `Reference-Material/reference/acrme_calculation_logic_reference.md`.
+
+**Bottom line.** The repo is internally consistent. The audit found **two** issues: one that requires your decision (a stale *uploaded* baseline vs. the repo baseline), and one internal typo that has been fixed in this change.
+
+---
+
+## Finding 1 — HIGH — The uploaded "source of truth" baseline is STALE vs. the repo baseline
+
+The standing instruction points at the uploaded file as the single source of truth, but it is an **older revision** than the baseline committed in the repo, and **every other document in the repo reconciles to the newer repo baseline, not the uploaded one.**
+
+| | Uploaded file | Repo baseline |
+|---|---|---|
+| Path | `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` | `Requirements/acrme_requirements_baseline_v2_4.md` |
+| Version / date | v2.4, **7 September 2026** | **v2.4 (amended), 11 September 2026** |
+| Middle East DR | **`DR_NOT_OFFERED`** ("DR is unlikely to be offered there") | **Cross-geo DR to Europe** (Prod+CVAL co-located in a weighted-selected ME region; DR weighted-selected in a Europe Standard region) |
+| DEC-001 | Pending / open | **RESOLVED** |
+| Extra normative IDs | — | Adds **DR-020, PLC-010b, A-ME1** |
+
+**Impact.** All downstream docs — ADRs, FDD, TDD, calc-logic reference, POC workbook, epics/stories, complete requirements reference — already implement the **amended (11-Sep)** Middle East cross-geo position with DEC-001 RESOLVED. Examples:
+- `Requirements/acrme_complete_requirements_reference.md:103,302` — cross-geo DR into Europe (DR-020, PLC-010b, DEC-001 RESOLVED).
+- `POC-Test-Scripts/acrme_poc_workbook_v2_4.md:19,144,2167` — POC-PLC-010b positive cross-geo case; supersedes `DR_NOT_OFFERED`.
+- `Reference-Material/backlog/acrme_epics_stories_tasks.md:593,697` — ACRME-S0706 Middle East cross-geo DR (DEC-001 RESOLVED).
+
+So the repo is coherent **against the amended repo baseline**; the divergence is only against the **uploaded** file the standing instruction names.
+
+**Action needed from you (cannot be auto-resolved — it's a question of which document is authoritative):**
+1. If the amended 11-Sep baseline is authoritative → **re-upload it** to `/home/ubuntu/Uploads/…` so the designated source of truth matches the repo. (Recommended — the whole repo already assumes it.)
+2. If the 7-Sep uploaded file is authoritative → the Middle East cross-geo work across the repo would need to be reverted, which is a large change; confirm before any such action.
+
+---
+
+## Finding 2 — LOW — Reconciliation interval typo (FIXED in this change)
+
+`Design/acrme_uml_class_diagrams_summary.md:64` stated the reconciliation loop target interval as **5 minutes**. Every other source says **6 minutes (360 s), configurable**:
+- Baseline **CAP-006**;
+- `Design/acrme_technical_design_document.md:135` — "6-minute target interval (configurable, CAP-006)";
+- `Reference-Material/reference/acrme_calculation_logic_reference.md:610`.
+
+**Fix applied:** line 64 now reads *"6-min target interval (configurable, CAP-006)"*.
+
+---
+
+## Items reviewed and confirmed CONSISTENT (no action)
+
+- **Formulas A.1–A.9** (baseline Appendix A) match the calc-logic reference — including A.6 DR destination sizing = **MAX not SUM** over sources (DR-017) and A.9 even-zone share = 1/zone_count.
+- **Scoring weights** α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10 (sum 1.0) — consistent wherever cited (marked `[Assumed]` in the calc ref, which is correct; the baseline does not fix them numerically).
+- **Growth buffers** prod/nonprod = 0.20, emergency transfer = 0.30; **auto-increase thresholds** dr=0.35, prod=0.20, nonprod=0.20; debounce 30 min — consistent.
+- **Region model** (US 3-region; EU/AU/APAC 2-region co-located; Middle East cross-geo) — consistent across ADRs, FDD, TDD, POC, backlog.
+- **ADRs** — no inconsistencies. ADR-007 is intentionally `PROPOSED` (pending POC-001/006, DEP-001); its §15 note that CAP-013 wording says "up to ~100" while Azure's hard limit is exactly 100 is a documented wording nit, not a contradiction.
+
+## Known open design gaps (not inconsistencies — noted for awareness)
+
+- **`total_customers` denominator** in the γ (fairness) term is not defined in the baseline. Already captured as an OPEN ISSUE in `Reference-Material/reference/acrme_calculation_logic_comprehensive_walkthrough.md` (prior commit) — left as-is.
+- **PS_NonProd design-of-record** intentionally combines α and δ signal (0.45); flagged in the PRR with a corrected pilot variant — intentional, not an error.
+- **Scenario 15** (fixed `dr_ratio`) is explicitly marked SUPERSEDED — intentional.

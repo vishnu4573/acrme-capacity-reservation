@@ -61,7 +61,7 @@ This document presents **four comprehensive UML diagram sets** for the Azure Cap
 ### From Diagram 3 (Service Layer Model):
 
 ✅ **Placement engine** — Applies HC-1..HC-7 hard constraints, then weighted scoring  
-✅ **Reconciliation loop** — 5-min target interval; debounce guard (30-min cooldown) for auto-increase  
+✅ **Reconciliation loop** — 6-min target interval (configurable, CAP-006); debounce guard (30-min cooldown) for auto-increase  
 ✅ **Capacity transfer service** — ONLY callable when `engine_mode == DR_EVENT_ACTIVE`  
 ✅ **Quota validation** — Pre-validates every mutating operation; enforces quota group floors  
 ✅ **VM disassociation service** — Path B (default, VM keeps running) vs. Path A (deallocate, requires restart)  
