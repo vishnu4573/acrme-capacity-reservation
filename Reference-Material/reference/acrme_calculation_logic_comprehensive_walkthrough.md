@@ -41,16 +41,20 @@ Think of each row as the current state of each office building before our custom
 
 | Region | Total Pool (vCPU) | Prod Already Used | NonProd Already Used | DR Earmark | Headroom Left | Existing Customers | Floors (AZs) |
 |---|---|---|---|---|---|---|---|
-| West US 3 | 500 | 120 | 80 | 60 | 240 | 8 of 20 | 3 |
-| Central US | 500 | 160 | 100 | 80 | 160 | 12 of 20 | 3 |
-| Canada Central | 500 | 80 | 60 | 32 | 328 | 5 of 20 | 2 |
+| West US 3 | 500 | 120 | 80 | 60 | 240 | 8 of 20 ⚠️ | 3 |
+| Central US | 500 | 160 | 100 | 80 | 160 | 12 of 20 ⚠️ | 3 |
+| Canada Central | 500 | 80 | 60 | 32 | 328 | 5 of 20 ⚠️ | 2 |
+
+> ⚠️ **"of 20"** — this `total_customers` denominator is an **undefined term** in the baseline. See the [Open Issue on `total_customers`](#️-open-issue--total_customers-in-the-γ-distribution-fairness-component) above. The value 20 is used here for illustrative arithmetic only.
 
 **EU Geography — 2 Standard buildings available:**
 
 | Region | Total Pool (vCPU) | Prod Already Used | NonProd Already Used | DR Earmark | Headroom Left | Existing Customers | Floors (AZs) |
 |---|---|---|---|---|---|---|---|
-| Switzerland North | 300 | 100 | 60 | 40 | 100 | 6 of 15 | 3 |
-| Sweden Central | 300 | 80 | 50 | 32 | 138 | 4 of 15 | 3 |
+| Switzerland North | 300 | 100 | 60 | 40 | 100 | 6 of 15 ⚠️ | 3 |
+| Sweden Central | 300 | 80 | 50 | 32 | 138 | 4 of 15 ⚠️ | 3 |
+
+> ⚠️ **"of 15"** — same undefined `total_customers` term. See the [Open Issue](#️-open-issue--total_customers-in-the-γ-distribution-fairness-component) above.
 
 **Minimum floor (safety net — always kept free regardless):**
 
@@ -77,6 +81,55 @@ It is the system picking which buildings a customer's deployment goes into — o
 | ε = 0.10 (smallest) | Zone diversity | Are the desks spread across different floors of the building? If one floor has a power cut, other floors keep running. Nice-to-have, not critical. |
 
 All five add to exactly **1.0 (100%)**. They are policy defaults stored in config — not hardcoded. The team can adjust them if priorities change.
+
+---
+
+### ⚠️ OPEN ISSUE — `total_customers` in the γ (Distribution Fairness) Component
+
+The distribution fairness component γ appears in all three scoring formulas (PS\_Prod, PS\_NonProd, PS\_DR) as:
+
+```
+γ_component = 1 - (region_customer_count / total_customers)
+```
+
+For example, in the US snapshot below, the γ calculation for Central US shows `1 - (12/20) = 0.40`, where **12** is the number of customers already placed in Central US and **20** is `total_customers`.
+
+#### What is `total_customers`?
+
+**It is undefined.** The Requirements Baseline v2.4 does not define this term — not in the Terminology (Section 4), not in Appendix A (Core Formulas), not in the Configurable Items Register (Section 22), and not in the Placement requirements (Section 11). The Calculation Logic Reference uses it in the PS\_Prod, PS\_NonProd, and PS\_DR formulas (marked `[Decided]`) but never specifies its source, scope, or refresh mechanism.
+
+#### Why does this matter?
+
+The value of `total_customers` fundamentally changes what γ measures and how it behaves:
+
+| If `total_customers` means… | γ behaviour | Problem |
+|---|---|---|
+| **All customers with a seed record** (actual, current count across ALL regions in the geography) | γ measures the **share of existing customers** in this region vs the total estate. It changes with every new placement. | This is a **relative share** signal — it gets weaker as the estate grows (at 1000 customers, adding 1 to a region barely moves γ). Works for fairness but becomes **insensitive at scale**. |
+| **A forecast / target** (expected future customer count — a planning number) | γ measures **how full this region is relative to a capacity plan**. It stays meaningful at scale because the denominator is a planning target, not an ever-growing count. | **Where does the forecast come from?** Who sets it? How often is it updated? Is it per-geography or global? The baseline does not say. This is the core of your question — assuming a known customer target presumes we know demand, but **no two customers are alike**. |
+| **A configurable policy constant** (e.g. "20" as a soft target per geography) | γ becomes a **governance lever** — the team decides how many customers a geography should absorb before scoring penalises concentration. | Must be defined, versioned, and documented in the Configurable Items Register (Section 22). Currently absent. |
+| **Sum of region\_customer\_counts** (i.e., the total across the candidate set) | γ computes a **simple proportion** of the geography's customers in each region. This is always fresh (derived from the snapshot) and needs no external input. | Mathematically valid but potentially a different design intent than "fairness against a target." |
+
+#### What this walkthrough assumes (and why it may be wrong)
+
+The worked examples in this document use **20** as `total_customers` for US and **15** for EU. These numbers were chosen to make the arithmetic illustrative. They could represent:
+
+- The count of distinct Customer IDs with an approved seed record in that geography at snapshot time, OR
+- A planning target, OR
+- An arbitrary example value
+
+**The walkthrough does not know which interpretation is correct, because the baseline does not say.** The γ component arithmetic shown below is mechanically accurate for any definition — the formula works the same way regardless — but the *meaning* of the score depends entirely on what `total_customers` actually is.
+
+#### What needs to happen
+
+This is a **design gap** that must be resolved before the scoring engine can be implemented:
+
+1. **Define `total_customers`** — add it to Section 4 (Terminology) and Appendix A of the Requirements Baseline v2.4.
+2. **Specify its source** — is it a snapshot field (derived from seed records at scoring time), a configurable policy constant, or a forecast input?
+3. **Specify its scope** — is it per-geography, per-environment, or global?
+4. **Add it to the Configurable Items Register** (Section 22) if it is a policy input.
+5. **Validate with a POC** — does γ actually spread customers evenly? At what estate size does it become too weak to influence scoring? Should a different fairness metric (e.g., Gini coefficient, max-region cap) replace or complement it?
+
+> **Bottom line:** The examples below demonstrate the scoring *mechanics* faithfully. But the `total_customers` denominator is an **unresolved design question**, not a settled parameter. Treat the absolute γ values as illustrative until the baseline defines this term.
 
 ---
 
