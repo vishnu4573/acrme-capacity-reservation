@@ -95,7 +95,7 @@ However, **α** and **δ** have **different semantic meanings** per environment 
 |-------------|-----------|---------|--------|
 | **PS_Prod** | DR CRG coverage readiness of this region's own DR CRG. When scoring a Prod region, δ captures the health of the region's DR CRG — a Prod region whose DR CRG is well-covered scores higher. | `dr_crg_coverage_ratio` | Prod placement favors regions with healthy DR capacity |
 | **PS_NonProd** | Overflow capacity health — intentionally **shares the same ratio as α**. Rewards regions genuinely under-utilised from both a NonProd-placement and a DR-overflow perspective. | `nonprod_crg_effective_free / nonprod_crg_quantity` (same as α) | NonProd placement prioritizes regions with DR overflow headroom |
-| **PS_DR** | Coverage ratio health relative to target. Scores 1.0 when coverage ≥ `dr_ratio_max` (0.40). Proportionally below 1.0 for coverage between `dr_ratio_min` (0.30) and `dr_ratio_max` (e.g. 0.35/0.40 = 0.875). | `min(1.0, dr_crg_coverage_ratio / dr_ratio_max)` | DR placement drives buffer margins toward target |
+| **PS_DR** | Coverage-ratio health relative to a configurable coverage target. `dr_crg_coverage_ratio = dr_crg_quantity / Destination_DR_Requirement(region)`, where `Destination_DR_Requirement(region) = MAX(source portions)` (max-not-sum, A.6/DR-017). Scores 1.0 when coverage meets the configurable `dr_coverage_target`; proportionally below 1.0 otherwise. **This target is a normalization reference for scoring only — it is NOT the retired fixed 30–40% DR-to-Prod sizing ratio** (Calc Logic Reference Scenario 15 → 17). | `min(1.0, dr_crg_coverage_ratio / dr_coverage_target)` | DR placement drives buffer margins toward target |
 
 **Why δ is different per env:** Each environment has a distinct resilience need. Prod cares about its paired DR region's readiness; NonProd cares about overflow headroom it can yield to DR during a crisis; DR cares about its own coverage health.
 
@@ -208,7 +208,7 @@ PS_DR(r) =
     0.30 × (dr_crg_free_slots / dr_crg_quantity)                            ← α: DR CRG headroom
   + 0.20 × (dr_crg_quota_headroom_vcpu / dr_crg_quota_limit_vcpu)          ← β: DR quota headroom
   + 0.25 × (1 - consumer_count_dr / total_customers)                       ← γ: DR distribution
-  + 0.15 × min(1.0, dr_crg_coverage_ratio / dr_ratio_max)                  ← δ: coverage ratio health
+  + 0.15 × min(1.0, dr_crg_coverage_ratio / dr_coverage_target)           ← δ: coverage ratio health (configurable target; coverage_ratio uses max-not-sum denominator, not fixed dr_ratio)
   + 0.10 × (az_count / 3)                                                  ← ε: zone diversity
 ```
 

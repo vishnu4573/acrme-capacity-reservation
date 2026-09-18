@@ -157,7 +157,10 @@ For NonProd placement in region R:
 
 For DR placement in region R:
   REJECT if: dr_headroom(R) < target_dr_qty × vCPU_per_instance
-             (target_dr_qty = customer_prod_vm_count × dr_ratio)
+             (target_dr_qty = customer's configured DR bootstrap target — DR-007/ENV-005,
+              configurable per workload/product/region; NOT a fixed dr_ratio. Destination-region
+              DR floor is sized max-not-sum: MAX(source portions), A.6/DR-017. The former fixed
+              30–40% dr_ratio model is superseded — see Calc Logic Reference Scenario 15 → 17.)
 ```
 
 #### Data Source
@@ -187,7 +190,7 @@ nonprod_headroom(R) = effective_nonprod_ceiling(R) - nonprod_quota_used(R)
 where:
   effective_nonprod_ceiling(R) = NonProd_DR_Group_Limit(R) - DR_Floor_vCPU(R)
   NonProd_DR_Group_Limit(R)    = base_subscription_quota_limit × (1 + emergency_transfer_headroom_vcpu / base_limit)
-  DR_Floor_vCPU(R)              = potential_dr_demand(R) × vCPU × dr_ratio_max
+  DR_Floor_vCPU(R)              = Destination_DR_Requirement(R) × vCPU   # max-not-sum (A.6/DR-017); NOT potential_dr_demand × dr_ratio_max
   nonprod_quota_used(R)         = Σ (nonprod_crg.quantity × vCPU) for all NonProd CRGs in region R
 ```
 
@@ -306,10 +309,15 @@ is insufficient to absorb the new customer's DR demand:
   dr_crg_free_slots(R) + nonprod_crg_effective_free(R) < customer_requested_dr_slots
 
 where:
-  customer_requested_dr_slots = prod_vm_count × dr_ratio_max
+  customer_requested_dr_slots = customer's configured DR bootstrap target (dr_bootstrap_qty)
   nonprod_crg_effective_free  = nonprod_crg_free_slots - nonprod_crg_dr_overflow_reserve
-  
-  dr_ratio_max = 0.40  (policy constant — upper bound for DR-to-Prod ratio)
+
+  dr_bootstrap_qty = configurable DR bootstrap target per workload/product/region
+                     (DR-007, ENV-005, C-1) — "enough to bootstrap; used-is-free".
+                     There is NO fixed DR-to-Prod ratio. The destination-region DR floor
+                     is sized max-not-sum (Destination_DR_Requirement(R) = MAX(source
+                     portions), A.6/DR-017). The former fixed dr_ratio (0.30–0.40) model
+                     is superseded — Calc Logic Reference Scenario 15 → Scenario 17.
 ```
 
 #### Rationale
@@ -329,11 +337,14 @@ Per-CRG-type snapshot fields (added in Pass 2):
 #### Implementation Pseudocode
 
 ```python
-def validate_HC6_DR_coverage_floor(region, customer_prod_vm_count):
+def validate_HC6_DR_coverage_floor(region, customer_dr_bootstrap_qty):
     snapshot = get_regional_snapshot(region)
-    
-    customer_requested_dr_slots = customer_prod_vm_count * DR_RATIO_MAX  # 0.40
-    
+
+    # DR demand is the customer's configured bootstrap target (DR-007/ENV-005),
+    # NOT prod_vm_count × a fixed dr_ratio. The destination DR floor is sized
+    # max-not-sum: MAX(source portions) per A.6/DR-017 (see Scenario 17).
+    customer_requested_dr_slots = customer_dr_bootstrap_qty
+
     combined_dr_capacity = (snapshot.dr_crg_free_slots + 
                             snapshot.nonprod_crg_effective_free)
     
@@ -345,13 +356,14 @@ def validate_HC6_DR_coverage_floor(region, customer_prod_vm_count):
 
 #### Policy Constants
 
-- **dr_ratio_min:** 0.30 (minimum DR-to-Prod ratio)
-- **dr_ratio_max:** 0.40 (maximum DR-to-Prod ratio, used in HC-6 floor calculation)
-- **dr_ratio_target:** 0.35 (recommended ratio)
+- **dr_bootstrap_qty:** configurable DR bootstrap target per workload/product/region (DR-007, ENV-005, C-1) — "enough to bootstrap; used-is-free". **No fixed DR-to-Prod ratio.**
+- **Destination DR sizing:** max-not-sum — `Destination_DR_Requirement(R) = MAX(source portions failing over to R)` (A.6 / DR-017 / Calc Logic Reference Scenario 17). A per-scope `SUM` override is available only where a contract requires concurrent-failure protection (C-11).
+
+> **Superseded — do not use.** The former fixed `dr_ratio_min/max/target` (0.30/0.40/0.35) DR-to-Prod ratio model is **retired** (Calc Logic Reference Scenario 15). It produced idle reserves estimated at **$1.5M–$5M/year** at platform scale (Requirements Baseline Appendix D) and is no longer used in any HC-6/HC-7 calculation.
 
 #### Evidence Tag
 
-`[Derived]` from Decision D8 (NonProd/DR co-location)
+`[Derived]` from Decision D8 (NonProd/DR co-location); DR sizing per max-not-sum (Scenario 17, DR-017)
 
 ---
 
@@ -393,28 +405,38 @@ HC-3 checks availability; HC-7 checks compliance.
 effective_nonprod_ceiling(R) = NonProd_DR_Group_Limit(R) - DR_Floor_vCPU(R)
 ```
 
-**DR Floor (per region):**
+**DR Floor (per region) — max-not-sum (A.6 / DR-017):**
 ```
-DR_Floor_vCPU(R) = potential_dr_demand(R) × vCPU_per_instance × dr_ratio_max
+DR_Floor_vCPU(R) = Destination_DR_Requirement(R) × vCPU_per_instance
 
 where:
-  potential_dr_demand(R) = Σ prod_crg.quantity for all Prod CRGs that could fail over to region R
-  dr_ratio_max           = 0.40
+  Destination_DR_Requirement(R) = MAX( source_portion(s) for every Prod CRG that could fail over to R )
+                                  # non-concurrent single-failure assumption (DR-001):
+                                  # size to the LARGEST single source, not the sum.
+                                  # each source_portion is that source's configured DR bootstrap
+                                  # quantity (DR-007) — not prod_qty × a fixed ratio.
 ```
+> **Superseded — do not use.** The former `DR_Floor_vCPU(R) = potential_dr_demand(R) × vCPU × dr_ratio_max` (SUM of sources × fixed 0.40) is **retired**. The destination DR floor is now the largest single protected source (max-not-sum), not the sum of all sources scaled by a fixed ratio (Calc Logic Reference Scenario 15 → Scenario 17). A per-scope `SUM` override (C-11) remains only for contractual concurrent-failure protection.
 
 #### POC Example (GP-06 Topology)
 
 **Inputs:**
 - Prod demand: 80 VMs × 2 vCPU = 160 vCPU
 - Base subscription quota limit: 200 vCPU
+- Sources that could fail over to this region R, with their configured DR bootstrap portions (DR-007):
+  - Source A (this customer): **32 VMs** ← largest source
+  - Source B: 24 VMs
 
 **Group Limits:**
 - **Prod Group:** 200 × 1.28 = 256 vCPU (28% emergency headroom)
 - **NonProd+DR Group:** 200 × 1.28 = 256 vCPU
 
-**DR Floor Calculation:**
+**DR Floor Calculation (max-not-sum, A.6/DR-017):**
 ```
-DR_Floor_vCPU = 80 VMs × 2 vCPU × 0.40 = 64 vCPU
+Destination_DR_Requirement(R) = MAX(32 VMs, 24 VMs) = 32 VMs   # NOT SUM = 56 VMs
+DR_Floor_vCPU = Destination_DR_Requirement(R) × vCPU_per_instance = 32 VMs × 2 vCPU = 64 vCPU
+# (Under the retired fixed-ratio model this would have been 80 VMs × 2 vCPU × 0.40 = 64 vCPU
+#  for a single source, but SUM-scaling multiple sources over-provisions — see Scenario 17.)
 ```
 
 **Effective NonProd Ceiling:**
@@ -894,9 +916,8 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
   "policy_version": "2026-08-Q3",
   "hard_constraints": {
     "capacity_floor_multiplier": 2,
-    "dr_ratio_min": 0.30,
-    "dr_ratio_max": 0.40,
-    "dr_ratio_target": 0.35,
+    "dr_bootstrap_qty": "configurable per workload/product/region (DR-007) — no fixed ratio",
+    "dr_destination_sizing": "max-not-sum (A.6/DR-017) — MAX(source portions failing over to region)",
     "allow_single_zone_dev": false,
     "cross_geo_extension_paths": {
       "Middle East": {
@@ -915,9 +936,9 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 | Constant | Default Value | Configurable? | Affected HCs |
 |---|---|---|---|
 | **capacity_floor_multiplier** | 2 | ✅ Yes (per geography/SKU) | HC-2 |
-| **dr_ratio_min** | 0.30 | ✅ Yes | HC-6, HC-7 |
-| **dr_ratio_max** | 0.40 | ✅ Yes | HC-6, HC-7 |
-| **dr_ratio_target** | 0.35 | ✅ Yes | Scoring (not HC) |
+| **dr_bootstrap_qty** | (none — per workload/product/region) | ✅ Yes (DR-007) | HC-6, HC-7 |
+| **dr_destination_sizing** | max-not-sum: `MAX(source portions)` (A.6/DR-017) | ✅ Yes (SUM override per C-11) | HC-6, HC-7 |
+| ~~dr_ratio_min / max / target~~ | ~~0.30 / 0.40 / 0.35~~ | ❌ Retired (Scenario 15 → 17) | — |
 | **min_zone_count** | 2 | ✅ Yes | HC-5 |
 | **allow_single_zone_dev** | false | ✅ Yes | HC-5 |
 | **cross_geo_extension_paths** | {} | ✅ Yes | HC-10 |

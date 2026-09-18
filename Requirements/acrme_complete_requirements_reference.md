@@ -99,7 +99,7 @@ Manages pre-positioned DR capacity pairs, failover triggering, and failback orch
 | **FR-5.3** | Support failover trigger: validate DR CRG capacity, initiate bulk VM deployment from DR Consumer | ✅ COVERED | E06-S03 (Failover Trigger); pre-gated by state machine (EngineModeState); requires DR_EVENT_ACTIVE mode |
 | **FR-5.4** | Support failback trigger: deallocate DR VMs, restore primary CRG to pre-failover config, record failback metadata | ✅ COVERED | E06-S04 (Failback Trigger); state transition FAILBACK_PENDING → STEADY_STATE |
 | **FR-5.5** | Monitor DR CRG capacity continuously; alert if DR reserved capacity consumed in steady-state | ✅ COVERED | E05-S01 (Reconciliation Engine); alert `UnauthorizedDRConsumption` (Critical) |
-| **FR-5.6** | Enforce minimum DR capacity buffers per DR pair as percentage of primary; alert when quota changes would violate | ✅ COVERED | E03-S11 (DR Floor Enforcement); HC-6, HC-7; `dr_ratio_min=0.30`, `dr_ratio_max=0.40` |
+| **FR-5.6** | Enforce minimum DR capacity floor per destination region; alert when quota changes would violate | ✅ COVERED | E03-S11 (DR Floor Enforcement); HC-6, HC-7; **max-not-sum** floor `DR_Floor_vCPU(R) = Destination_DR_Requirement(R) × vCPU` where `Destination_DR_Requirement(R) = MAX(source portions)` (A.6/DR-017); per-workload configurable DR bootstrap (DR-007). Fixed `dr_ratio_*` (30–40%) model **retired** — see Calc Logic Reference Scenario 15 → 17. |
 | **FR-5.7** | Support cross-region DR pair definitions with separate CRGs per region, independent sharing profiles and zone mappings | ✅ COVERED | E06-S01, E06-S05 (Cross-Region DR); **[v2.4]** Middle East cross-geo DR into Europe (DR-020, PLC-010b) |
 
 **FR-5 Verdict:** ✅ **7/7 covered — Fully Implemented**

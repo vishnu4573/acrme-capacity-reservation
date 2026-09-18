@@ -451,6 +451,8 @@ PS_DR(r)      = 0.30·Clamp(dr.free_slots / dr.quantity)
               + 0.10·Clamp(az_count / 3)
 ```
 
+**Note on the PS_DR δ term:** `dr.coverage_ratio` is `dr.quantity / Destination_DR_Requirement(region)`, where `Destination_DR_Requirement(region) = MAX(source portions)` (max-not-sum, A.6/DR-017). The `dr_ratio_target` divisor here is only a **configurable normalization reference for the coverage-health signal** — it is **not** the retired fixed 30–40% DR-to-Prod sizing ratio (Calc Logic Reference Scenario 15 → 17). DR sizing itself uses max-not-sum, never a fixed ratio.
+
 `PS_Prod` is dual-purpose (derive on exception; validate/audit otherwise). Every candidate score + policy version + snapshot ref is written to the `OperationRecord` for deterministic replay. A reviewer-recommended pilot `PS_NonProd` variant (removing the α/δ duplication) is recorded in the Calculation Logic Reference; the formula above is the approved design-of-record. Scoring runs in shadow/recommendation mode until empirically validated. `[Decided]`
 
 ### 8.3 Quota-pool arithmetic (single-pool, Section 26/QUA-004)

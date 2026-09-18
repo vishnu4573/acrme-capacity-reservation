@@ -1483,7 +1483,7 @@ baseline defaults, and how they're configured.
 | Parameter | Baseline Default | Configurable? | Scope | What it controls |
 |---|---|---|---|---|
 | `dr_bootstrap_target` (per workload) | TBD (lean, ~5–20%) | ✅ Yes | Per workload/product/region/zone/VM family/subscription | Minimum DR capacity to pre-stage (ENV-005) |
-| `dr_ratio_target` (coverage ratio) | TBD (varies per customer SLA) | ✅ Yes | Per customer/product | Target DR coverage ratio for scoring δ component |
+| `dr_coverage_target` (scoring only) | TBD (varies per customer SLA) | ✅ Yes | Per customer/product | Normalization target for the scoring δ component only — NOT a DR sizing ratio (sizing uses max-not-sum, A.6/DR-017; fixed `dr_ratio_*` retired) |
 
 **How to change:** Update `PlacementPolicy` config file → no validation gate required. DR bootstrap cannot be implicitly zero (ENV-006) — zero requires explicit approved policy exception.
 

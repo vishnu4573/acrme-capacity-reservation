@@ -163,8 +163,9 @@ Invalid: α=0.20, β=0.20, γ=0.25, δ=0.15, ε=0.10  → sum = 0.90 ✗ (REJECT
 
 ```
 nonprod_crg.effective_free = nonprod_crg.free_slots - dr_overflow_reserve
-dr_crg.coverage_ratio      = dr_crg.quantity / potential_dr_demand
-potential_dr_demand(region)= Σ prod_allocated  for all customers whose dr_region = region
+dr_crg.coverage_ratio      = dr_crg.quantity / Destination_DR_Requirement(region)   # max-not-sum (A.6/DR-017); see Scenario 17 and line ~465
+Destination_DR_Requirement(region) = MAX(source portions failing over to region)     # NOT Σ prod_allocated × dr_ratio (Scenario 15 retired)
+potential_dr_demand(region)= Σ prod_allocated  for all customers whose dr_region = region   # emergency-transfer sizing only (Scenario 13), NOT DR floor
 ```
 
 ### Key formula disambiguation
@@ -174,7 +175,7 @@ potential_dr_demand(region)= Σ prod_allocated  for all customers whose dr_regio
 | `Target Reserved Capacity = Allocated + Buffer` | Continuous reconciliation floor (Scenario 16) | CAP-003 |
 | `Forecast_Quantity = ceil(Peak × (1+Growth) + DR_Buffer)` | Proactive growth ahead of demand (Scenario 11) | ADR-004 |
 | `Destination DR Requirement(d) = MAX(source portions)` | DR standby sizing (Scenario 17) | A.6 / DR-017 |
-| `dr_ratio_*` constants | Superseded (Scenario 15) — configuration reference only | PRR Section 32 |
+| `dr_ratio_*` constants | Retired (Scenario 15) — historical reference only; not used in any live sizing | PRR Section 32 |
 
 ---
 
@@ -332,12 +333,15 @@ PS_DR(r) =
     0.30 × Clamp(dr_crg.free_slots / dr_crg.quantity)                   ← α: DR CRG headroom
   + 0.20 × Clamp(dr_crg.quota_headroom / dr_crg.quota_limit)           ← β: DR quota headroom
   + 0.25 × Clamp(1 - dr_customer_count / total_customers)              ← γ: distribution fairness
-  + 0.15 × min(1.0, dr_crg.coverage_ratio / dr_ratio_target)           ← δ: coverage-ratio health
+  + 0.15 × min(1.0, dr_crg.coverage_ratio / dr_coverage_target)        ← δ: coverage-ratio health
   + 0.10 × Clamp(az_count / 3)                                         ← ε: zone diversity
 ```
 
-**Note on δ:** `dr_ratio_target` in the PS_DR formula is now a **configurable bootstrap reference**
-rather than a fixed 30–40% constant. See Scenario 17 for the authoritative DR sizing formula. `[Decided]`
+**Note on δ:** `dr_coverage_target` in the PS_DR formula is a **configurable scoring-normalization
+reference** (per customer/product), **not** the retired fixed 30–40% `dr_ratio`. `dr_crg.coverage_ratio`
+itself uses the max-not-sum denominator `Destination_DR_Requirement(region) = MAX(source portions)`
+(see the regional-snapshot quantities above and line ~465). See Scenario 17 for the authoritative DR
+sizing formula. `[Decided]`
 
 ---
 
@@ -615,10 +619,11 @@ Drift detection                  ≤ 2 reconciliation cycles
 
 ---
 
-## Scenario 15 — DR Ratio Parameters (Fixed %) — **SUPERSEDED**
+## Scenario 15 — DR Ratio Parameters (Fixed %) — **RETIRED (historical rationale only)**
 
-> **Status: Superseded by Scenario 17 (max-not-sum).** These constants are retained for configuration
-> reference and legacy comparison only. The fixed-percentage DR sizing model (`30–40% of Prod`) was
+> **Status: Retired — superseded by Scenario 17 (max-not-sum).** The fixed `dr_ratio_*` constants are
+> **no longer used in any live sizing, HC-6, or HC-7 calculation.** They are documented here solely to
+> preserve the historical rationale. The fixed-percentage DR sizing model (`30–40% of Prod`) was
 > rejected in Requirements v2.0/v2.1 because it produces idle reserves estimated at **$1.5M–$5M/year**
 > at platform scale — directly contradicting the cost-reduction mandate. See Appendix D of the
 > Requirements Baseline for the full derivation.
@@ -633,8 +638,9 @@ nonprod_growth_buffer  = 0.20    [still current — Scenario 8]
 ```
 
 The `SUM` override (C-11 in the Configurable Items Register) remains available for specific customers or
-geographies that contractually require protection against concurrent regional failures. All other scopes
-use the max-not-sum formula (Scenario 17).
+geographies that contractually require protection against concurrent regional failures. **This override
+sums the actual source portions (`Σ source portions`) — it does NOT reintroduce the fixed `dr_ratio`
+multiplier.** All other scopes use the default max-not-sum formula (Scenario 17).
 
 ---
 
@@ -1025,9 +1031,9 @@ Rebalancing never violates capacity, quota, restriction, or zone-alignment const
 | Reconciliation loop target | 6 min (configurable) | 14 | Current |
 | ARM read / write baseline | 250 per 5 min / 1,200 per hour | 14 | Current |
 | `Forecast_Horizon` | 30 / 60 / 90 days | 11 | Current |
-| `dr_ratio_min` | 0.30 | 15 | **Superseded** |
-| `dr_ratio_max` | 0.40 | 15 | **Superseded** |
-| `dr_ratio_target` | [0.30, 0.40] | 15 | **Superseded** |
+| `dr_ratio_min` | 0.30 | 15 | **Retired (historical only)** |
+| `dr_ratio_max` | 0.40 | 15 | **Retired (historical only)** |
+| `dr_ratio_target` | [0.30, 0.40] | 15 | **Retired (historical only)** |
 | DR bootstrap target | Configurable per product/workload — no fixed % | 17 | **Replaces ratio** |
 | Max-not-sum default | `MAX(source portions)` | 17 | Current |
 | SUM override (C-11) | `SUM(source portions)` — per-scope opt-in | 17 | Current |
@@ -1056,8 +1062,9 @@ Rebalancing never violates capacity, quota, restriction, or zone-alignment const
 | Even per-zone distribution & rebalancing (Scenario 21) | `[Decided]` | Ready for Phase 3 (placement) |
 
 All constants are policy defaults stored in `PlacementPolicy` (config-as-code, versioned). Tuning any
-constant requires updating the config; no code change is needed. The `dr_ratio_*` constants are retained
-in the codebase as fallback references for the SUM override (C-11) only.
+constant requires updating the config; no code change is needed. The `dr_ratio_*` constants are **retired**
+(Scenario 15) — they are **not** used by the SUM override (C-11), which sums the actual source portions
+(`Σ source portions`), not a fixed ratio. They remain in documentation for historical reference only.
 
 ---
 

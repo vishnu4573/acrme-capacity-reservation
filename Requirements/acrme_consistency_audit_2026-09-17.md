@@ -44,6 +44,24 @@ So the repo is coherent **against the amended repo baseline**; the divergence is
 
 ---
 
+## Finding 3 — MEDIUM — Fixed DR ratio still live in Hard Constraints / ADR-007 (CONVERTED to max-not-sum in this change)
+
+While the Calculation Logic Reference already sized DR with **max-not-sum** (A.6 / DR-017 / Scenario 17) and marked Scenario 15 superseded, several docs still **actively computed HC-6 / HC-7 with the fixed `dr_ratio_max = 0.40`** — the exact model the calc ref says must NOT be used. This was an internal inconsistency, now resolved by retiring the fixed `dr_ratio_*` model everywhere it was still a *live* formula and converting to max-not-sum plus the configurable DR bootstrap target (DR-007).
+
+**Files converted:**
+- `Reference-Material/reference/acrme_hard_constraints_reference.md` — HC-6 (per-customer DR demand → `dr_bootstrap_qty`, DR-007), HC-7 DR floor (`DR_Floor_vCPU(R) = Destination_DR_Requirement(R) × vCPU`, `Destination_DR_Requirement(R) = MAX(source portions)`), POC example reframed, policy JSON + constants table (`dr_ratio_*` marked ❌ Retired).
+- `Reference-Material/reference/acrme_calculation_logic_reference.md` — fixed internal inconsistency in `coverage_ratio` denominator (was `Σ potential_dr_demand`, now `Destination_DR_Requirement = MAX(...)`, matching line ~465); Scenario 15 reframed **Retired (historical rationale only)**; clarified the C-11 SUM override sums actual source portions and does **not** reintroduce `dr_ratio`; summary/disambiguation tables → Retired.
+- `Architecture/adr/acrme_adr_007_crg_deployment_model.md` — Appendix B HC-6/HC-7 formulas converted to bootstrap + max-not-sum.
+- `Requirements/acrme_complete_requirements_reference.md` — FR-5.6 traceability note updated to max-not-sum floor + configurable bootstrap.
+- `Design/acrme_technical_design_document.md`, `Reference-Material/reference/ACRME_Scoring_Weights_Explained.md`, `Reference-Material/reference/acrme_plain_english_walkthrough.md`, and calc ref PS_DR — the scoring δ term's normalization constant renamed `dr_ratio_target` → `dr_coverage_target` and annotated as a **scoring-only** reference (its `coverage_ratio` uses the max-not-sum denominator), NOT the retired sizing ratio.
+- `POC-Test-Scripts/acrme_poc_workbook_v2_4.md` — assumption A-09 ("30–40% baseline is sufficient") marked **RETIRED**.
+
+**Preserved (historical rationale, intentionally not removed):** the $1.5M–$5M/year idle-cost justification (Scenario 15, ADR-002/003/005, baseline Appendix D), ENV-005 "must NOT default to fixed 30–40%", and C-1's ratio-evolution history. **Out of scope:** `Archive/` documents (historical snapshots) retain the old fixed-ratio formulas by design.
+
+**No conversion needed (already correct):** FDD §4.5, ADR-002/003/005, comprehensive walkthrough, code glossary C-1, and the baseline itself — all already state max-not-sum / configurable bootstrap and reject the fixed ratio.
+
+---
+
 ## Items reviewed and confirmed CONSISTENT (no action)
 
 - **Formulas A.1–A.9** (baseline Appendix A) match the calc-logic reference — including A.6 DR destination sizing = **MAX not SUM** over sources (DR-017) and A.9 even-zone share = 1/zone_count.
@@ -56,4 +74,4 @@ So the repo is coherent **against the amended repo baseline**; the divergence is
 
 - **`total_customers` denominator** in the γ (fairness) term is not defined in the baseline. Already captured as an OPEN ISSUE in `Reference-Material/reference/acrme_calculation_logic_comprehensive_walkthrough.md` (prior commit) — left as-is.
 - **PS_NonProd design-of-record** intentionally combines α and δ signal (0.45); flagged in the PRR with a corrected pilot variant — intentional, not an error.
-- **Scenario 15** (fixed `dr_ratio`) is explicitly marked SUPERSEDED — intentional.
+- **Scenario 15** (fixed `dr_ratio`) is now **RETIRED** and every live HC-6/HC-7 formula has been converted to max-not-sum (see Finding 3). Historical rationale retained by design.

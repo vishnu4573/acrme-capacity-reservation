@@ -2714,7 +2714,7 @@ Source: Production-Readiness Review §8 Assumption Validation Matrix (A-01 throu
 | A-06              | Azure natively protects the DR share within NonProd plus DR      | Rejected — engine floor only                     | POC-13                             |            |
 | A-07              | NonProd reduction immediately funds DR expansion                 | Unproven — measure propagation                   | POC-31, POC-32, POC-19             |            |
 | A-08              | Quantity can safely reduce to zero while VMs run                 | Unproven as general guarantee                    | POC-15                             |            |
-| A-09              | 30–40% DR baseline is sufficient                                 | Unsupported business assumption                  | POC-11, POC-13 + workload analysis |            |
+| A-09              | ~~30–40% DR baseline is sufficient~~ **RETIRED**                 | Rejected — replaced by max-not-sum sizing (DR-017) + configurable DR bootstrap (DR-007); fixed ratio no longer used | POC-11, POC-13 + workload analysis |            |
 | A-10              | 30% emergency headroom is economically and operationally optimal | Unsupported — tunable parameter                  | POC-18 + scenario tests            |            |
 | A-11              | NonProd and DR co-location is acceptable                         | Conditional — customer approval required         | PF-09/10, POC-11                   |            |
 | A-12              | Sequential placement is near-optimal                             | Unproven — shadow joint optimization             | Placement shadow tests (engine)    |            |

@@ -1108,10 +1108,13 @@ REJECT DR placement in region R if:
   dr_crg_free_slots(R) + nonprod_crg_effective_free(R) < customer_requested_dr_slots
 
 where:
-  customer_requested_dr_slots  = prod_vm_count × dr_ratio_max
+  customer_requested_dr_slots  = dr_bootstrap_qty   # configurable DR bootstrap target
+                                                    # per workload/product/region (DR-007);
+                                                    # NOT prod_vm_count × a fixed dr_ratio
   nonprod_crg_effective_free   = nonprod_crg_free_slots − nonprod_crg_dr_overflow_reserve
-  dr_ratio_max                 = 0.40   (policy constant, per HC-6 definition)
 ```
+
+> **Note:** The former `customer_requested_dr_slots = prod_vm_count × dr_ratio_max (0.40)` is **retired**. Per-customer DR demand is the configured DR bootstrap target (DR-007), and the destination-region DR floor is sized max-not-sum (see HC-7 below). Fixed `dr_ratio_*` (30–40%) model superseded — Calc Logic Reference Scenario 15 → 17.
 
 ### HC-7 — DR_FLOOR_INTEGRITY (evaluated on NonProd/CVAL placement requests)
 
@@ -1122,6 +1125,10 @@ REJECT NonProd placement in region R if:
 
 where:
   effective_nonprod_ceiling(R) = NonProd_DR_Group_Limit(R) − DR_Floor_vCPU(R)
+  DR_Floor_vCPU(R)             = Destination_DR_Requirement(R) × vCPU   # max-not-sum (A.6/DR-017)
+  Destination_DR_Requirement(R)= MAX(source portions failing over to R) # NOT Σ sources × dr_ratio;
+                                                                        # per-scope SUM override (C-11)
+                                                                        # only for contractual concurrent failure
 ```
 
 Both checks apply to the shared CVAL/DR CRG pool. HC-7 protects the DR floor; HC-6 ensures the combined pool can absorb DR demand.
