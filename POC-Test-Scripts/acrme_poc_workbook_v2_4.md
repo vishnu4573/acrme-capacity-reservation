@@ -900,7 +900,7 @@ DR VM reaches Running; capacity consumed from DR reservation. Record total elaps
 | Group               | Group 3: DR Capacity and Failover                                                                                                                          |
 | Objective           | Calculate and verify the engine DR floor accounting: NonProd must not consume below the protected DR floor within the shared NonProd+DR quota group model. |
 | Phase Gate          | Phase 1 Pilot                                                                                                                                              |
-| Prerequisites       | POC-11 Pass; potential_dr_demand and DR_RATIO_MAX known for the scenario                                                                                   |
+| Prerequisites       | POC-11 Pass; source workload portions failing over to the DR region known (for max-not-sum calculation, A.6/DR-017)                                        |
 | Executed by         |                                                                                                                                                            |
 | Execution date      |                                                                                                                                                            |
 | API version(s) used |                                                                                                                                                            |
@@ -912,7 +912,11 @@ DR VM reaches Running; capacity consumed from DR reservation. Record total elaps
 
 az capacity reservation show --resource-group \<PROVIDER_RG\> --capacity-reservation-group \<DR_CRG_NAME\> --name \<DR_CR_NAME\> --query sku.capacity -o tsv
 
-**2.** Calculate DR_Floor_vCPU = Potential_DR_Demand × vCPU_Per_Instance × DR_Ratio_Max (default DR_Ratio_Max = 0.40)
+**2.** Calculate DR_Floor_vCPU using max-not-sum (A.6/DR-017):
+   - `Destination_DR_Requirement(region) = MAX(source portions failing over to this region)` (NOT sum of all sources)
+   - `DR_Floor_vCPU = Destination_DR_Requirement × vCPU_Per_Instance`
+   - Example: if Source A sends 32 VMs and Source B sends 24 VMs to this DR region, `Destination_DR_Requirement = MAX(32, 24) = 32 VMs`
+   - **Retired:** the former `Potential_DR_Demand × vCPU × DR_Ratio_Max (0.40)` fixed-ratio formula is no longer used (see Calc Logic Reference Scenario 15 → 17)
 
 **3.** Calculate Effective_NonProd_Ceiling = NonProd_DR_Group_Limit - DR_Floor_vCPU
 
