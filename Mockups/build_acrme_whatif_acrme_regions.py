@@ -73,7 +73,7 @@ CATALOGUE = [
  ('Australia','Australia Southeast','australiasoutheast',2,'2-region','Australia','Standard',None),
  ('Asia Pacific','East Asia','eastasia',3,'2-region','Asia Pacific','Standard',None),
  ('Asia Pacific','Southeast Asia','southeastasia',3,'2-region','Asia Pacific','Standard',None),
- ('Middle East','Saudi Arabia Central','saudicentral',3,'cross-geo','EU','Restricted',4),  # RESTRICTED
+ ('Middle East','Saudi Arabia East','saudiarbiaeast',3,'cross-geo','EU','Restricted',4),  # RESTRICTED — FUTURE REGION (not yet GA; Microsoft target Q4 2026, Eastern Province)
  ('Middle East','UAE North','uaenorth',3,'cross-geo','EU','Restricted',4),                 # RESTRICTED
 ]
 GEO_MODEL={'US':('3-region','US'),'EU':('2-region','EU'),'Australia':('2-region','Australia'),
@@ -122,7 +122,10 @@ for geo in ['US','EU','Australia','Asia Pacific','Middle East']:
         aksv=int(raks.get(name,0))
         REGIONS.append([rid,name,geo,model,az, prodRes,pAll,prodQL,prodQU,
                         npRes,npAll,npEF,npQL,npQU, drRes,drFree,drCov, cust, cls])
-        origin=("real" if rtot.get(name,0)>0 else ("SYNTHETIC (Middle East — no real usage)" if geo=='Middle East' else "mock (catalogue region absent from data)"))
+        origin=("real" if rtot.get(name,0)>0
+                else ("SYNTHETIC — FUTURE REGION (not yet GA; Microsoft target Q4 2026, Eastern Province; no real usage data exists)" if name=='Saudi Arabia East'
+                      else ("SYNTHETIC (Middle East — no real usage; GA region absent from ACRME source data)" if geo=='Middle East'
+                            else "mock (catalogue region absent from data)")))
         USAGE_ROWS.append([name,geo,cls, rup(p_alloc),rup(n_alloc),rup(p_alloc+n_alloc), aksv, cust, origin])
 
 NR=len(REGIONS); FIRST,LAST=4,3+NR
@@ -161,7 +164,7 @@ rows=[
  ("REGION CLASSIFICATION FOR THIS MOCKUP (your instruction)",H2,SUBFILL),
  ("• ALL regions are STANDARD (engine-selectable). This deliberately promotes East US 2, North Europe and West Europe — "
   "normally 'Restricted / exception-only' in the baseline catalogue — to Standard so they compete for placement.",None),
- ("• EXCEPTION: the Middle East regions (Saudi Arabia Central, UAE North) are RESTRICTED — production-only, and NOT "
+ ("• EXCEPTION: the Middle East regions (Saudi Arabia East, UAE North) are RESTRICTED — production-only, and NOT "
   "auto-selected by the engine unless you explicitly supply one as the Prod region on Setup (cell B8). This matches the "
   "baseline 'Restricted deployment regions' definition. So for a Middle East run you must name a Prod region; DR still "
   "auto-selects cross-geo in a Standard Europe region.",None,RESTFILL),
@@ -201,7 +204,9 @@ rows=[
  ("• Metric = Total Cores. Prod = environment tag 'Prod'; everything else = Non-Prod.",None,WARNFILL),
  ("• Reserved & Quota are DERIVED planning figures (max of even-share and actual alloc, +8% margin), not billed reservations — edit to model reality.",None,WARNFILL),
  ("• Middle East has ~no real usage in the data — its two regions use a flagged SYNTHETIC pool so the geography can be "
-  "exercised. Japan East (Asia Pacific) is 'pending' in the catalogue and is excluded.",None,SYNFILL),
+  "exercised. Saudi Arabia East is a FUTURE REGION (not yet GA; Microsoft target Q4 2026, Eastern Province; no real "
+  "usage data will exist until launch). UAE North is GA but absent from ACRME source data. "
+  "Japan East (Asia Pacific) is 'pending' in the catalogue and is excluded.",None,SYNFILL),
  ("• total_customers is undefined in baseline v2.4 — mode selector on Policy (Live/Constant/Manual). γ values illustrative.",None,WARNFILL),
  ("• PS_NonProd δ duplicates its α (baseline design-of-record). DR bootstrap / target are configurable placeholders.",None,WARNFILL),
 ]
@@ -213,7 +218,7 @@ for it in rows:
 us=wb.create_sheet("Usage_Source"); us.sheet_view.showGridLines=False
 us["A1"]="CURRENT USAGE — SOURCE SNAPSHOT (real, from uploaded files)"; us["A1"].font=H1
 us.merge_cells("A1:I1")
-note=us.cell(row=2,column=1,value="Real aggregation from SKU_USage (1).xlsx (Total Cores). Prod = tag 'Prod'; all other tags = Non-Prod. This is provenance; the engine reads the distributed Capacity_Usage sheet.")
+note=us.cell(row=2,column=1,value="Real aggregation from SKU_USage (1).xlsx (Total Cores). Prod = tag 'Prod'; all other tags = Non-Prod. This is provenance; the engine reads the distributed Capacity_Usage sheet. ACRME catalogue regions absent from source data use SYNTHETIC capacity — see the footer section below. NOTE: Saudi Arabia East is a FUTURE REGION (not yet GA; Microsoft target Q4 2026, Eastern Province) — no real usage data exists; capacity figures are entirely SYNTHETIC.")
 note.font=Font(italic=True,color="808080"); us.merge_cells("A2:I2")
 uh=["Region (as in data)","Geography","Class in this mockup","Prod Cores","Non-Prod Cores","Total Cores","AKS Cores","Unique Subs","ACRME catalogue region?"]
 for j,h in enumerate(uh):
@@ -240,6 +245,29 @@ for c in range(1,10): us.cell(row=tr,column=c).font=BOLD
 widths=[20,14,18,11,14,12,11,11,34]
 for j,w in enumerate(widths): us.column_dimensions[get_column_letter(1+j)].width=w
 us.freeze_panes="A4"
+# ---- Usage_Source footer: ACRME catalogue regions with no real source data ----
+absent_cat=[(g,name,cls,
+             "FUTURE REGION — not yet GA (Microsoft target Q4 2026, Eastern Province); no real usage data; capacity figures SYNTHETIC"
+             if name=="Saudi Arabia East"
+             else ("absent from source data; mock subscription count used; capacity figures SYNTHETIC"
+                   if name=="Canada Central"
+                   else "GA region — absent from ACRME source data; capacity figures SYNTHETIC"))
+            for (g,name,rid,az,model,drscope,cls,mocksub) in CATALOGUE if rtot.get(name,0)==0]
+if absent_cat:
+    af=tr+2
+    hc2=us.cell(row=af,column=1,value="ACRME CATALOGUE REGIONS — ABSENT FROM SOURCE DATA (capacity figures are SYNTHETIC)")
+    hc2.font=Font(bold=True,color="C00000"); us.merge_cells(f"A{af}:I{af}")
+    af+=1
+    for (g2,nm2,cls2,nt2) in absent_cat:
+        us.cell(row=af,column=1,value=nm2).border=BORDER; us.cell(row=af,column=1).font=BOLD
+        us.cell(row=af,column=2,value=g2).border=BORDER; us.cell(row=af,column=2).alignment=CTR
+        cc=us.cell(row=af,column=3,value=cls2); cc.border=BORDER; cc.alignment=CTR
+        cc.fill=(RESTFILL if cls2=='Restricted' else PatternFill("solid",fgColor="FDE9D9"))
+        nc=us.cell(row=af,column=4,value=nt2)
+        nc.font=Font(italic=True,color="C00000"); nc.alignment=WRAP
+        us.merge_cells(f"D{af}:I{af}")
+        for col in range(4,10): us.cell(row=af,column=col).border=BORDER
+        us.row_dimensions[af].height=30; af+=1
 
 # ============================================================ Setup
 sp=wb.create_sheet("Setup"); sp.sheet_view.showGridLines=False
