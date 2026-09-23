@@ -184,13 +184,16 @@ rows=[
  ("1. How_To_Use — this guide.",None),
  ("2. Usage_Source — the REAL aggregated usage by region from the uploaded files (read-only provenance), with the "
   "geography roll-up and which regions fold in.",None),
- ("3. Setup — pick Geography, SKU, VM count, optional customer-supplied Prod region (required for Middle East), Customer ID.",None),
+ ("3. Setup — pick Geography, then add one or more SKU line items (SKU + VM count) for the SAME Customer ID & Geography/Region. "
+  "vCPU/VM auto-fills from the SKU catalogue and Requested vCPU (total) auto-sums across all lines. Optional customer-supplied "
+  "Prod region (required for Middle East), Customer ID.",None),
  ("4. Policy — the five weights (sum=1.0), total_customers mode, DR bootstrap / target, min headroom floors.",None),
  ("5. Capacity_Usage — the ACRME catalogue regions with distributed usage + a Class column (Standard / Restricted). "
   "Yellow = editable; grey = computed; green Class cell = Restricted (Middle East).",None),
  ("6. HC_Gate — HC-3 / HC-6 / HC-7 pass/fail and eligibility per region.",None),
  ("7. Scoring_Prod / 8. Scoring_CVAL / 9. Scoring_DR — PS component breakdown, AutoSelect flag and winners.",None),
- ("10. Result — final placement (Prod / CVAL / DR), readiness, DR sizing (max-not-sum).",None),
+ ("10. Result — final placement (Prod / CVAL / DR), readiness, DR sizing (max-not-sum), plus a RANKED CANDIDATE "
+  "REGIONS table (Rank 1 = highest PS) across all catalogue regions for each mode.",None),
  ("",None),
  ("THE FORMULAS (from the baseline)",H2,SUBFILL),
  ("Clamp(x)=MIN(MAX(x,0),1). PS_Prod=α·(npEffFree/prodRes)+β·(prodQHeadroom/prodQLimit)+γ·(1−cust/total)+δ·drCov+ε·(az/3).",None),
@@ -271,42 +274,84 @@ if absent_cat:
 
 # ============================================================ Setup
 sp=wb.create_sheet("Setup"); sp.sheet_view.showGridLines=False
-for col,w in {"A":26,"B":24,"C":3,"D":3,"E":20,"F":10,"G":16}.items():
+for col,w in {"A":28,"B":22,"C":11,"D":11,"E":3,"F":14,"G":9,"H":3,"I":14,"J":10,"K":14}.items():
     sp.column_dimensions[col].width=w
 sp["A1"]="SETUP — Customer & Workload"; sp["A1"].font=H1
 def lbl(ws_,cell,txt): ws_[cell]=txt; ws_[cell].font=BOLD
 def inp(ws_,cell,val):
     ws_[cell]=val; ws_[cell].fill=INFILL; ws_[cell].border=BORDER; ws_[cell].alignment=CTR
+def out(ws_,cell):
+    ws_[cell].border=BORDER; ws_[cell].alignment=CTR
+
+# --- SKU line-item table geometry (one Customer ID, one Geography/Region, MANY SKUs) ---
+LINE_TOP=15; NLINES=8; LINE_BOT=LINE_TOP+NLINES-1   # rows 15..22
+
+# --- Curated SKU catalogue (name -> vCPU). vCPU = the integer in the Azure size name for
+#     standard (non-constrained) sizes — verified against Microsoft Learn for the Eadsv5/v6,
+#     Dadsv5/Dasv5 and Fsv2 families. Selection = the highest-usage standard SKUs in the real
+#     SKU_USage data (constrained-core and GPU/specialty SKUs excluded to keep vCPU unambiguous). ---
+skus=[("E64ads_v6",64),("E64ads_v5",64),("E48ads_v5",48),("E32ads_v6",32),("E32ads_v5",32),
+      ("E20ads_v5",20),("E16ads_v6",16),("E16ads_v5",16),("E8ads_v5",8),("E4ads_v5",4),("E2ads_v5",2),
+      ("D64ads_v5",64),("D32ads_v5",32),("D16ads_v5",16),("D16as_v5",16),("D8ads_v5",8),("D8as_v5",8),
+      ("D4ads_v5",4),("D4as_v5",4),("D2ads_v5",2),("D2as_v5",2),
+      ("F32s_v2",32),("F16s_v2",16),("F8s_v2",8),("F4s_v2",4),("F2s_v2",2)]
+SKU_TOP=3; SKU_BOT=SKU_TOP+len(skus)-1               # F/G rows 3..28
+GEO_TOP=3; GEO_BOT=GEO_TOP+4                          # I/J/K rows 3..7
+skurange=f"$F${SKU_TOP}:$G${SKU_BOT}"; skulist=f"$F${SKU_TOP}:$F${SKU_BOT}"
+georange=f"$I${GEO_TOP}:$K${GEO_BOT}"
+
+# --- Top single-value block (downstream contract: B3, B7, B8, B9, B10, B11 addresses fixed) ---
 lbl(sp,"A3","Geography");          inp(sp,"B3","US")
-lbl(sp,"A4","SKU");                inp(sp,"B4","E16ads_v5")
-lbl(sp,"A5","VM count");           inp(sp,"B5",3)
-lbl(sp,"A6","vCPU per VM");        sp["B6"]="=VLOOKUP(B4,E3:F10,2,FALSE)"; sp["B6"].alignment=CTR
-lbl(sp,"A7","Requested vCPU");     sp["B7"]="=B5*B6"; sp["B7"].font=BOLD; sp["B7"].alignment=CTR
+lbl(sp,"A4","Total VMs (all SKUs)");   sp["B4"]=f"=SUM(B{LINE_TOP}:B{LINE_BOT})"; out(sp,"B4")
+lbl(sp,"A5","SKU line count");         sp["B5"]=f"=COUNTA(A{LINE_TOP}:A{LINE_BOT})"; out(sp,"B5")
+lbl(sp,"A6","Workload SKUs");           sp["B6"]=f'=_xlfn.TEXTJOIN(", ",TRUE,A{LINE_TOP}:A{LINE_BOT})'; out(sp,"B6")
+lbl(sp,"A7","Requested vCPU (total)");  sp["B7"]=f"=SUM(D{LINE_TOP}:D{LINE_BOT})"; sp["B7"].font=BOLD; out(sp,"B7")
 lbl(sp,"A8","Prod region (req. for Middle East)"); inp(sp,"B8","")
 lbl(sp,"A9","Customer ID");        inp(sp,"B9","CUST-0042")
-lbl(sp,"A10","Distribution model");sp["B10"]="=VLOOKUP(B3,E13:G17,2,FALSE)"; sp["B10"].alignment=CTR
-lbl(sp,"A11","DR scope geography");sp["B11"]="=VLOOKUP(B3,E13:G17,3,FALSE)"; sp["B11"].alignment=CTR
-sp["E1"]="Lookup tables (do not edit)"; sp["E1"].font=Font(italic=True,color="808080")
-sp["E2"]="SKU"; sp["F2"]="vCPU/VM"
-for c in ("E2","F2"): sp[c].font=WHITEB; sp[c].fill=HEADFILL; sp[c].alignment=CTR
-skus=[("E16ads_v5",16),("E32ads_v5",32),("E8ads_v5",8),("E4ads_v5",4),
-      ("D8ads_v5",8),("D4ads_v5",4),("D2ads_v5",2),("D16ads_v5",16)]
+lbl(sp,"A10","Distribution model");sp["B10"]=f"=VLOOKUP(B3,{georange},2,FALSE)"; out(sp,"B10")
+lbl(sp,"A11","DR scope geography");sp["B11"]=f"=VLOOKUP(B3,{georange},3,FALSE)"; out(sp,"B11")
+
+# --- SKU line-item table: multiple SKUs for the SAME customer & region ---
+sp.cell(row=13,column=1,value="WORKLOAD — SKU LINE ITEMS  (one Customer ID, one Geography/Region; add as many SKUs as needed)").font=H2
+sp.merge_cells("A13:D13"); sp["A13"].fill=SUBFILL
+lihdr=["SKU","VM count","vCPU/VM","Line vCPU"]
+for j,h in enumerate(lihdr):
+    c=sp.cell(row=14,column=1+j,value=h); c.font=WHITEB; c.fill=HEADFILL; c.alignment=CTR; c.border=BORDER
+prefill=[("E16ads_v5",2),("D8ads_v5",2)]   # demo: 2×16 + 2×8 = 48 vCPU total (same as prior default)
+for i in range(NLINES):
+    r=LINE_TOP+i
+    sku_v = prefill[i][0] if i<len(prefill) else None
+    cnt_v = prefill[i][1] if i<len(prefill) else None
+    ca=sp.cell(row=r,column=1,value=sku_v); ca.fill=INFILL; ca.border=BORDER; ca.alignment=CTR
+    cb=sp.cell(row=r,column=2,value=cnt_v); cb.fill=INFILL; cb.border=BORDER; cb.alignment=CTR
+    sp.cell(row=r,column=3,value=f'=IF($A{r}="","",VLOOKUP($A{r},{skurange},2,FALSE))'); out(sp,f"C{r}")
+    sp.cell(row=r,column=4,value=f'=IF($A{r}="","",$B{r}*$C{r})'); out(sp,f"D{r}")
+sp.cell(row=LINE_BOT+1,column=3,value="TOTAL").font=BOLD
+sp.cell(row=LINE_BOT+1,column=4,value=f"=SUM(D{LINE_TOP}:D{LINE_BOT})").font=BOLD
+out(sp,f"D{LINE_BOT+1}")
+
+# --- Lookup tables (do not edit) ---
+sp["F1"]="Lookup tables (do not edit)"; sp["F1"].font=Font(italic=True,color="808080")
+sp["F2"]="SKU"; sp["G2"]="vCPU/VM"
+for c in ("F2","G2"): sp[c].font=WHITEB; sp[c].fill=HEADFILL; sp[c].alignment=CTR
 for i,(s,v) in enumerate(skus):
-    sp.cell(row=3+i,column=5,value=s).border=BORDER
-    sp.cell(row=3+i,column=6,value=v).border=BORDER
-sp["E12"]="Geography"; sp["F12"]="Model"; sp["G12"]="DR Scope Geo"
-for c in ("E12","F12","G12"): sp[c].font=WHITEB; sp[c].fill=HEADFILL; sp[c].alignment=CTR
+    sp.cell(row=SKU_TOP+i,column=6,value=s).border=BORDER
+    sp.cell(row=SKU_TOP+i,column=7,value=v).border=BORDER
+sp["I2"]="Geography"; sp["J2"]="Model"; sp["K2"]="DR Scope Geo"
+for c in ("I2","J2","K2"): sp[c].font=WHITEB; sp[c].fill=HEADFILL; sp[c].alignment=CTR
 geos=[("US","3-region","US"),("EU","2-region","EU"),("Australia","2-region","Australia"),
       ("Asia Pacific","2-region","Asia Pacific"),("Middle East","cross-geo","EU")]
 for i,(g,m,d) in enumerate(geos):
-    sp.cell(row=13+i,column=5,value=g).border=BORDER
-    sp.cell(row=13+i,column=6,value=m).border=BORDER
-    sp.cell(row=13+i,column=7,value=d).border=BORDER
+    sp.cell(row=GEO_TOP+i,column=9,value=g).border=BORDER
+    sp.cell(row=GEO_TOP+i,column=10,value=m).border=BORDER
+    sp.cell(row=GEO_TOP+i,column=11,value=d).border=BORDER
+
 dv_geo=DataValidation(type="list",formula1='"US,EU,Australia,Asia Pacific,Middle East"',allow_blank=False)
-dv_sku=DataValidation(type="list",formula1='"E16ads_v5,E32ads_v5,E8ads_v5,E4ads_v5,D8ads_v5,D4ads_v5,D2ads_v5,D16ads_v5"',allow_blank=False)
+dv_sku=DataValidation(type="list",formula1=f"={skulist}",allow_blank=True)
 dv_reg=DataValidation(type="list",formula1=f"=Capacity_Usage!$B${FIRST}:$B${LAST}",allow_blank=True)
-for dv,cell in ((dv_geo,"B3"),(dv_sku,"B4"),(dv_reg,"B8")):
-    sp.add_data_validation(dv); dv.add(sp[cell])
+sp.add_data_validation(dv_geo); dv_geo.add(sp["B3"])
+sp.add_data_validation(dv_reg); dv_reg.add(sp["B8"])
+sp.add_data_validation(dv_sku); dv_sku.add(f"A{LINE_TOP}:A{LINE_BOT}")
 
 # ============================================================ Policy
 pol=wb.create_sheet("Policy"); pol.sheet_view.showGridLines=False
@@ -414,7 +459,7 @@ def build_scoring(name,alpha_num,alpha_den,beta_num,beta_den,delta_expr,elig_col
     s=wb.create_sheet(name); s.sheet_view.showGridLines=False
     s["A1"]=title; s["A1"].font=H1
     cols=["Region","Geography","InScope","Eligible","AutoSel","total_cust",
-          "α_raw","α_c","β_raw","β_c","γ_raw","γ_c","δ_raw","δ_c","ε_raw","ε_c","PS","Candidate"]
+          "α_raw","α_c","β_raw","β_c","γ_raw","γ_c","δ_raw","δ_c","ε_raw","ε_c","PS","Candidate","Rank"]
     HRr=3
     for j,h in enumerate(cols):
         c=s.cell(row=HRr,column=1+j,value=h); c.font=WHITEB; c.fill=HEADFILL; c.alignment=CTR; c.border=BORDER
@@ -442,10 +487,12 @@ def build_scoring(name,alpha_num,alpha_den,beta_num,beta_den,delta_expr,elig_col
             s.cell(row=xr,column=18,value=f'=IF(AND(C{xr}=1,D{xr}=1,E{xr}=1,A{xr}<>Scoring_Prod!$U$3),Q{xr},-1)')
         else:
             s.cell(row=xr,column=18,value=f"=IF(AND(C{xr}=1,D{xr}=1,E{xr}=1),Q{xr},-1)")
-        for col in range(1,19):
+        # Rank (col 19 = S): 1 = highest candidate PS; blank for non-candidates (Candidate<0)
+        s.cell(row=xr,column=19,value=f'=IF(R{xr}<0,"",COUNTIF($R${HRr+1}:$R${HRr+NR},">"&R{xr})+1)')
+        for col in range(1,20):
             cc=s.cell(row=xr,column=col); cc.border=BORDER; cc.alignment=CTR
             if col in range(7,18): cc.number_format="0.000"
-    for col in range(1,19): s.column_dimensions[get_column_letter(col)].width=9
+    for col in range(1,20): s.column_dimensions[get_column_letter(col)].width=9
     s.column_dimensions["A"].width=20; s.column_dimensions["B"].width=13
     return s,HRr
 
@@ -499,7 +546,7 @@ def rlbl(cell,t): rs[cell]=t; rs[cell].font=BOLD
 def rout(cell,f): rs[cell]=f; rs[cell].border=BORDER; rs[cell].alignment=CTR
 rlbl("A3","Customer ID"); rout("B3","=Setup!B9")
 rlbl("A4","Geography");   rout("B4","=Setup!B3")
-rlbl("A5","SKU");         rout("B5","=Setup!B4")
+rlbl("A5","Workload SKUs");rout("B5","=Setup!B6")
 rlbl("A6","Requested vCPU");rout("B6","=Setup!B7")
 rs["A8"]="Environment"; rs["B8"]="Region"; rs["C8"]="Score"
 for c in ("A8","B8","C8"): rs[c].font=WHITEB; rs[c].fill=HEADFILL; rs[c].alignment=CTR; rs[c].border=BORDER
@@ -527,6 +574,32 @@ rlbl("E9","DR Reserved (region)"); rout("F9",f'=IFERROR(INDEX(Capacity_Usage!$R$
 rlbl("E10","DR Gap"); rout("F10","=MAX(0,F8-F9)")
 rs["E11"]="Note: illustrative — sources = regions in DR scope geography."; rs["E11"].font=Font(italic=True,color="808080",size=9)
 rs.merge_cells("E11:F11")
+
+# ---- RANKED CANDIDATE REGIONS across all catalogue regions (Rank 1 = highest PS) ----
+for col,w in {"G":3,"H":6,"I":20,"J":9,"K":6,"L":20,"M":9,"N":6,"O":20,"P":9}.items():
+    rs.column_dimensions[col].width=w
+rs["H3"]=("RANKED CANDIDATE REGIONS  (Rank 1 = highest PS; blank = not a candidate for this mode)")
+rs["H3"].font=H2; rs["H3"].fill=SUBFILL; rs.merge_cells("H3:P3")
+# mode super-headers
+rs["H4"]="Prod"; rs["K4"]="CVAL"; rs["N4"]="DR"
+for c,mrng in (("H4","H4:J4"),("K4","K4:M4"),("N4","N4:P4")):
+    rs[c].font=WHITEB; rs[c].fill=HEADFILL; rs[c].alignment=CTR; rs.merge_cells(mrng)
+# column headers
+subhdr={"H5":"Rank","I5":"Region","J5":"PS","K5":"Rank","L5":"Region","M5":"PS","N5":"Rank","O5":"Region","P5":"PS"}
+for c,t in subhdr.items():
+    rs[c]=t; rs[c].font=WHITEB; rs[c].fill=HEADFILL; rs[c].alignment=CTR; rs[c].border=BORDER
+# one row per rank 1..NR; INDEX/MATCH the Rank column (S) in each Scoring sheet
+RANK_TOP=6
+for k in range(1,NR+1):
+    r=RANK_TOP+k-1
+    for (rankcol,regcol,pscol,sheet) in (("H","I","J","Scoring_Prod"),("K","L","M","Scoring_CVAL"),("N","O","P","Scoring_DR")):
+        srng=f"{sheet}!$S${top}:$S${bot}"; arng=f"{sheet}!$A${top}:$A${bot}"; qrng=f"{sheet}!$Q${top}:$Q${bot}"
+        rs[f"{rankcol}{r}"]=f'=IFERROR(IF(INDEX({srng},MATCH({k},{srng},0))="","",{k}),"")'
+        rs[f"{regcol}{r}"]=f'=IFERROR(INDEX({arng},MATCH({k},{srng},0)),"")'
+        rs[f"{pscol}{r}"]=f'=IFERROR(INDEX({qrng},MATCH({k},{srng},0)),"")'
+        rs[f"{pscol}{r}"].number_format="0.000"
+        for cc in (rankcol,regcol,pscol):
+            rs[f"{cc}{r}"].border=BORDER; rs[f"{cc}{r}"].alignment=CTR
 
 # charts
 ch=BarChart(); ch.type="col"; ch.title="PS_Prod by ACRME Region"; ch.height=7.5; ch.width=18
