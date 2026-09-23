@@ -617,5 +617,280 @@ c3=Reference(us,min_col=1,min_row=4,max_row=3+len(data_regions)-1)
 ch3.add_data(d3,titles_from_data=True); ch3.set_categories(c3); ch3.legend=None
 us.add_chart(ch3,"K3")
 
+
+# ============================================================ Formula_Reference
+fr=wb.create_sheet("Formula_Reference"); fr.sheet_view.showGridLines=False
+fr.column_dimensions["A"].width=12; fr.column_dimensions["B"].width=30
+fr.column_dimensions["C"].width=50; fr.column_dimensions["D"].width=10
+fr.column_dimensions["E"].width=60; fr.column_dimensions["F"].width=35
+
+fr["A1"]="PLACEMENT SCORING FORMULA REFERENCE"; fr["A1"].font=H1
+fr.merge_cells("A1:F1")
+
+# Introduction
+fr["A3"]="This sheet explains the three placement scoring (PS) formulas used by the ACRME region-selection engine."
+fr["A3"].font=Font(italic=True); fr.merge_cells("A3:F3")
+fr["A4"]="Each formula evaluates candidate regions across five weighted components (α, β, γ, δ, ε) that sum to 1.0."
+fr["A4"].font=Font(italic=True); fr.merge_cells("A4:F4")
+fr["A5"]="All components are clamped to [0, 1] to prevent outliers from dominating the score."
+fr["A5"].font=Font(italic=True); fr.merge_cells("A5:F5")
+
+# PS_Prod Table
+row=7
+fr[f"A{row}"]="PS_Prod — PRODUCTION REGION SCORING"; fr[f"A{row}"].font=H2; fr[f"A{row}"].fill=HEADFILL
+fr.merge_cells(f"A{row}:F{row}")
+row+=1
+
+headers_prod=[
+    ("Component", "A"),
+    ("What It Measures", "B"),
+    ("Signal / Formula", "C"),
+    ("Weight", "D"),
+    ("Explanation", "E"),
+    ("Excel Column References", "F")
+]
+for h, col in headers_prod:
+    fr[f"{col}{row}"]=h; fr[f"{col}{row}"].font=WHITEB; fr[f"{col}{row}"].fill=HEADFILL
+    fr[f"{col}{row}"].alignment=Alignment(horizontal="center", vertical="top", wrap_text=True)
+    fr[f"{col}{row}"].border=BORDER
+
+prod_components=[
+    ("α",
+     "Capacity headroom (forward-looking regional health)",
+     "Clamp(nonprod_crg.effective_free / prod_crg.quantity)",
+     "0.30",
+     "Uses NonProd effective free capacity as a regional health indicator. A region with ample NonProd headroom signals overall capacity health, overflow capacity for Prod spikes, and readiness for future CVAL co-location (2-region model). This is NOT self-referential — it evaluates regional capacity resilience, not just Prod-specific capacity.",
+     "Capacity_Usage: N (NP Eff-Free) ÷ F (Prod Reserved)\nScoring_Prod: G (α_raw), H (α_c)"),
+    ("β",
+     "Quota headroom (direct Prod capacity readiness)",
+     "Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)",
+     "0.20",
+     "Direct measure of Prod quota availability. High quota headroom means the region can accommodate the Prod workload without quota exhaustion. This complements α by providing a Prod-specific capacity signal while α measures regional health.",
+     "Capacity_Usage: K (Prod Q-Headroom) ÷ I (Prod Q-Limit)\nScoring_Prod: I (β_raw), J (β_c)"),
+    ("γ",
+     "Distribution fairness (load balancing)",
+     "Clamp(1 - prod_customer_count / total_customers)",
+     "0.25",
+     "Rewards regions with fewer existing Prod customers, promoting even distribution of workload across the geography. A region with lower customer count scores higher, preventing concentration in a single region. ⚠️ Note: total_customers is currently UNDEFINED in baseline v2.4 (scope and source unspecified).",
+     "Capacity_Usage: U (Cust Count)\nScoring_Prod: F (total_cust for denominator), K (γ_raw), L (γ_c)\n⚠️ total_customers scope: geography-level (most likely) or global (pending clarification)"),
+    ("δ",
+     "DR readiness signal (destination DR coverage)",
+     "Clamp(dr_crg.coverage_ratio)",
+     "0.15",
+     "Measures the region's existing DR coverage ratio — how much of its DR requirement is already met. A region with good DR coverage is more resilient and can potentially host additional DR workloads (multi-source DR hosting, DR-016).",
+     "Capacity_Usage: T (DR Coverage)\nScoring_Prod: M (δ_raw), N (δ_c)"),
+    ("ε",
+     "Zone diversity (availability zone count)",
+     "Clamp(az_count / 3)",
+     "0.10",
+     "Favors regions with more availability zones (max 3 in Azure). Higher zone count provides better fault isolation and distributes VMs more evenly (PLC-011 even zone-distribution target). A 3-AZ region scores 1.0; 2-AZ scores 0.67; 1-AZ scores 0.33.",
+     "Capacity_Usage: E (AZ)\nScoring_Prod: O (ε_raw), P (ε_c)")
+]
+
+row+=1
+for comp, measure, formula, weight, explanation, cols in prod_components:
+    fr[f"A{row}"]=comp; fr[f"A{row}"].font=BOLD; fr[f"A{row}"].alignment=Alignment(horizontal="center", vertical="top")
+    fr[f"B{row}"]=measure; fr[f"B{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"C{row}"]=formula; fr[f"C{row}"].font=Font(name="Courier New", size=9)
+    fr[f"C{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"D{row}"]=weight; fr[f"D{row}"].alignment=Alignment(horizontal="center", vertical="top")
+    fr[f"E{row}"]=explanation; fr[f"E{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"F{row}"]=cols; fr[f"F{row}"].font=Font(name="Courier New", size=8)
+    fr[f"F{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    for c in ("A","B","C","D","E","F"):
+        fr[f"{c}{row}"].border=BORDER
+    fr.row_dimensions[row].height=90
+    row+=1
+
+fr[f"A{row}"]="FINAL SCORE"; fr[f"A{row}"].font=BOLD; fr[f"A{row}"].fill=PatternFill("solid",fgColor="D9EAD3")
+fr[f"A{row}"].alignment=Alignment(horizontal="center", vertical="center")
+fr[f"B{row}"]="Weighted sum of all five components"
+fr[f"C{row}"]="PS_Prod = 0.30×α + 0.20×β + 0.25×γ + 0.15×δ + 0.10×ε"
+fr[f"C{row}"].font=Font(name="Courier New", size=10, bold=True)
+fr[f"D{row}"]="1.00"; fr[f"D{row}"].font=BOLD; fr[f"D{row}"].alignment=Alignment(horizontal="center")
+fr[f"E{row}"]="Range: [0, 1]. Highest score = best candidate. Winner = argmax(PS_Prod) over eligible Standard regions."
+fr[f"F{row}"]="Scoring_Prod: Q (PS)"
+fr[f"F{row}"].font=Font(name="Courier New", size=8)
+for c in ("A","B","C","D","E","F"):
+    fr[f"{c}{row}"].border=BORDER
+    fr[f"{c}{row}"].fill=PatternFill("solid",fgColor="D9EAD3")
+fr[f"C{row}"].alignment=Alignment(vertical="center", wrap_text=True)
+fr[f"E{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+fr[f"F{row}"].alignment=Alignment(vertical="center", wrap_text=True)
+fr.row_dimensions[row].height=50
+
+# PS_NonProd Table
+row+=3
+fr[f"A{row}"]="PS_NonProd — CVAL (NON-PRODUCTION) REGION SCORING"; fr[f"A{row}"].font=H2; fr[f"A{row}"].fill=HEADFILL
+fr.merge_cells(f"A{row}:F{row}")
+row+=1
+
+for h, col in headers_prod:
+    fr[f"{col}{row}"]=h; fr[f"{col}{row}"].font=WHITEB; fr[f"{col}{row}"].fill=HEADFILL
+    fr[f"{col}{row}"].alignment=Alignment(horizontal="center", vertical="top", wrap_text=True)
+    fr[f"{col}{row}"].border=BORDER
+
+nonprod_components=[
+    ("α",
+     "Capacity headroom (direct NonProd capacity)",
+     "Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)",
+     "0.30",
+     "Direct measure of NonProd effective free capacity. Unlike PS_Prod (which uses NonProd as a regional health signal), here we evaluate NonProd capacity directly for CVAL placement. High NonProd headroom = region can accommodate CVAL workload.",
+     "Capacity_Usage: N (NP Eff-Free) ÷ L (NP Reserved)\nScoring_CVAL: G (α_raw), H (α_c)"),
+    ("β",
+     "Quota headroom (NonProd quota availability)",
+     "Clamp(nonprod_crg.quota_headroom / nonprod_crg.quota_limit)",
+     "0.20",
+     "NonProd quota headroom. Ensures the region has sufficient NonProd quota to accommodate the CVAL workload without hitting quota limits.",
+     "Capacity_Usage: Q (NP Q-Headroom) ÷ O (NP Q-Limit)\nScoring_CVAL: I (β_raw), J (β_c)"),
+    ("γ",
+     "Distribution fairness (load balancing)",
+     "Clamp(1 - nonprod_customer_count / total_customers)",
+     "0.25",
+     "Rewards regions with fewer existing NonProd customers, promoting even CVAL distribution. Identical logic to PS_Prod but evaluated against NonProd customer counts. ⚠️ total_customers scope undefined.",
+     "Capacity_Usage: U (Cust Count)\nScoring_CVAL: F (total_cust for denominator), K (γ_raw), L (γ_c)\n⚠️ total_customers scope: geography-level (most likely) or global (pending clarification)"),
+    ("δ",
+     "Overflow capacity health (redundant with α)",
+     "Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)",
+     "0.15",
+     "⚠️ DUPLICATE: This is identical to α. Combined α+δ weight = 0.45. This is the design-of-record formula (baseline v2.4). A pilot variant exists that removes this duplication and reallocates the weight.",
+     "Capacity_Usage: N (NP Eff-Free) ÷ L (NP Reserved)\nScoring_CVAL: M (δ_raw), N (δ_c)\n⚠️ Same as α — duplication acknowledged in Calculation Logic Reference"),
+    ("ε",
+     "Zone diversity (availability zone count)",
+     "Clamp(az_count / 3)",
+     "0.10",
+     "Identical to PS_Prod. Favors regions with more availability zones for better fault isolation.",
+     "Capacity_Usage: E (AZ)\nScoring_CVAL: O (ε_raw), P (ε_c)")
+]
+
+row+=1
+for comp, measure, formula, weight, explanation, cols in nonprod_components:
+    fr[f"A{row}"]=comp; fr[f"A{row}"].font=BOLD; fr[f"A{row}"].alignment=Alignment(horizontal="center", vertical="top")
+    fr[f"B{row}"]=measure; fr[f"B{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"C{row}"]=formula; fr[f"C{row}"].font=Font(name="Courier New", size=9)
+    fr[f"C{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"D{row}"]=weight; fr[f"D{row}"].alignment=Alignment(horizontal="center", vertical="top")
+    fr[f"E{row}"]=explanation; fr[f"E{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"F{row}"]=cols; fr[f"F{row}"].font=Font(name="Courier New", size=8)
+    fr[f"F{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    for c in ("A","B","C","D","E","F"):
+        fr[f"{c}{row}"].border=BORDER
+    fr.row_dimensions[row].height=90
+    row+=1
+
+fr[f"A{row}"]="FINAL SCORE"; fr[f"A{row}"].font=BOLD; fr[f"A{row}"].fill=PatternFill("solid",fgColor="D9EAD3")
+fr[f"A{row}"].alignment=Alignment(horizontal="center", vertical="center")
+fr[f"B{row}"]="Weighted sum of all five components"
+fr[f"C{row}"]="PS_NonProd = 0.30×α + 0.20×β + 0.25×γ + 0.15×δ + 0.10×ε"
+fr[f"C{row}"].font=Font(name="Courier New", size=10, bold=True)
+fr[f"D{row}"]="1.00"; fr[f"D{row}"].font=BOLD; fr[f"D{row}"].alignment=Alignment(horizontal="center")
+fr[f"E{row}"]="Range: [0, 1]. Highest score = best CVAL candidate. Winner = argmax(PS_NonProd) over eligible Standard regions (excluding Prod region). In 2-region model (EU, AU, AP): CVAL placement is deterministic (the other Standard region)."
+fr[f"F{row}"]="Scoring_CVAL: Q (PS)"
+fr[f"F{row}"].font=Font(name="Courier New", size=8)
+for c in ("A","B","C","D","E","F"):
+    fr[f"{c}{row}"].border=BORDER
+    fr[f"{c}{row}"].fill=PatternFill("solid",fgColor="D9EAD3")
+fr[f"C{row}"].alignment=Alignment(vertical="center", wrap_text=True)
+fr[f"E{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+fr[f"F{row}"].alignment=Alignment(vertical="center", wrap_text=True)
+fr.row_dimensions[row].height=60
+
+# PS_DR Table
+row+=3
+fr[f"A{row}"]="PS_DR — DR (DISASTER RECOVERY) REGION SCORING"; fr[f"A{row}"].font=H2; fr[f"A{row}"].fill=HEADFILL
+fr.merge_cells(f"A{row}:F{row}")
+row+=1
+
+for h, col in headers_prod:
+    fr[f"{col}{row}"]=h; fr[f"{col}{row}"].font=WHITEB; fr[f"{col}{row}"].fill=HEADFILL
+    fr[f"{col}{row}"].alignment=Alignment(horizontal="center", vertical="top", wrap_text=True)
+    fr[f"{col}{row}"].border=BORDER
+
+dr_components=[
+    ("α",
+     "Capacity headroom (DR CRG free slots)",
+     "Clamp(dr_crg.free_slots / dr_crg.quantity)",
+     "0.30",
+     "Direct measure of DR capacity headroom. High DR free slots = region can accommodate additional DR workload. This evaluates the region's ability to serve as a DR destination (multi-source DR hosting, DR-016).",
+     "Capacity_Usage: S (DR Free) ÷ R (DR Reserved)\nScoring_DR: G (α_raw), H (α_c)"),
+    ("β",
+     "Quota headroom (DR quota availability)",
+     "Clamp(dr_crg.quota_headroom / dr_crg.quota_limit)",
+     "0.20",
+     "DR quota headroom. In practice, DR uses NonProd quota (DR VMs are in a NonProd environment), so this typically references NP Q-Headroom. Ensures the region has sufficient quota to accommodate the DR workload.",
+     "Capacity_Usage: Q (NP Q-Headroom) ÷ O (NP Q-Limit)\nScoring_DR: I (β_raw), J (β_c)\n(DR uses NonProd quota per ENV-002)"),
+    ("γ",
+     "Distribution fairness (load balancing)",
+     "Clamp(1 - dr_customer_count / total_customers)",
+     "0.25",
+     "Rewards regions with fewer existing DR customers, promoting even DR distribution. Prevents DR concentration in a single destination region. ⚠️ total_customers scope undefined.",
+     "Capacity_Usage: U (Cust Count)\nScoring_DR: F (total_cust for denominator), K (γ_raw), L (γ_c)\n⚠️ total_customers scope: geography-level (most likely) or global (pending clarification)"),
+    ("δ",
+     "Coverage ratio health (DR sizing adequacy)",
+     "min(1.0, dr_crg.coverage_ratio / dr_coverage_target)",
+     "0.15",
+     "Measures how close the region's existing DR coverage is to the configured target. Uses min(1.0, ...) instead of Clamp() for normalization. dr_coverage_target is a configurable scoring reference (per customer/product), NOT the retired 30-40% dr_ratio. DR sizing uses max-not-sum (A.6, DR-017).",
+     "Capacity_Usage: T (DR Coverage)\nScoring_DR: M (δ_raw), N (δ_c)\ndr_coverage_target = configurable scoring parameter (Policy sheet or config)"),
+    ("ε",
+     "Zone diversity (availability zone count)",
+     "Clamp(az_count / 3)",
+     "0.10",
+     "Identical to PS_Prod and PS_NonProd. Favors regions with more availability zones for better DR fault isolation.",
+     "Capacity_Usage: E (AZ)\nScoring_DR: O (ε_raw), P (ε_c)")
+]
+
+row+=1
+for comp, measure, formula, weight, explanation, cols in dr_components:
+    fr[f"A{row}"]=comp; fr[f"A{row}"].font=BOLD; fr[f"A{row}"].alignment=Alignment(horizontal="center", vertical="top")
+    fr[f"B{row}"]=measure; fr[f"B{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"C{row}"]=formula; fr[f"C{row}"].font=Font(name="Courier New", size=9)
+    fr[f"C{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"D{row}"]=weight; fr[f"D{row}"].alignment=Alignment(horizontal="center", vertical="top")
+    fr[f"E{row}"]=explanation; fr[f"E{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr[f"F{row}"]=cols; fr[f"F{row}"].font=Font(name="Courier New", size=8)
+    fr[f"F{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    for c in ("A","B","C","D","E","F"):
+        fr[f"{c}{row}"].border=BORDER
+    fr.row_dimensions[row].height=90
+    row+=1
+
+fr[f"A{row}"]="FINAL SCORE"; fr[f"A{row}"].font=BOLD; fr[f"A{row}"].fill=PatternFill("solid",fgColor="D9EAD3")
+fr[f"A{row}"].alignment=Alignment(horizontal="center", vertical="center")
+fr[f"B{row}"]="Weighted sum of all five components"
+fr[f"C{row}"]="PS_DR = 0.30×α + 0.20×β + 0.25×γ + 0.15×δ + 0.10×ε"
+fr[f"C{row}"].font=Font(name="Courier New", size=10, bold=True)
+fr[f"D{row}"]="1.00"; fr[f"D{row}"].font=BOLD; fr[f"D{row}"].alignment=Alignment(horizontal="center")
+fr[f"E{row}"]="Range: [0, 1]. Highest score = best DR candidate. Winner = argmax(PS_DR) over eligible Standard regions (excluding Prod, CVAL). In 2-region model (EU, AU, AP): DR co-locates with CVAL (PLC-010a mandatory). Middle East: DR cross-geo in Europe (weighted-selected)."
+fr[f"F{row}"]="Scoring_DR: Q (PS)"
+fr[f"F{row}"].font=Font(name="Courier New", size=8)
+for c in ("A","B","C","D","E","F"):
+    fr[f"{c}{row}"].border=BORDER
+    fr[f"{c}{row}"].fill=PatternFill("solid",fgColor="D9EAD3")
+fr[f"C{row}"].alignment=Alignment(vertical="center", wrap_text=True)
+fr[f"E{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+fr[f"F{row}"].alignment=Alignment(vertical="center", wrap_text=True)
+fr.row_dimensions[row].height=60
+
+# Footer notes
+row+=2
+fr[f"A{row}"]="KEY NOTES"; fr[f"A{row}"].font=Font(bold=True, size=11)
+fr.merge_cells(f"A{row}:F{row}")
+row+=1
+notes=[
+    "1. Clamp(x) = MIN(MAX(x, 0), 1) — ensures all component values stay in [0, 1] range to prevent outliers from dominating.",
+    "2. Weight sum constraint: α + β + γ + δ + ε = 1.0 (enforced by Policy sheet validation).",
+    "3. The three PS formulas are IDENTICAL across all region models (2-region, 3-region, 4-region, cross-geo). What changes: number of argmax passes, candidate pool, HC gate constraints.",
+    "4. ⚠️ OPEN ISSUE: total_customers (γ component) is UNDEFINED in baseline v2.4 — no source, scope, or data type specified. Geography-level scope is most likely.",
+    "5. PS_NonProd α and δ are identical (design-of-record v2.4) — combined weight 0.45. A pilot variant exists that removes this duplication.",
+    "6. PS_DR δ uses min(1.0, ...) instead of Clamp() for coverage-ratio normalization.",
+    "7. Column references: _raw = unclamped component; _c = clamped component; PS = final placement score.",
+    "8. Winner selection: argmax(PS) over eligible Standard regions (or deterministic in 2-region co-located model)."
+]
+for note in notes:
+    fr[f"A{row}"]=note; fr[f"A{row}"].alignment=Alignment(vertical="top", wrap_text=True)
+    fr.merge_cells(f"A{row}:F{row}")
+    fr.row_dimensions[row].height=30
+    row+=1
+
 wb.save(OUT)
 print("Saved",OUT,"regions=",NR)
