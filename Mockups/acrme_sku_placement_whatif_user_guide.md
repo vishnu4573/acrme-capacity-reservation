@@ -16,8 +16,9 @@ This is a **new, standalone** what-if — a *different kind of analysis* from `a
 | Capacity grain | ONE blended number per region | **Per SKU** (CAP-022/023) |
 | Quota grain | ONE number per environment/region | **Per VM/quota family** (QUA-002/003/004) |
 | Availability term (α) | blended region free-pool | **per-SKU `GROUP AVAIL` = MIN(reserved-free, family quota-available)** |
-| Question answered | "Which region overall?" | **"For *this SKU*, which region for Prod / CVAL / DR — and is it READY?"** |
-| Readiness | region-level | **RDY-002 per candidate** |
+| Question answered | "Which region overall?" | **"For *this multi-SKU workload*, which region for Prod / CVAL / DR — and is it READY for every SKU?"** |
+| Readiness | region-level | **RDY-002 per candidate (all active SKU lines must clear)** |
+| SKUs per run | single | **up to 8 SKU lines per run** |
 
 Phase 2 is the design-doc step *"availability-by-group in scoring: point α at per-SKU group-availability; emit RDY-002 readiness per candidate."* It is **read-only** — the freeze & logical-lock layer is **Phase 3** and is not in this file.
 
@@ -41,56 +42,116 @@ Phase 2 is the design-doc step *"availability-by-group in scoring: point α at p
 
 ## 3. How to run a scenario
 
-1. **Request sheet** (yellow): set `Geography` (US/EU dropdown), `Requested SKU` (dropdown of the 8 modelled SKUs), `VM count`, `Customer ID`. The sheet derives **Quota Family**, **vCPU/instance**, and **Requested cores** (= VMs × vCPU).
-2. *(Optional)* **Policy sheet** (yellow): tune weights `w_alpha` / `w_beta` / `w_epsilon` (must sum to 1.00 — check `B7`) and thresholds `risk_factor`, `min_buffer_floor`.
-3. Read **Result**: the recommended region per environment, its PS and readiness, the overall readiness, and the ranked Prod-candidate table.
+### Request sheet (yellow cells only)
 
-> **One SKU per run.** Placement is evaluated at SKU grain, so a multi-SKU workload is run once per SKU.
+| Cell | Input | Notes |
+|------|-------|-------|
+| B4 | **Geography** | Dropdown: `US` or `EU`. Filters eligible regions. |
+| B5 | **Customer ID** | Free text — flows to the Result sheet header. |
+| B8–B15 | **SKU** (per line) | Dropdown of the 8 managed SKUs. Leave blank to skip a line. |
+| C8–C15 | **VM Count** (per line) | Positive integer. Leave blank to skip a line. |
 
-## 4. The scoring model (per candidate region, for the requested SKU)
+Both **SKU** and **VM Count** must be filled for a line to be active. Leaving either blank removes that line from all scoring.
 
-For each of the 8 candidate regions, in each environment, the sheet pulls the region's numbers for the **requested SKU** from `Capacity_By_SKU` / `Quota_Groups` via `SUMIFS` keyed on (Region, Environment, SKU) and (Region, Family):
+Derived (auto-filled, read-only):
 
-| Column | Meaning | Formula (essence) |
-|--------|---------|-------------------|
-| Reserved / Reserved-Free | reservation for this SKU | `SUMIFS(Capacity_By_SKU!J / K, …)` |
-| Family Q-Limit / Q-Avail | pooled quota for the family | `SUMIFS(Quota_Groups!E / G, …)` |
-| **GROUP AVAIL** | **placeable headroom** | **`=MIN(Reserved-Free, Family Q-Avail)`** |
-| InGeo | region geography = requested geography | `=IF(B=Request!Geo,1,0)` |
-| Meets-Cap | GROUP AVAIL ≥ requested cores | `=IF(GROUP AVAIL≥Req Cores,1,0)` |
-| Readiness (RDY-002) | per-candidate state | see §5 |
-| Eligible | `InGeo AND Meets-Cap` | `=IF(AND(InGeo,Meets-Cap),1,0)` |
+| Column | Derivation |
+|--------|-----------|
+| D — vCPU / instance | `VLOOKUP(SKU, SKU_Catalogue)` |
+| E — Line Cores | `VM Count × vCPU` |
+| F — Quota Family | `VLOOKUP(SKU, SKU_Family_Map)` |
 
-**Score components (only for eligible candidates):**
+**B17 (Active SKU lines)** and **B18 (Total requested cores)** are summary counters — read-only.
 
-- **α (availability fit)** = `1 − requested cores / GROUP AVAIL` — the **headroom cushion left after placement**. Higher = safer. *This is the SKU-grain change* — α is driven by the per-SKU group availability, not a blended region pool. (Chosen over a capped `MIN(avail/req,1)` because that saturates at 1 and fails to discriminate between candidates; the cushion form ranks regions by how much room remains.)
-- **β (quota headroom)** = `family quota-available / family quota-limit`.
-- **ε (buffer safety)** = `reserved-free / reserved`.
+### Policy sheet (optional tuning)
+
+Tune weights `w_alpha` / `w_beta` / `w_epsilon` (must sum to 1.00 — verify `B7`) and thresholds `risk_threshold` (default 0.10) and `min_buffer_floor`.
+
+### Reading the results
+
+Go to the **Result** sheet. It shows:
+
+- **Recommended Placement** — the top-pick region per environment (Prod / CVAL / DR), its Placement Score, and its RDY-002 readiness state. Each recommendation satisfies **every active SKU line**.
+- **Overall Readiness** — a summary signal based on the Prod top-pick.
+- **Ranked Prod Candidates** — all 8 regions ranked by Placement Score (only eligible regions get a rank).
+
+## 4. The scoring model (per candidate region, across all active SKU lines)
+
+A region is **eligible** only when **every active SKU line** clears the availability gate. The score aggregates across lines using **bottleneck semantics** — a single thin line drags all components down.
+
+### Availability gate (Meets-All)
+
+For each active line `i` the sheet computes:
+
+```
+GROUP_AVAIL_i = MIN( SUMIFS(Capacity_By_SKU.ReservedFree, Region, SKU_i),
+                     SUMIFS(Quota_Groups.QuotaAvail, Region, Family_i) )
+
+line_meets_i  = IF( GROUP_AVAIL_i >= LineCore_i, 1, 0 )
+```
+
+A blank line contributes 1 (not a constraint). The region-level gate is:
+
+```
+Meets-All = MIN( line_meets_1, …, line_meets_8 )   [= 0 if any active line fails]
+```
+
+`Eligible = 1` only when `InGeo = 1` **AND** `Meets-All = 1`.
+
+### Score components (eligible candidates only)
+
+Each component is the **MIN** across active lines — the tightest constraint drives the score:
+
+| Symbol | Formula per active line | Aggregate |
+|--------|------------------------|-----------|
+| **α** (availability fit) | `1 − LineCore_i / MIN(ReservedFree_i, QuotaAvail_i)` — headroom cushion left | `MIN(α_i)` |
+| **β** (quota headroom) | `QuotaAvail_i / QuotaLimit_i` | `MIN(β_i)` |
+| **ε** (buffer safety) | `ReservedFree_i / Reserved_i` | `MIN(ε_i)` |
+
+Blank lines contribute 1 to every MIN (neutral). Components are clamped to `[0, 1]`.
 
 **Placement Score:** `PS = w_alpha·α + w_beta·β + w_epsilon·ε` (defaults 0.50 / 0.30 / 0.20).
 
 **Rank:** dense rank of PS among eligible candidates (Rank 1 = highest PS). The **top pick** per environment is `INDEX/MATCH` on Rank = 1; if no region is eligible it shows `NONE ELIGIBLE`.
 
+**Binding Constraint:** for eligible rows, shows whether `CAPACITY` or `QUOTA` is the tighter limit (i.e., which of ε vs β is lower across lines).
+
 ## 5. Readiness states (RDY-002, per candidate)
+
+The readiness hierarchy evaluates in strict priority order:
 
 | State | Condition |
 |-------|-----------|
-| `RESERVATION_DEFICIT` | reserved-free ≤ 0, or capacity is the binding shortfall when GROUP AVAIL < requested |
-| `QUOTA_DEFICIT` | family quota-available ≤ 0, or quota is the binding shortfall when GROUP AVAIL < requested |
-| `READY_WITH_RISK` | eligible but GROUP AVAIL < requested cores × `risk_factor` (thin cushion) |
-| `READY` | eligible with comfortable cushion |
+| `NO_REQUEST` | No active SKU lines (B17 = 0). |
+| `RESERVATION_DEFICIT` | At least one active line has `ReservedFree = 0` for this region. |
+| `QUOTA_DEFICIT` | At least one active line has `QuotaAvail = 0` for this region. |
+| `CAPACITY_DEFICIT` | `Meets-All = 0` — GROUP AVAIL < LineCore for at least one line, but no full zero-capacity line. |
+| `READY_WITH_RISK` | Eligible (`Meets-All = 1`), but `MIN(α_i) < risk_threshold` (0.10 default) — thin cushion across lines. |
+| `READY` | Eligible with comfortable cushion across all lines. |
 
-The **Binding Constraint** column shows whether CAPACITY or QUOTA is the limiter for that row.
+The **Binding Constraint** column (col O) shows `CAPACITY` or `QUOTA` for eligible rows; `N/A` for ineligible.
 
-## 6. Worked examples (verified with a headless recalc — 0 formula errors)
+## 6. Worked example (pre-loaded sample — verified with a headless recalc, 0 formula errors)
 
-**Scenario A — `Standard_E32ads_v5`, 6 VMs (192 cores), US:**
-- **Prod →** East US 2 (`GROUP AVAIL` 684, READY) — the only US region with enough per-SKU headroom; Central US and Canada Central fall to `RESERVATION_DEFICIT`, West US 3 to `QUOTA_DEFICIT` (greenfield, no quota provisioned).
-- **CVAL →** ranks **East US 2 (α 0.978) > Canada Central (0.877) > Central US (0.650)** — the cushion-based α discriminates correctly.
-- **DR →** East US 2, `READY_WITH_RISK` (DR is a 30% bootstrap, so cushions are thin).
+The workbook ships with a 2-line sample request (US geography):
 
-**Scenario B — `Standard_D8as_v5`, 2 VMs (16 cores), US:**
-- **Prod →** East US 2 (1191) > Central US (613) > Canada Central (301); all `READY`. DR now `READY` too (small request fits the bootstrap).
+| Line | SKU | VMs | vCPU | Line Cores | Family |
+|------|-----|-----|------|-----------|--------|
+| 1 | Standard_E32ads_v5 | 4 | 32 | **128 cores** | memory_optimized |
+| 2 | Standard_D8as_v5 | 2 | 8 | **16 cores** | general_purpose |
+
+**Total requested cores: 144** (shown in B18). **Active lines: 2** (shown in B17).
+
+A region must have GROUP AVAIL ≥ 128 for E32ads_v5 **and** GROUP AVAIL ≥ 16 for D8as_v5 to pass Meets-All. The tighter constraint (E32ads_v5, 128 cores) dominates α, β, and ε via the MIN aggregation.
+
+Expected observations (US, Prod):
+
+- **East US 2** — passes both lines, `READY`. High α because E32ads_v5 headroom is large relative to 128 cores.
+- **Canada Central** — mock region (0.5 × mean); likely `CAPACITY_DEFICIT` or `READY_WITH_RISK` on the E32ads_v5 line.
+- **West US 3** — `RESERVATION_DEFICIT` by design (greenfield, ~0 observed allocation → quota limit = 0).
+- **DR** — 30% bootstrap capacity (ENV-005); thin cushions push to `READY_WITH_RISK` for the large E32ads_v5 line.
+
+To test a single-SKU scenario, clear lines 2–8 (leave B9:C15 blank) and update line 1 as needed. The formulas automatically reduce to single-line evaluation.
 
 ## 7. Data provenance & rulings baked in
 
@@ -101,7 +162,7 @@ The **Binding Constraint** column shows whether CAPACITY or QUOTA is the limiter
 ## 8. Limitations / deferred
 
 - **Read-only feasibility** — does not modify the v2.4 baseline or the Phase 1 workbook.
-- **One SKU per run** (SKU grain).
+- **8-line cap** — the Request sheet supports up to 8 concurrent SKU lines. Workloads exceeding 8 SKU types require a separate run or a builder extension.
 - **CRG scope is regional** (`crg-…-reg`); per-AZ CRGs (CAP-023, `crg-…-az1`) are a later increment.
 - **Freeze & logical lock** (the `LOCKED` state + `Allocation_Ledger`, logical-vs-physical CAP-002 distinction) is **Phase 3** — not in this file.
 - **SKU→family map is naming-derived**; a canonical Azure family table would replace `SKU_Family_Map`.
@@ -109,4 +170,4 @@ The **Binding Constraint** column shows whether CAPACITY or QUOTA is the limiter
 
 ---
 
-*Phase 2 SKU-grain placement what-if — baseline v2.4 · created 24 Sep 2026*
+*Phase 2 SKU-grain placement what-if (multi-SKU, up to 8 lines) — baseline v2.4 · updated 24 Sep 2026*

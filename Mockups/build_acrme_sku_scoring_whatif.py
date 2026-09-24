@@ -240,7 +240,7 @@ pol.cell(7, 1, "Sum of weights (check = 1.00)").font = BOLD
 pol.cell(7, 2, "=B4+B5+B6").font = BOLD; pol.cell(7, 2).alignment = CTR; pol.cell(7, 2).border = BORDER
 pol["A9"] = "Thresholds"; pol["A9"].font = H2; pol["A9"].fill = SUBFILL; pol.merge_cells("A9:C9")
 thr = [
- ("risk_factor  (READY_WITH_RISK if group_avail < requested x this)", 1.25, "B10"),
+ ("risk_threshold  (READY_WITH_RISK if alpha < this value; 0.10 = keep ≥10% buffer)", 0.10, "B10"),
  ("min_buffer_floor (cores; buffer must stay >= this after placement)", 8, "B11"),
 ]
 r = 10
@@ -249,97 +249,226 @@ for label, val, _ in thr:
     c = pol.cell(r, 2, val); c.fill = INFILL; c.border = BORDER; c.alignment = CTR; r += 1
 setw(pol, {"A": 58, "B": 12, "C": 4})
 
+# Row constants — referenced by build_scoring so define BEFORE that function
+RQ_FIRST = 8   # first SKU line row
+RQ_LAST  = 15  # last  SKU line row
+RQ_ACT   = 17  # active-lines summary row
+RQ_TOT   = 18  # total-cores summary row
+
 # ==================================================================== Request (inputs)
 rq = wb.create_sheet("Request"); rq.sheet_view.showGridLines = False
-rq["A1"] = "REQUEST  —  Customer placement request (edit yellow cells)"; rq["A1"].font = H1; rq.merge_cells("A1:D1")
-rq["A2"] = "Phase 2 evaluates ONE SKU per run at SKU grain across the ACRME candidate regions for Prod / CVAL / DR."
-rq["A2"].font = Font(italic=True, color="595959"); rq.merge_cells("A2:D2")
+rq["A1"] = "REQUEST  —  Customer placement request (edit yellow cells)"; rq["A1"].font = H1; rq.merge_cells("A1:G1")
+rq["A2"] = ("Phase 2 evaluates up to 8 SKU lines per deployment. "
+             "Enter each SKU and VM count; ALL lines must be satisfiable in a candidate region for it to be Eligible.")
+rq["A2"].font = Font(italic=True, color="595959"); rq.merge_cells("A2:G2")
 
-def rq_in(row, label, val, help_=""):
-    rq.cell(row, 1, label).font = BOLD; rq.cell(row, 1).border = BORDER
-    c = rq.cell(row, 2, val); c.fill = INFILL; c.border = BORDER; c.alignment = CTR
-    if help_:
-        rq.cell(row, 3, help_).font = Font(italic=True, color="595959")
+# Row 4: Geography
+rq.cell(4, 1, "Geography").font = BOLD; rq.cell(4, 1).border = BORDER
+c = rq.cell(4, 2, "US"); c.fill = INFILL; c.border = BORDER; c.alignment = CTR
+rq.cell(4, 3, "US or EU (candidate regions filtered to this)").font = Font(italic=True, color="595959")
 
-def rq_out(row, label, formula):
-    rq.cell(row, 1, label).font = BOLD; rq.cell(row, 1).border = BORDER
-    c = rq.cell(row, 2, formula); c.border = BORDER; c.alignment = CTR; c.fill = RESTFILL
+# Row 5: Customer ID
+rq.cell(5, 1, "Customer ID").font = BOLD; rq.cell(5, 1).border = BORDER
+c = rq.cell(5, 2, "CUST-0042"); c.fill = INFILL; c.border = BORDER; c.alignment = CTR
 
-rq_in(4, "Geography", "US", "US or EU (candidate regions are filtered to this)")
-rq_in(5, "Requested SKU", "Standard_E32ads_v5", "one of the SKU_Catalogue SKUs")
-rq_in(6, "VM count", 6, "number of instances")
-rq_in(7, "Customer ID", "CUST-0042", "")
-rq_out(8, "Quota Family (derived)", "=VLOOKUP(B5,SKU_Family_Map!$A:$B,2,FALSE)")
-rq_out(9, "vCPU / instance (derived)", "=VLOOKUP(B5,SKU_Catalogue!$A:$B,2,FALSE)")
-rq_out(10, "Requested cores (VMs x vCPU)", "=B6*B9")
-setw(rq, {"A": 30, "B": 22, "C": 46})
-# dropdowns
-dv_geo = DataValidation(type="list", formula1='"US,EU"', allow_blank=False); rq.add_data_validation(dv_geo); dv_geo.add(rq["B4"])
-sku_list = ",".join([s for (s, v, f) in PHASE1_SKUS])
-dv_sku = DataValidation(type="list", formula1=f'"{sku_list}"', allow_blank=False); rq.add_data_validation(dv_sku); dv_sku.add(rq["B5"])
+# Row 7: table header
+tbl_heads = ["Line #", "SKU", "VM Count", "vCPU / inst", "Line Cores", "Quota Family", "Notes"]
+for ci, h in enumerate(tbl_heads, 1):
+    c = rq.cell(7, ci, h); c.font = BOLD; c.fill = SUBFILL; c.border = BORDER; c.alignment = CTR
+
+# Rows 8–15: SKU line items (8 lines)
+SAMPLE_SKUS = [
+    ("Standard_E32ads_v5", 4),
+    ("Standard_D8as_v5",   2),
+]
+sku_list_str = ",".join([s for (s, v, f) in PHASE1_SKUS])
+dv_geo = DataValidation(type="list", formula1='"US,EU"', allow_blank=False)
+rq.add_data_validation(dv_geo); dv_geo.add(rq["B4"])
+dv_sku = DataValidation(type="list", formula1=f'"{sku_list_str}"', allow_blank=True)
+rq.add_data_validation(dv_sku)
+
+for idx in range(8):
+    r = RQ_FIRST + idx
+    # Col A: line number (static label)
+    c = rq.cell(r, 1, idx + 1); c.font = BOLD; c.border = BORDER; c.alignment = CTR
+    # Col B: SKU (yellow dropdown)
+    sku_val = SAMPLE_SKUS[idx][0] if idx < len(SAMPLE_SKUS) else ""
+    c = rq.cell(r, 2, sku_val); c.fill = INFILL; c.border = BORDER; c.alignment = CTR
+    dv_sku.add(rq.cell(r, 2))
+    # Col C: VM count (yellow)
+    vm_val = SAMPLE_SKUS[idx][1] if idx < len(SAMPLE_SKUS) else ""
+    c = rq.cell(r, 3, vm_val); c.fill = INFILL; c.border = BORDER; c.alignment = CTR
+    # Col D: vCPU / inst (derived) — blank if SKU blank
+    vcpu_f = f'=IFERROR(IF(B{r}="","",VLOOKUP(B{r},SKU_Catalogue!$A:$B,2,FALSE)),"")'
+    c = rq.cell(r, 4, vcpu_f); c.fill = RESTFILL; c.border = BORDER; c.alignment = CTR
+    # Col E: line cores = VM count × vCPU (derived)
+    cores_f = f'=IFERROR(IF(OR(B{r}="",C{r}=""),"",C{r}*D{r}),"")'
+    c = rq.cell(r, 5, cores_f); c.fill = RESTFILL; c.border = BORDER; c.alignment = CTR
+    # Col F: Quota Family (derived)
+    fam_f = f'=IFERROR(IF(B{r}="","",VLOOKUP(B{r},SKU_Family_Map!$A:$B,2,FALSE)),"")'
+    c = rq.cell(r, 6, fam_f); c.fill = RESTFILL; c.border = BORDER; c.alignment = CTR
+    # Col G: Notes (free text — blank)
+    rq.cell(r, 7).border = BORDER
+
+# Row 16: separator (empty styled row)
+for ci in range(1, 8):
+    rq.cell(16, ci).border = BORDER
+
+# Row 17: Active lines count
+rq.cell(RQ_ACT, 1, "Active lines (SKU + VM both filled)").font = BOLD; rq.cell(RQ_ACT, 1).border = BORDER
+act_f = f'=COUNTIFS(B{RQ_FIRST}:B{RQ_LAST},"<>",C{RQ_FIRST}:C{RQ_LAST},"<>")'
+c = rq.cell(RQ_ACT, 2, act_f); c.border = BORDER; c.alignment = CTR; c.fill = RESTFILL
+rq.merge_cells(f"A{RQ_ACT}:A{RQ_ACT}")
+
+# Row 18: Total cores
+rq.cell(RQ_TOT, 1, "Total requested cores (all active lines)").font = BOLD; rq.cell(RQ_TOT, 1).border = BORDER
+tot_f = f'=SUMPRODUCT(IFERROR(E{RQ_FIRST}:E{RQ_LAST}*1,0))'
+c = rq.cell(RQ_TOT, 2, tot_f); c.border = BORDER; c.alignment = CTR; c.fill = RESTFILL
+
+# Row 19: constraint note
+rq.cell(19, 1, "★ A region is Eligible only when every active line can be satisfied (Meets-All = 1).").font = Font(italic=True, color="595959")
+rq.merge_cells("A19:G19")
+
+setw(rq, {"A": 34, "B": 22, "C": 10, "D": 12, "E": 12, "F": 18, "G": 28})
 
 # ==================================================================== scoring sheet builder
 def build_scoring(sheet, env, title, exclude_regionmatch=False):
-    """One scoring sheet per environment. Candidates = the 8 regions, evaluated for
-    the REQUESTED SKU in this environment. Alpha reads per-SKU GROUP AVAIL."""
+    """One scoring sheet per environment (Prod/CVAL/DR).
+    Evaluates ALL active SKU lines in the Request sheet for EVERY candidate region.
+    A region is Eligible only when EVERY active line has GROUP AVAIL >= line cores.
+    Score components (alpha/beta/eps) are MIN across active lines (bottleneck drives score).
+    """
     ws = wb.create_sheet(sheet); ws.sheet_view.showGridLines = False
-    ws["A1"] = title; ws["A1"].font = H1; ws.merge_cells("A1:V1")
-    ws["A2"] = ("Alpha (availability fit) reads per-SKU GROUP AVAIL = MIN(reserved-free, family quota-avail) for the requested SKU. "
-                "Eligible = in-geography AND group_avail >= requested cores AND readiness not a deficit.")
-    ws["A2"].font = Font(italic=True, color="595959"); ws.merge_cells("A2:V2")
-    heads = ["Region", "Geography", "Env", "Req SKU", "Family", "vCPU/inst", "Req Cores",
-             "Reserved", "Reserved-Free", "Family Q-Limit", "Family Q-Avail", "GROUP AVAIL",
-             "InGeo", "Meets-Cap", "Readiness (RDY-002)", "Eligible",
+    ws["A1"] = title; ws["A1"].font = H1; ws.merge_cells("A1:O1")
+    ws["A2"] = ("Meets-All = 1 only when EVERY active SKU line has GROUP AVAIL \u2265 Line Cores. "
+                "Alpha=MIN(1\u2212cores/GAVAIL), Beta=MIN(quota-avail/quota-limit), "
+                "Eps=MIN(res-free/res) across all active lines.")
+    ws["A2"].font = Font(italic=True, color="595959"); ws.merge_cells("A2:O2")
+
+    heads = ["Region", "Geo", "Env", "Active Lines", "Total Req Cores",
+             "InGeo", "Meets-All", "Readiness (RDY-002)", "Eligible",
              "alpha_c", "beta_c", "eps_c", "PS", "Rank", "Binding"]
     HRs = 3
     hdr(ws, HRs, heads)
     r0 = HRs + 1
+
+    # ---- inner formula helpers (capture env from outer scope) ----
+
+    def gavail_f(sk, rr):
+        """Return (rf_formula, qa_formula, gavail_formula) for line sk in scoring row rr."""
+        rkey = (f'Capacity_By_SKU!$A:$A,$A{rr},'
+                f'Capacity_By_SKU!$C:$C,"{env}",'
+                f'Capacity_By_SKU!$D:$D,Request!$B${sk}')
+        fam  = f'IFERROR(VLOOKUP(Request!$B${sk},SKU_Family_Map!$A:$B,2,FALSE),"")'
+        qkey = f'Quota_Groups!$B:$B,$A{rr},Quota_Groups!$D:$D,{fam}'
+        rf   = f'SUMIFS(Capacity_By_SKU!$K:$K,{rkey})'
+        qa   = f'SUMIFS(Quota_Groups!$G:$G,{qkey})'
+        return rf, qa, f'MIN({rf},{qa})'
+
+    def meets_line_f(sk, rr):
+        """1 if line sk is satisfiable in rr, else 0. Blank line contributes 1."""
+        _, _, ga = gavail_f(sk, rr)
+        return (f'IF(OR(Request!$B${sk}="",Request!$C${sk}=""),1,'
+                f'IF({ga}>=Request!$E${sk},1,0))')
+
+    def meets_all_f(rr):
+        parts = [meets_line_f(sk, rr) for sk in range(RQ_FIRST, RQ_LAST + 1)]
+        return f'=IF(Request!$B${RQ_ACT}=0,0,MIN({",".join(parts)}))'
+
+    def alpha_line_f(sk, rr):
+        _, _, ga = gavail_f(sk, rr)
+        return (f'IF(OR(Request!$B${sk}="",Request!$C${sk}=""),1,'
+                f'IFERROR(1-Request!$E${sk}/{ga},0))')
+
+    def beta_line_f(sk, rr):
+        fam  = f'IFERROR(VLOOKUP(Request!$B${sk},SKU_Family_Map!$A:$B,2,FALSE),"")'
+        qkey = f'Quota_Groups!$B:$B,$A{rr},Quota_Groups!$D:$D,{fam}'
+        qa   = f'SUMIFS(Quota_Groups!$G:$G,{qkey})'
+        ql   = f'SUMIFS(Quota_Groups!$E:$E,{qkey})'
+        return (f'IF(OR(Request!$B${sk}="",Request!$C${sk}=""),1,'
+                f'IFERROR({qa}/MAX({ql},1),0))')
+
+    def eps_line_f(sk, rr):
+        rkey = (f'Capacity_By_SKU!$A:$A,$A{rr},'
+                f'Capacity_By_SKU!$C:$C,"{env}",'
+                f'Capacity_By_SKU!$D:$D,Request!$B${sk}')
+        rf  = f'SUMIFS(Capacity_By_SKU!$K:$K,{rkey})'
+        res = f'SUMIFS(Capacity_By_SKU!$J:$J,{rkey})'
+        return (f'IF(OR(Request!$B${sk}="",Request!$C${sk}=""),1,'
+                f'IFERROR({rf}/MAX({res},1),0))')
+
+    def readiness_f(rr):
+        res_chks, qa_chks = [], []
+        for sk in range(RQ_FIRST, RQ_LAST + 1):
+            rf, qa, _ = gavail_f(sk, rr)
+            act = f'Request!$B${sk}<>"",Request!$C${sk}<>""'
+            res_chks.append(f'IF(AND({act},{rf}<=0),1,0)')
+            qa_chks.append( f'IF(AND({act},{qa}<=0),1,0)')
+        res_def   = f'SUM({",".join(res_chks)})>0'
+        quota_def = f'SUM({",".join(qa_chks)})>0'
+        alp = [alpha_line_f(sk, rr) for sk in range(RQ_FIRST, RQ_LAST + 1)]
+        alpha_min = f'MIN({",".join(alp)})'
+        return (f'=IF(Request!$B${RQ_ACT}=0,"NO_REQUEST",'
+                f'IF({res_def},"RESERVATION_DEFICIT",'
+                f'IF({quota_def},"QUOTA_DEFICIT",'
+                f'IF(G{rr}=0,"CAPACITY_DEFICIT",'
+                f'IF({alpha_min}<Policy!$B$10,"READY_WITH_RISK","READY")))))')
+
+    # ---- per-region rows (pass 1: main columns) ----
     for i, (rn, rid, g, mk) in enumerate(PHASE1_REGIONS):
-        r = r0 + i
-        # keyed lookups into Capacity_By_SKU for (region, env, requested SKU)
-        key = f'Capacity_By_SKU!$A:$A,$A{r},Capacity_By_SKU!$C:$C,"{env}",Capacity_By_SKU!$D:$D,Request!$B$5'
-        vals = {
-            1: rn, 2: g, 3: env, 4: "=Request!$B$5", 5: "=Request!$B$8",
-            6: "=Request!$B$9", 7: "=Request!$B$10",
-            8:  f'=SUMIFS(Capacity_By_SKU!$J:$J,{key})',   # Reserved
-            9:  f'=SUMIFS(Capacity_By_SKU!$K:$K,{key})',   # Reserved-Free
-            10: f'=SUMIFS(Quota_Groups!$E:$E,Quota_Groups!$B:$B,$A{r},Quota_Groups!$D:$D,$E{r})',  # Family Q-Limit
-            11: f'=SUMIFS(Quota_Groups!$G:$G,Quota_Groups!$B:$B,$A{r},Quota_Groups!$D:$D,$E{r})',  # Family Q-Avail
-            12: f'=MIN(I{r},K{r})',                        # GROUP AVAIL (MIN)
-            13: f'=IF(B{r}=Request!$B$4,1,0)',             # InGeo
-            14: f'=IF(L{r}>=G{r},1,0)',                    # Meets-Cap
-            15: (f'=IF(I{r}<=0,"RESERVATION_DEFICIT",IF(K{r}<=0,"QUOTA_DEFICIT",'
-                 f'IF(L{r}<G{r},IF(I{r}<=K{r},"RESERVATION_DEFICIT","QUOTA_DEFICIT"),'
-                 f'IF(L{r}<G{r}*Policy!$B$10,"READY_WITH_RISK","READY"))))'),
-            16: f'=IF(AND(M{r}=1,N{r}=1),1,0)',            # Eligible
-            # score components (only meaningful when eligible)
-            17: f'=IF(P{r}=1,IFERROR(1-G{r}/L{r},0),0)',                       # alpha_c: headroom cushion left after placement (higher=safer, discriminates)
-            18: f'=IF(P{r}=1,IFERROR(K{r}/MAX(J{r},1),0),0)',                   # beta_c: quota headroom ratio
-            19: f'=IF(P{r}=1,IFERROR(I{r}/MAX(H{r},1),0),0)',                   # eps_c: buffer safety
-            20: f'=IF(P{r}=1,ROUND(Policy!$B$4*Q{r}+Policy!$B$5*R{r}+Policy!$B$6*S{r},4),"")',  # PS
-        }
-        for c, val in vals.items():
-            cell = ws.cell(r, c, val); cell.border = BORDER
-            if c not in (1, 2, 3, 4, 5, 15): cell.alignment = CTR
-        ws.cell(r, 12).fill = ORANGE; ws.cell(r, 12).font = BOLD
-        # Rank (dense rank among eligible PS, higher = rank1)
-        ws.cell(r, 21, f'=IF(P{r}=1,SUMPRODUCT(($P${r0}:$P${r0+len(PHASE1_REGIONS)-1}=1)*($T${r0}:$T${r0+len(PHASE1_REGIONS)-1}>T{r}))+1,"")').border = BORDER
-        ws.cell(r, 21).alignment = CTR
-        ws.cell(r, 22, f'=IF(I{r}<=K{r},"CAPACITY","QUOTA")').border = BORDER
-        ws.cell(r, 22).alignment = CTR
-        # readiness colour
-        ws.cell(r, 20).fill = SUBFILL
+        rr = r0 + i
+        ws.cell(rr, 1, rn).border = BORDER
+        ws.cell(rr, 2, g).border  = BORDER; ws.cell(rr, 2).alignment = CTR
+        ws.cell(rr, 3, env).border= BORDER; ws.cell(rr, 3).alignment = CTR
+        ws.cell(rr, 4, f'=Request!$B${RQ_ACT}').border = BORDER; ws.cell(rr, 4).alignment = CTR
+        ws.cell(rr, 5, f'=Request!$B${RQ_TOT}').border = BORDER; ws.cell(rr, 5).alignment = CTR
+        ws.cell(rr, 6, f'=IF(B{rr}=Request!$B$4,1,0)').border = BORDER; ws.cell(rr, 6).alignment = CTR
+
+        c = ws.cell(rr, 7, meets_all_f(rr))
+        c.border = BORDER; c.alignment = CTR; c.fill = ORANGE; c.font = BOLD
+
+        ws.cell(rr, 8, readiness_f(rr)).border = BORDER
+
+        elig = f'=IF(AND(F{rr}=1,G{rr}=1,OR(H{rr}="READY",H{rr}="READY_WITH_RISK")),1,0)'
+        ws.cell(rr, 9, elig).border = BORDER; ws.cell(rr, 9).alignment = CTR
+
+        alpha_f = f'=IF(I{rr}=1,MAX(0,MIN({",".join(alpha_line_f(sk,rr) for sk in range(RQ_FIRST,RQ_LAST+1))})),0)'
+        beta_f  = f'=IF(I{rr}=1,MAX(0,MIN({",".join(beta_line_f(sk,rr)  for sk in range(RQ_FIRST,RQ_LAST+1))})),0)'
+        eps_f   = f'=IF(I{rr}=1,MAX(0,MIN({",".join(eps_line_f(sk,rr)   for sk in range(RQ_FIRST,RQ_LAST+1))})),0)'
+
+        ws.cell(rr, 10, alpha_f).border = BORDER; ws.cell(rr, 10).alignment = CTR
+        ws.cell(rr, 11, beta_f).border  = BORDER; ws.cell(rr, 11).alignment = CTR
+        ws.cell(rr, 12, eps_f).border   = BORDER; ws.cell(rr, 12).alignment = CTR
+
+        ps = f'=IF(I{rr}=1,ROUND(Policy!$B$4*J{rr}+Policy!$B$5*K{rr}+Policy!$B$6*L{rr},4),"")'
+        c  = ws.cell(rr, 13, ps); c.border = BORDER; c.alignment = CTR; c.fill = SUBFILL
+
     RS_LAST = r0 + len(PHASE1_REGIONS) - 1
-    # top result cells (row 1 area on the right)
-    ws["X1"] = "TOP PICK"; ws["X1"].font = H2
-    ws["X2"] = "Region"; ws["Y2"] = f'=IFERROR(INDEX($A${r0}:$A${RS_LAST},MATCH(1,$U${r0}:$U${RS_LAST},0)),"NONE ELIGIBLE")'
-    ws["X3"] = "PS";     ws["Y3"] = f'=IFERROR(INDEX($T${r0}:$T${RS_LAST},MATCH(1,$U${r0}:$U${RS_LAST},0)),"")'
-    ws["X4"] = "Readiness"; ws["Y4"] = f'=IFERROR(INDEX($O${r0}:$O${RS_LAST},MATCH(1,$U${r0}:$U${RS_LAST},0)),"")'
-    for cc in ("X2", "X3", "X4"): ws[cc].font = BOLD
-    for cc in ("Y2", "Y3", "Y4"): ws[cc].alignment = CTR; ws[cc].fill = GREENF
-    setw(ws, {"A": 16, "B": 10, "C": 8, "D": 20, "E": 9, "F": 9, "G": 9, "H": 9, "I": 12, "J": 12,
-              "K": 12, "L": 12, "M": 7, "N": 9, "O": 20, "P": 8, "Q": 8, "R": 8, "S": 8, "T": 8,
-              "U": 6, "V": 9, "X": 10, "Y": 16})
+
+    # ---- per-region rows (pass 2: rank + binding, now RS_LAST is known) ----
+    for i, _ in enumerate(PHASE1_REGIONS):
+        rr = r0 + i
+        rank = (f'=IF(I{rr}=1,'
+                f'SUMPRODUCT(($I${r0}:$I${RS_LAST}=1)*($M${r0}:$M${RS_LAST}>M{rr}))+1,"")')
+        ws.cell(rr, 14, rank).border = BORDER; ws.cell(rr, 14).alignment = CTR
+
+        min_rf = f'MIN({",".join(eps_line_f(sk,rr)  for sk in range(RQ_FIRST,RQ_LAST+1))})'
+        min_qa = f'MIN({",".join(beta_line_f(sk,rr) for sk in range(RQ_FIRST,RQ_LAST+1))})'
+        bind   = f'=IF(I{rr}=0,"N/A",IF({min_rf}<={min_qa},"CAPACITY","QUOTA"))'
+        ws.cell(rr, 15, bind).border = BORDER; ws.cell(rr, 15).alignment = CTR
+
+    # ---- TOP PICK summary (cols Q / R) ----
+    ws["Q1"] = "TOP PICK"; ws["Q1"].font = H2
+    ws["Q2"] = "Region";    ws["Q3"] = "PS";    ws["Q4"] = "Readiness"
+    ws["R2"] = f'=IFERROR(INDEX($A${r0}:$A${RS_LAST},MATCH(1,$N${r0}:$N${RS_LAST},0)),"NONE ELIGIBLE")'
+    ws["R3"] = f'=IFERROR(INDEX($M${r0}:$M${RS_LAST},MATCH(1,$N${r0}:$N${RS_LAST},0)),"")'
+    ws["R4"] = f'=IFERROR(INDEX($H${r0}:$H${RS_LAST},MATCH(1,$N${r0}:$N${RS_LAST},0)),"")'
+    for cc in ("Q2","Q3","Q4"): ws[cc].font = BOLD
+    for cc in ("R2","R3","R4"): ws[cc].alignment = CTR; ws[cc].fill = GREENF
+
+    setw(ws, {"A": 16, "B": 8, "C": 8, "D": 11, "E": 13, "F": 7,
+              "G": 11, "H": 20, "I": 8, "J": 9, "K": 9, "L": 9,
+              "M": 9, "N": 7, "O": 10, "Q": 10, "R": 16})
     return r0, RS_LAST
 
 pr0, pr1 = build_scoring("Score_Prod", "Prod", "SCORE_PROD  —  SKU-grain placement score (Production)")
@@ -348,25 +477,28 @@ dr0, dr1 = build_scoring("Score_DR", "DR", "SCORE_DR  —  SKU-grain placement s
 
 # ==================================================================== Result
 res = wb.create_sheet("Result"); res.sheet_view.showGridLines = False
-res["A1"] = "RESULT  —  SKU-grain placement recommendation (What-If, Phase 2)"; res["A1"].font = H1; res.merge_cells("A1:H1")
-res["A3"] = "Customer ID"; res["B3"] = "=Request!B7"
-res["A4"] = "Geography";   res["B4"] = "=Request!B4"
-res["A5"] = "Requested SKU"; res["B5"] = "=Request!B5"
-res["A6"] = "Quota Family"; res["B6"] = "=Request!B8"
-res["A7"] = "Requested cores"; res["B7"] = "=Request!B10"
-for rr in range(3, 8):
-    res.cell(rr, 1).font = BOLD; res.cell(rr, 1).border = BORDER
-    res.cell(rr, 2).border = BORDER; res.cell(rr, 2).alignment = CTR
+res["A1"] = "RESULT  —  Multi-SKU placement recommendation (What-If, Phase 2)"; res["A1"].font = H1; res.merge_cells("A1:I1")
+# summary panel (rows 3-7)
+summary_rows = [
+    ("Customer ID",          "=Request!B5"),
+    ("Geography",            "=Request!B4"),
+    ("Active SKU lines",     f"=Request!B{RQ_ACT}"),
+    ("Total requested cores",f"=Request!B{RQ_TOT}"),
+    ("",                     ""),
+]
+for idx, (lbl, val) in enumerate(summary_rows, start=3):
+    res.cell(idx, 1, lbl).font = BOLD; res.cell(idx, 1).border = BORDER
+    res.cell(idx, 2, val).border = BORDER; res.cell(idx, 2).alignment = CTR
 
-res["A9"] = "RECOMMENDED PLACEMENT (per environment, for the requested SKU)"; res["A9"].font = H2; res["A9"].fill = SUBFILL; res.merge_cells("A9:D9")
+res["A9"] = "RECOMMENDED PLACEMENT (per environment — region satisfies ALL active SKU lines)"; res["A9"].font = H2; res["A9"].fill = SUBFILL; res.merge_cells("A9:D9")
 hdr(res, 10, ["Environment", "Region", "PS", "Readiness (RDY-002)"])
 env_sheets = [("Prod", "Score_Prod"), ("CVAL", "Score_CVAL"), ("DR", "Score_DR")]
 r = 11
 for envlbl, sh in env_sheets:
     res.cell(r, 1, envlbl).font = BOLD; res.cell(r, 1).border = BORDER
-    res.cell(r, 2, f"='{sh}'!Y2").border = BORDER; res.cell(r, 2).alignment = CTR
-    res.cell(r, 3, f"='{sh}'!Y3").border = BORDER; res.cell(r, 3).alignment = CTR
-    res.cell(r, 4, f"='{sh}'!Y4").border = BORDER; res.cell(r, 4).alignment = CTR; res.cell(r, 4).fill = BLUE
+    res.cell(r, 2, f"='{sh}'!R2").border = BORDER; res.cell(r, 2).alignment = CTR
+    res.cell(r, 3, f"='{sh}'!R3").border = BORDER; res.cell(r, 3).alignment = CTR
+    res.cell(r, 4, f"='{sh}'!R4").border = BORDER; res.cell(r, 4).alignment = CTR; res.cell(r, 4).fill = BLUE
     r += 1
 res.cell(15, 1, "Overall Readiness").font = BOLD; res.cell(15, 1).border = BORDER
 res.cell(15, 2, '=IF(B11="NONE ELIGIBLE","QUOTA_DEFICIT / NEEDS ATTENTION (Prod)",'
@@ -375,18 +507,18 @@ res.cell(15, 2, '=IF(B11="NONE ELIGIBLE","QUOTA_DEFICIT / NEEDS ATTENTION (Prod)
 res.cell(15, 2).border = BORDER; res.cell(15, 2).alignment = LEFT; res.cell(15, 2).fill = ORANGE; res.cell(15, 2).font = BOLD
 res.merge_cells("B15:D15")
 
-# ranked candidate table (Prod)
-res["F9"] = "RANKED PROD CANDIDATES (for requested SKU)"; res["F9"].font = H2; res["F9"].fill = SUBFILL; res.merge_cells("F9:I9")
+# ranked candidate table (Prod) — updated to new column refs (N=Rank, M=PS, H=Readiness)
+res["F9"] = "RANKED PROD CANDIDATES (all active SKU lines satisfiable)"; res["F9"].font = H2; res["F9"].fill = SUBFILL; res.merge_cells("F9:I9")
 hdr(res, 10, ["Rank", "Region", "PS", "Readiness"], startcol=6)
 for k in range(1, 9):
     rr = 10 + k
     res.cell(rr, 6, k).border = BORDER; res.cell(rr, 6).alignment = CTR
-    res.cell(rr, 7, f'=IFERROR(INDEX(Score_Prod!$A${pr0}:$A${pr1},MATCH({k},Score_Prod!$U${pr0}:$U${pr1},0)),"")').border = BORDER
-    res.cell(rr, 8, f'=IFERROR(INDEX(Score_Prod!$T${pr0}:$T${pr1},MATCH({k},Score_Prod!$U${pr0}:$U${pr1},0)),"")').border = BORDER
-    res.cell(rr, 9, f'=IFERROR(INDEX(Score_Prod!$O${pr0}:$O${pr1},MATCH({k},Score_Prod!$U${pr0}:$U${pr1},0)),"")').border = BORDER
+    res.cell(rr, 7, f'=IFERROR(INDEX(Score_Prod!$A${pr0}:$A${pr1},MATCH({k},Score_Prod!$N${pr0}:$N${pr1},0)),"")').border = BORDER
+    res.cell(rr, 8, f'=IFERROR(INDEX(Score_Prod!$M${pr0}:$M${pr1},MATCH({k},Score_Prod!$N${pr0}:$N${pr1},0)),"")').border = BORDER
+    res.cell(rr, 9, f'=IFERROR(INDEX(Score_Prod!$H${pr0}:$H${pr1},MATCH({k},Score_Prod!$N${pr0}:$N${pr1},0)),"")').border = BORDER
     for cc in (7, 8, 9):
         res.cell(rr, cc).alignment = CTR
-setw(res, {"A": 18, "B": 20, "C": 10, "D": 24, "E": 3, "F": 6, "G": 20, "H": 10, "I": 22})
+setw(res, {"A": 22, "B": 20, "C": 10, "D": 24, "E": 3, "F": 6, "G": 20, "H": 10, "I": 22})
 
 # ==================================================================== ReadMe
 rm = wb.create_sheet("ReadMe"); rm.sheet_view.showGridLines = False
@@ -396,25 +528,35 @@ def g(row, text, style=None, fill=None):
     if fill: c.fill = fill
     c.alignment = WRAP; rm.merge_cells(start_row=row, start_column=1, end_row=row, end_column=10)
 lines = [
- ("ACRME SKU-LEVEL PLACEMENT WHAT-IF  —  PHASE 2 (SKU-grain scoring)", H1, None),
+ ("ACRME SKU-LEVEL PLACEMENT WHAT-IF  —  PHASE 2 (Multi-SKU deployment scoring)", H1, None),
  ("", None, None),
  ("WHAT THIS IS", H2, SUBFILL),
- ("A DIFFERENT what-if from the region-selection model. That model scored capacity/quota as ONE blended number per region.", None, None),
- ("This model scores placement at SKU grain: it evaluates ONE requested SKU across the candidate regions and picks Prod / CVAL / DR.", None, None),
- ("The availability term (alpha) reads per-SKU GROUP AVAIL = MIN(reserved-free for the SKU, quota available for its family).", None, None),
+ ("A DIFFERENT what-if from the region-selection model (Phase 1). That model scores capacity/quota as ONE blended number per region.", None, None),
+ ("This model scores placement at SKU grain for a MULTI-SKU deployment: enter up to 8 SKU lines (SKU + VM count each).", None, None),
+ ("A candidate region is Eligible only when EVERY active SKU line has GROUP AVAIL >= Line Cores (Meets-All = 1).", None, None),
+ ("Score components are aggregated across lines using MIN (bottleneck-SKU drives the score).", None, None),
  ("", None, None),
  ("HOW TO USE", H2, SUBFILL),
- ("1. Edit the Request sheet (yellow): Geography, Requested SKU, VM count, Customer ID.", None, None),
+ ("1. Open the Request sheet. Fill yellow cells:", None, None),
+ ("   - B4: Geography (US or EU).  B5: Customer ID.", None, None),
+ ("   - Rows 8-15: For each SKU line, select SKU (col B dropdown) and enter VM count (col C).", None, None),
+ ("   - vCPU/inst (col D), Line Cores (col E), and Quota Family (col F) are derived automatically.", None, None),
+ ("   - Leave a row blank (B and C empty) to deactivate that line. At least 1 active line required.", None, None),
  ("2. (Optional) tune Policy weights/thresholds (yellow). Weights must sum to 1.00 (check cell B7).", None, None),
- ("3. Read Result: recommended Prod/CVAL/DR region for that SKU + ranked Prod candidates + readiness.", None, None),
+ ("3. Read Result: recommended Prod/CVAL/DR region for the deployment + ranked Prod candidates + readiness.", None, None),
  ("", None, None),
- ("SCORING (per candidate region, for the requested SKU in each environment)", H2, SUBFILL),
- ("Eligible = in-geography AND GROUP AVAIL >= requested cores AND readiness is not a deficit.", None, None),
- ("PS = w_alpha*alpha + w_beta*beta + w_eps*eps   (only for eligible candidates).", None, None),
- ("  alpha (availability fit) = 1 - requested cores / GROUP AVAIL  = headroom cushion left after placement (higher = safer)  <- the SKU-grain change", None, None),
- ("  beta  (quota headroom)   = family quota-available / family quota-limit", None, None),
- ("  eps   (buffer safety)    = reserved-free / reserved", None, None),
- ("Readiness (RDY-002): RESERVATION_DEFICIT, QUOTA_DEFICIT, READY_WITH_RISK, or READY.", None, None),
+ ("SCORING (per candidate region, per environment)", H2, SUBFILL),
+ ("Eligible = InGeo=1 AND Meets-All=1 AND Readiness is READY or READY_WITH_RISK.", None, None),
+ ("Meets-All = MIN across active lines of: 1 if GROUP_AVAIL(line) >= Line_Cores(line), else 0.", None, None),
+ ("PS = w_alpha * alpha_c + w_beta * beta_c + w_eps * eps_c   (only for eligible candidates).", None, None),
+ ("  alpha_c = MAX(0, MIN(1 - Line_Cores/GAVAIL) across active lines)   [bottleneck line drives score]", None, None),
+ ("  beta_c  = MAX(0, MIN(quota-avail / quota-limit) across active lines)", None, None),
+ ("  eps_c   = MAX(0, MIN(reserved-free / reserved) across active lines)", None, None),
+ ("  GAVAIL per line = MIN(reserved-free for that SKU in this env, quota-avail for its family).", None, None),
+ ("Readiness (RDY-002) hierarchy: NO_REQUEST -> RESERVATION_DEFICIT -> QUOTA_DEFICIT -> CAPACITY_DEFICIT -> READY_WITH_RISK -> READY.", None, None),
+ ("  NO_REQUEST: no active SKU lines.  RESERVATION_DEFICIT: any line has reserved-free=0.", None, None),
+ ("  QUOTA_DEFICIT: any line's family has quota-avail=0.  CAPACITY_DEFICIT: Meets-All=0 (GAVAIL < Line Cores for some line).", None, None),
+ ("  READY_WITH_RISK: Meets-All=1 but MIN(alpha) < risk_threshold (Policy!B10).  READY: all checks pass.", None, None),
  ("", None, None),
  ("RULINGS BAKED IN (from Phase 1)", H2, SUBFILL),
  ("- ONE pooled quota group per region+family across Prod+NonProd+DR (QUA-004).", None, None),
@@ -424,7 +566,7 @@ lines = [
  ("", None, None),
  ("SCOPE / LIMITATIONS", H2, SUBFILL),
  ("- Read-only feasibility. Does NOT modify the v2.4 baseline or the Phase 1 workbook.", None, WARNFILL),
- ("- One SKU per run (SKU grain). Multi-SKU workloads = run per SKU.", None, WARNFILL),
+ ("- SKU dropdown is constrained to the ACRME catalogue; new SKUs require updating the builder.", None, WARNFILL),
  ("- CRG scope is regional (crg-...-reg); per-AZ CRGs (CAP-023) are a later increment.", None, WARNFILL),
  ("- Freeze & logical lock (the LOCKED state + Allocation_Ledger) is Phase 3, not in this file.", None, WARNFILL),
  ("- SKU->family map is naming-derived; a canonical Azure family table would replace it.", None, WARNFILL),
