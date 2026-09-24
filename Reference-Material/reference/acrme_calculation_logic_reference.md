@@ -658,8 +658,10 @@ Target Reserved Capacity = Allocated VM Count + Configured Buffer
 - `Allocated VM Count` = VMs in `running` / `allocated` state consuming compute capacity.
 - `Configured Buffer` = policy-defined headroom above allocated demand. Tunable per
   product/region/env/SKU. Not hard-coded.
-- **Associated-but-deallocated VMs** do not force reservation retention (CAP-004). They are reported
+- **Associated-but-deallocated VMs** do not raise the capacity target (CAP-004). They are reported
   separately so teams understand restart risk, but do not add to the target.
+- Those same VMs **still consume reservation quota** until dissociated. Shrink and quota return wait
+  on dissociation. `virtualMachinesAssociated` includes deallocated VMs.
 
 ### A.2 Reservation headroom
 
@@ -890,7 +892,8 @@ All of the following must pass for `READY`:
 4. reservation_policy known for (subscription, region, zone, sku)
 5. reservation exists (if required by policy)
 6. reserved_quantity ≥ requested_count OR approved_over_allocation active
-7. consumer_subscription_quota ≥ requested_units        (QUA-013 — POC-gated)
+7. consumer_subscription_quota ≥ requested_units        (QUA-013 — documented;
+     lesser of family remaining and regional-total remaining)
 8. snapshot_age     ≤ max_snapshot_age_seconds           (RDY-004)
 9. no blocking policy exception or hard constraint violation
 ```
@@ -1054,7 +1057,7 @@ Rebalancing never violates capacity, quota, restriction, or zone-alignment const
 | DR floor accounting (Scenario 9) | `[Decided]` | Updated to use max-not-sum input |
 | Tier 2 quota-neutral math (Scenario 13) | `[Derived]` | POC-31/POC-32 required |
 | Max-not-sum DR sizing (Scenario 17) | `[Decided]` | POC-011 required before production dependency |
-| Consumer-subscription quota (QUA-013) | `[Assumed]` | POC-001 — **top technical unknown** |
+| Consumer-subscription quota (QUA-013) | `[Documented]` — Microsoft Learn | Confirm on the API version in use (POC-001). Sharing remains Preview |
 | Reservation target floor (Scenario 16) | `[Decided]` | Ready for Phase 1 |
 | Standby activation staging (Scenario 18) | `[Decided]` | Dependent on POC-005 (VM state semantics) |
 | Deployment readiness gate (Scenario 19) | `[Decided]` | Ready for Phase 1 |
@@ -1068,4 +1071,4 @@ constant requires updating the config; no code change is needed. The `dr_ratio_*
 
 ---
 
-*Document version 2.4 — 7 September 2026. Next review: upon POC-001 / POC-011 results.*
+*Document version 2.5 — 24 September 2026. QUA-013 moved from Assumed to Documented. Next review: POC-011 and sharing GA (DEP-001).*

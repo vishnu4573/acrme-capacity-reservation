@@ -209,8 +209,8 @@ Flagged rather than assumed (consistent with prior `total_customers` handling):
 2. **SKU → quota-family mapping source.** The map in Section 3 is derived from SKU naming (`Dadsv5`, `Eadsv5`). Is there an authoritative Azure family table we should ingest, or is naming-derived acceptable for the mockup? (169 distinct SKUs in the data.)
 3. **Logical lock vs Azure-first (CAP-002).** Does a freeze **immediately** trigger the physical Azure reservation scale-up, or only the logical accounting lock with physical reconciliation on the next CAP-005/006 cycle? This determines whether `LOCKED` implies a real cost commitment.
 4. **Over-allocation at freeze (CAP-018).** On freeze, do we lock **guaranteed = reserved_free** only, or allow committing into the over-allocation allowance? Affects the `_after` math.
-5. **Zone selection within the frozen region.** Capacity is zonal (CAP-011); a freeze must pick a **zone** (or regional CRG for non-zonal SKUs, CAP-023). Confirm whether the mockup freezes at region-level (engine picks zone) or the user freezes a specific zone.
-6. **Consumer-subscription quota (QUA-013, POC-gated).** Quota is assumed to live at subscription level, not the reservation group — still POC-validation-required. The quota-group model should keep this flagged.
+5. **Zone selection within the frozen region.** Capacity is zonal (CAP-011). A freeze picks a **zone** inside the environment’s zonal CRG (one reservation per VM size per zone, CAP-023). A no-zone group is only for a SKU that cannot take a zonal reservation, and Azure pins that group to one zone.
+6. **Consumer-subscription quota (QUA-013, documented).** The deploying subscription must hold its own quota, including when the reservation is shared. The Quota Group limit is not the deploy-time check. Sharing remains Preview, so production placement uses a reservation in the deploying subscription (CAP-013).
 7. *(Carried over)* **`total_customers`** in the γ distribution term remains undefined in v2.4 — unaffected by this change but still open.
 
 ---

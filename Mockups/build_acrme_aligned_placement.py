@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """ACRME aligned placement what-if.
 
-Fresh mockup. Placement rules follow the v2.4 baseline and the plain-English
-walkthrough. Capacity is reserved per SKU (CAP-003 / CAP-022). Quota is one
-pool per region and VM family (QUA-004). Figures are synthetic.
+Fresh mockup. Placement rules follow the v2.5 baseline and the plain-English
+walkthrough. Capacity is reserved per SKU (CAP-003 / CAP-022). Family quota
+is one accounting cell per region and VM family (QUA-004). The HC-3 gate
+also requires the regional vCPU total (QUA-002). Figures are synthetic.
 
 Does not modify the requirements baseline or the earlier what-if workbooks.
 """
@@ -94,9 +95,13 @@ ABBR = {
 ENV_AB = {"Prod": "pr", "NonProd": "np", "DR": "dr"}
 ENVS = ("Prod", "NonProd", "DR")
 
-# Extra pooled quota above current usage, per region × family. Uniform and
-# large so the sample is capacity-gated, not accidentally quota-gated.
+# Extra pooled family quota above current usage, per region × family.
+# Large so the sample is capacity-gated, not accidentally quota-gated.
 QUOTA_HEADROOM = 5000
+# Total regional vCPU cap (QUA-002), stored once per region on the anchor
+# family row. Large so the shipped sample stays capacity-gated.
+REGIONAL_VCPU_LIMIT = 50000
+ANCHOR_FAMILY = FAMILIES[0]
 
 N_REG = len(REGIONS)
 N_SKU = len(SKUS)
@@ -248,7 +253,7 @@ def build_readme(wb):
     ws.title = "ReadMe"
     lines = [
         "ACRME aligned placement what-if",
-        "Mock planning workbook. Figures are synthetic. Nothing here is live Azure state, and nothing here changes the v2.4 baseline.",
+        "Mock planning workbook. Figures are synthetic. Nothing here is live Azure state.",
         "",
         "What you do",
         "1. On Request, set Geography and Customer ID. Enter up to 8 SKU lines (SKU and VM count).",
@@ -278,14 +283,14 @@ def build_readme(wb):
         "",
         "Gates",
         "HC-2 capacity floor: reserved-free ≥ multiplier × requested cores. The multiplier is policy. This file ships at 1 so the sample fits; the reference write-up uses 2.",
-        "HC-3 quota floor: pooled quota can absorb the request and still leave the configured remainder.",
+        "HC-3 quota floor: the lesser of family quota available and regional vCPU available can absorb the request and still leave the configured remainder.",
         "HC-5: region has at least 2 availability zones.",
         "HC-6: applied on DR only when the model is 2-region. DR free + NonProd free ≥ this customer's DR bootstrap. The co-host flag does not turn this gate on.",
         "HC-7: applied on CVAL. NonProd headroom after Prod and DR earmarks must cover the request.",
         "HC-8: Prod and CVAL stay in the requested geography. DR stays in that geography, or in Europe when the request is Middle East.",
         "HC-9: Standard regions, or the explicit Prod region even when it is Restricted.",
         "HC-4: DR region is a different region from Prod. Middle East DR must be in Europe. The full HIGH/MEDIUM pair matrix is not in the baseline catalogue, so it is not encoded.",
-        "Group availability for a line is MIN(reserved-free for that SKU and environment, family quota available). Every active line must clear it.",
+        "Group availability for a line is MIN(reserved-free for that SKU and environment, family quota available, regional vCPU available). Every active line must clear it.",
         "",
         "DR size",
         "The new customer's DR reservation is requested cores × the bootstrap fraction on Policy (default 0.10). It is not a 30–40% copy of Prod (ENV-005, DR-007). Existing DR rows in the mock estate are a separate synthetic stock.",
@@ -575,18 +580,24 @@ def build_capacity(wb, cap_rows):
 
 def build_quota(wb, cap_rows, limits):
     ws = wb.create_sheet("Quota_Groups")
-    ws["A1"] = "Mock quota groups — one pool per region and VM family"
+    ws["A1"] = "Mock quota — family cells plus the regional vCPU cap"
     ws["A1"].font = H1
     ws["A2"] = (
-        "One group covers Prod, NonProd, and DR (QUA-004). Yellow Limit is synthetic. "
-        "Used sums Allocated on Capacity_Reservations. "
-        "Prod earmark and DR earmark are the reserved cores of those environments, so CVAL cannot spend them (HC-7)."
+        "Family rows are the QUA-004 accounting cell (Prod, NonProd, and DR together). "
+        "Yellow Limit is synthetic. Used sums Allocated on Capacity_Reservations. "
+        "Prod earmark and DR earmark are the reserved cores of those environments, so CVAL cannot spend them (HC-7). "
+        "Columns N–P are the total regional vCPU cap (QUA-002), filled on the Eadsv5 row of each region. "
+        "HC-3 uses the lesser of family available and that regional available. "
+        "The group limit is not what a deployment checks; these numbers stand in for subscription quota after transfer."
     )
     ws["A2"].font = SMALL
-    ws.merge_cells("A2:M2")
+    ws["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells("A2:P2")
+    ws.row_dimensions[2].height = 48
     labels = ("Quota group", "Region", "Region id", "Geography", "Family", "Limit",
               "Used", "Available", "Prod earmark", "DR earmark", "NonProd used",
-              "Allocatable to NonProd", "NonProd headroom")
+              "Allocatable to NonProd", "NonProd headroom",
+              "Regional vCPU limit", "Regional vCPU used", "Regional vCPU available")
     header_row(ws, 4, labels)
     cap_b, cap_d, cap_f, cap_i, cap_k = (
         f"Capacity_Reservations!$B$5:$B${CAP_LAST}",
@@ -612,6 +623,13 @@ def build_quota(wb, cap_rows, limits):
             ws.cell(r, 11, f'=SUMIFS({cap_i},{cap_b},C{r},{cap_d},"NonProd",{cap_f},E{r})')
             ws.cell(r, 12, f"=MAX(0,F{r}-I{r}-J{r})")
             ws.cell(r, 13, f"=L{r}-K{r}")
+            if fam == ANCHOR_FAMILY:
+                limit = ws.cell(r, 14, REGIONAL_VCPU_LIMIT)
+                paint(limit, IN, "#,##0")
+                ws.cell(r, 15, f'=SUMIFS({cap_i},{cap_b},C{r})')
+                ws.cell(r, 16, f"=N{r}-O{r}")
+                paint(ws.cell(r, 15), GREY, "#,##0")
+                paint(ws.cell(r, 16), GREY, "#,##0")
             for col in range(1, 14):
                 if col == 6:
                     continue
@@ -620,9 +638,9 @@ def build_quota(wb, cap_rows, limits):
                       LEFT if col in (1, 2, 3, 5) else CTR)
             r += 1
     widths(ws, {"A": 22, "B": 26, "C": 22, "D": 16, "E": 12, "F": 12, "G": 12, "H": 14,
-                "I": 16, "J": 14, "K": 16, "L": 24, "M": 20})
+                "I": 16, "J": 14, "K": 16, "L": 24, "M": 20, "N": 22, "O": 20, "P": 26})
     ws.freeze_panes = "A5"
-    ws.auto_filter.ref = f"A4:M{QUOTA_LAST}"
+    ws.auto_filter.ref = f"A4:P{QUOTA_LAST}"
     return ws
 
 
@@ -672,7 +690,12 @@ def build_line_check(wb):
                 "np_res": f'=IF({active}=1,SUMIFS({cap}!$K$5:$K${CAP_LAST},{cap}!$B$5:$B${CAP_LAST},$B{r},{cap}!$D$5:$D${CAP_LAST},"NonProd",{cap}!$E$5:$E${CAP_LAST},{sku}),0)',
                 "dr_free": f'=IF({active}=1,SUMIFS({cap}!$L$5:$L${CAP_LAST},{cap}!$B$5:$B${CAP_LAST},$B{r},{cap}!$D$5:$D${CAP_LAST},"DR",{cap}!$E$5:$E${CAP_LAST},{sku}),0)',
                 "dr_res": f'=IF({active}=1,SUMIFS({cap}!$K$5:$K${CAP_LAST},{cap}!$B$5:$B${CAP_LAST},$B{r},{cap}!$D$5:$D${CAP_LAST},"DR",{cap}!$E$5:$E${CAP_LAST},{sku}),0)',
-                "q_avail": f'=IF({active}=1,SUMIFS({quo}!$H$5:$H${QUOTA_LAST},{quo}!$C$5:$C${QUOTA_LAST},$B{r},{quo}!$E$5:$E${QUOTA_LAST},Request!E{req}),0)',
+                "q_avail": (
+                    f'=IF({active}=1,MIN('
+                    f'SUMIFS({quo}!$H$5:$H${QUOTA_LAST},{quo}!$C$5:$C${QUOTA_LAST},$B{r},{quo}!$E$5:$E${QUOTA_LAST},Request!E{req}),'
+                    f'SUMIFS({quo}!$P$5:$P${QUOTA_LAST},{quo}!$C$5:$C${QUOTA_LAST},$B{r},{quo}!$E$5:$E${QUOTA_LAST},"{ANCHOR_FAMILY}")'
+                    f'),0)'
+                ),
                 "q_limit": f'=IF({active}=1,SUMIFS({quo}!$F$5:$F${QUOTA_LAST},{quo}!$C$5:$C${QUOTA_LAST},$B{r},{quo}!$E$5:$E${QUOTA_LAST},Request!E{req}),0)',
                 "np_head": f'=IF({active}=1,SUMIFS({quo}!$M$5:$M${QUOTA_LAST},{quo}!$C$5:$C${QUOTA_LAST},$B{r},{quo}!$E$5:$E${QUOTA_LAST},Request!E{req}),0)',
             }
@@ -1222,7 +1245,11 @@ def build_quota_after(wb):
     ws = wb.create_sheet("Quota_After")
     ws["A1"] = "Quota groups after a successful allocation"
     ws["A1"].font = H1
-    ws["A2"] = "Added cores are the Prod, CVAL, and DR amounts placed in that region for that family. Available falls by the same number."
+    ws["A2"] = (
+        "Added cores are the Prod, CVAL, and DR amounts placed in that region for that family. "
+        "Available falls by the same number. The regional vCPU cap lives on Quota_Groups columns N–P; "
+        "HC-3 already took the lesser of family available and that regional available."
+    )
     ws["A2"].font = SMALL
     labels = (
         "Quota group", "Region", "Region id", "Geography", "Family",

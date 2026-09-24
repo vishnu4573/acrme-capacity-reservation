@@ -12,7 +12,7 @@
 | Field                   | Value                                                                                                                             |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | **Title**               | Azure Capacity & Quota Management — Consolidated Requirements Baseline                                                            |
-| **Version**             | 2.4 (reservation-model gaps folded in: Availability-Set ineligibility, seed-at-0 matrix, regional+per-AZ CRG structure, reactive SKU discovery, even zone distribution, naming convention)          |
+| **Version**             | 2.5 (Microsoft Learn foundation: sharing remains Preview, consumer quota documented, dual quota caps, zonal CRG structure, logical-zone mapping, associated-VM quota) |
 | **Status**              | Working baseline — 90–95% approved direction; open POCs and business decisions remain                                             |
 | **Baseline date**       | 27 August 2026                                                                                                                    |
 | **Owners**              | Vishnuvardhan Reddy (design/requirements), Roy Szabady (strategy/business alignment)                                              |
@@ -25,6 +25,7 @@
 
 | Version | Date           | Change                                                                                                                                                                                                                                                                                                                                             |
 |---------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 2.5     | 24 Sep 2026    | **Foundation aligned to Microsoft Learn.** Sharing stays **Preview**: production placement uses a reservation in the deploying subscription until Capacity Reservation Sharing is GA (CAP-013, DEP-001). **QUA-013** is documented, not an unknown: the consumer subscription must hold its own quota; POC-001 is now a version-confirmation test. Quota has **two caps** — VM-family vCPU and total regional vCPU (QUA-002, RDY-001). A Quota Group **transfers** quota; deploy-time checks the subscription (QUA-003, QUA-004, QUA-007). **CAP-023**: one zonal CRG per environment with zones fixed at creation and one reservation per VM size per zone; a CRG with no zones is pinned by Azure to a single zone and is not a region-wide pool. **CAP-016**: logical zone numbers are per subscription. **CAP-004**: deallocated associated VMs do not raise the capacity target, and they still consume reservation quota until dissociated. |
 | 2.4 (amended) | 11 Sep 2026 | **Middle East DR offering resolved — cross-geography DR to Europe.** DEC-001 is **decided**: DR **is now offered** for Middle East. Prod and CVAL co-locate in a selected **Middle East** Standard region; **DR is placed cross-geo in a selected Europe Standard region**, both chosen by the **weighted capacity placement model**. Added **DR-020** (cross-geography DR: Middle East → Europe), **PLC-010b** (cross-geo DR override — supersedes the two-region CVAL/DR co-location for Middle East). Amended **REG-002** (Europe cross-geo DR region is weighted-selected, not fixed to Switzerland North), **REG-003** (third distribution model: cross-geo DR), **PLC-010a** (Middle East carved out), **ENV-003** (co-location-in-region vs capacity-sharing clarified), **DR-002**, **DR-014** (per-country flag retained; Middle East default no longer `DR_NOT_OFFERED`), **DEC-001** (resolved), **C-8**, Section 2 strategic drivers, Section 6 catalogue. Region-selection rules changed for **Middle East** and **Europe**. Data-residency caveat recorded (A-ME1). |
 | 2.4     | 7 Sep 2026     | **Reservation-model gaps folded into baseline** from the reviewed architecture diagrams (Reservation Model, Reservation Creation, Reservation Decommissioning). Added **CAP-020** (Availability-Set VMs ineligible for reservations), **CAP-021** (deallocate-or-migrate-to-AZ onboarding precondition), **CAP-022** (seed-at-0 eligible-SKU/AZ matrix + product-team budget governance, extends CAP-009), **CAP-023** (explicit regional + per-AZ CRG structure per environment, extends CAP-011), **CAP-024** (reactive SKU/AZ discovery auto-create reconciled with CAP-019 governance), **PLC-011** (even ≈1/zone_count zone-distribution target + rebalancing action), **OPS-006** and **C-12/C-13** (deterministic RG/CRG/subscription naming convention + counter; zone-distribution target/tolerance). Updated **CAP-001** (core subscription = all production classification, CAP-001a), **CAP-008/CAP-010** (decommissioning-workflow boundary vs automatic buffer scale-down), **CAP-009** (cross-ref seed matrix), **CAP-011** (cross-ref per-AZ CRG structure), **CAP-019** (reactive-discovery reconciliation). Added Section 4 glossary disambiguation of **seed reservation** (count-0 capacity reservation) vs **seed record / placement seed** (PLC-003), plus Availability Set, core subscription, and regional/per-AZ CRG terms. Added Appendix A **A.9** even zone-distribution formula. |
 | 2.3     | 7 Sep 2026     | **Region scope expanded to five geographies** (US, Europe, Australia, Asia Pacific, Middle East) with an authoritative in-scope catalogue in Section 6. **US is the only three-region geography; all others use a two-region distribution model.** Generalised the CVAL/DR co-location mechanism to all two-region geographies (new **PLC-010a**), reconciled REG-003, DR-002, PLC-002, and Section 2 strategic drivers. Region catalogue reaffirmed as a configurable item (REG-001). Australia and Asia Pacific back in scope; Japan East pending confirmation. |
@@ -146,9 +147,11 @@ v1 to v2.
 -   **No multi-cloud.** Multi-cloud DR has been repeatedly rejected at
     the ELT level; “all of Azure down” is explicitly out of scope as an
     addressable failure mode.
--   **Preview-feature dependency.** The DR capacity model increasingly
-    depends on **Capacity Reservation Sharing**, which is a preview
-    feature; GA timing and supportability must be confirmed with
+-   **Preview-feature dependency.** **Capacity Reservation Sharing**
+    is a preview feature. Production placement does not depend on it.
+    Until sharing is generally available for the API version in use, a
+    production VM is placed on a reservation in the **deploying
+    subscription** (CAP-013, DEP-001). GA timing stays tracked with
     Microsoft.
 
 ## 3. Design Principles
@@ -198,7 +201,7 @@ v1 to v2.
 | **Availability Set**                 | Legacy Azure fault-/update-domain VM grouping. **Mutually exclusive with Capacity Reservations** — Availability-Set VMs are ineligible for reservation management (CAP-020) and must be redeployed into an availability zone before onboarding (CAP-021). |
 | **Available reserved capacity**      | Reserved capacity not currently consumed by allocated VMs.                                                 |
 | **Buffer target**                    | Approved capacity held above current allocated demand for a defined scope.                                 |
-| **Capacity Reservation Group (CRG)** | Azure construct holding reservations for a defined region + availability-zone scope. Per environment the engine maintains one **regional CRG** (non-zonal SKUs) plus one **per-AZ CRG** for each availability zone (CAP-023). |
+| **Capacity Reservation Group (CRG)** | Azure construct holding reservations for one region. A group is either **zonal** (zones declared at creation, immutable; one reservation per VM size per zone) or **non-zonal** (Azure pins the group to one zone at first reservation; VMs deploy without a zone). The engine default is one zonal CRG per environment (CAP-023). |
 | **Core subscription**                | A shared platform/"core" subscription whose VMs are **all classified production** for reservation and buffer purposes (CAP-001a); non-production workloads must not run there (ENV-003). |
 | **Seed reservation**                 | A managed reservation created at reserved quantity **0** for an eligible SKU × region × availability zone, as part of the initial **seed matrix** (CAP-022); reconciliation scales it up from 0 when allocated demand first appears. *Distinct from the placement **seed record** below.* |
 | **Seed matrix**                      | The full set of count-0 **seed reservations** across every eligible SKU/AZ combination in the scope file (CAP-022), governed by product-team budget approval. |
@@ -206,7 +209,7 @@ v1 to v2.
 | **Provider subscription**            | Subscription that owns a reservation shared with other subscriptions.                                      |
 | **CVAL**                             | Customer validation environment; its capacity may contribute to DR readiness.                              |
 | **DR bootstrap capacity**            | Minimum deployed/reserved platform capacity required to initiate recovery orchestration.                   |
-| **Quota pool / quota group**         | Regional VM-family quota pooled across subscriptions and allocated on demand.                              |
+| **Quota pool / quota group**         | An Azure Quota Group moves unused quota onto a member subscription. Deploy-time checks that subscription’s **VM-family** vCPU and **total regional** vCPU, not the group limit. One subscription belongs to one group; each transfer is scoped to one region and one VM family (QUA-003, QUA-004). |
 | **Quota hoarding**                   | Governance practice of collecting default per-region quota into a family pool for controlled reallocation. |
 | **Seed record** (a.k.a. **placement seed**) | Authoritative customer record holding production, CVAL, and DR regional placement (PLC-003). *Distinct from a **seed reservation** (a count-0 capacity reservation, CAP-022) — "seed record/placement seed" is about **where** a customer is placed; "seed reservation" is a **zero-count reservation object** waiting to scale.* |
 | **SKU scope**                        | The SKU/VM-family × region × zone × subscription × environment combination managed by policy.              |
@@ -417,11 +420,17 @@ reservation.
 
 The target is **never** computed from associated VM count alone.
 
-**CAP-004 — Associated-but-deallocated VMs.** These do not automatically
-force reservation retention. Report them separately so teams understand
-restart risk and cost. (Rationale: if a customer such as a non-paying
-account is shut down, its VMs become *associated* not *allocated*, and
-the engine must not keep paying to guarantee that capacity.)
+**CAP-004 — Associated-but-deallocated VMs.** Two checks, kept separate.
+
+1. **Capacity target.** These VMs do not raise Target Reserved Capacity.
+   Target stays Allocated + Buffer (CAP-003). Report them separately so
+   teams can see restart risk and cost. A shut-down account must not by
+   itself keep the engine paying for a larger reservation.
+2. **Quota and shrink.** `virtualMachinesAssociated` includes
+   deallocated VMs. That association still consumes the quota charged
+   to the reservation until the VM is dissociated. Reconciliation does
+   not treat that quota as free, and it does not lower reserved
+   quantity below the associated count until those VMs are dissociated.
 
 **CAP-005 — Automated reconciliation.** Periodically compare reserved
 quantity, allocated VMs, associated VMs, available reserved capacity,
@@ -479,18 +488,22 @@ decommission is confirmed through the workflow, not by reconciliation.
 **CAP-011 — Availability-zone isolation.** Track and manage reservations
 by region **and** availability zone; zone-1 capacity is not counted as
 available in another zone. Reservations are physically organised into
-the regional + per-AZ CRG structure defined in **CAP-023** so that zone
+the zonal CRG structure defined in **CAP-023** so that zone
 isolation is enforced structurally, not merely in accounting.
 
 **CAP-012 — Regional isolation.** Reservations are never counted, moved,
 or shared across regions. DR planning models destination-region capacity
 independently.
 
-**CAP-013 — Capacity sharing.** Support cross-subscription reservation
-sharing within the supported Azure scope (same region **and** same
-availability zone; up to \~100 subscriptions per tenant) once approved.
-Track provider/consumer subscriptions, sharing permissions, consumption,
-and revocation.
+**CAP-013 — Capacity sharing.** Cross-subscription reservation sharing
+is a **preview** feature (DEP-001). **Production placement uses a
+reservation in the deploying subscription** until sharing is generally
+available for the API version in use. The preview path, once explicitly
+enabled, stays inside Azure’s supported scope: same region, an explicit
+consumer subscription list, up to 100 subscriptions, same tenant or a
+trusted tenant. Track provider and consumer subscriptions, sharing
+permissions, consumption, and revocation. Logical zone numbers are not
+shared across subscriptions (CAP-016).
 
 **CAP-014 — Shared capacity visibility.** For each shared reservation,
 show owning subscription, authorised consumers, consuming VMs, consumed
@@ -505,7 +518,17 @@ consumer allocation; *authorisation to consume* is not treated as
 deploying against a reservation, validate: reservation exists; SKU
 matches; region matches; zone matches; consumer subscription authorised
 (if shared); sufficient reserved capacity or approved over-allocation;
-and required quota available in the deploying subscription.
+and required quota available in the deploying subscription (both the
+VM-family cap and the total regional vCPU cap, QUA-002).
+
+**Zone match** is the same physical zone. Azure assigns logical zone
+numbers per subscription, so Zone 1 in the consumer subscription and
+Zone 1 in the provider subscription can be different datacentres. On a
+shared zonal reservation the engine stores the **provider** logical
+zone and translates the consumer logical zone to that provider zone
+before deploy. Equal zone numbers across two subscriptions fail this
+check. Same-subscription placement compares zones inside one
+subscription.
 
 **CAP-017 — Deployment failure policy.** If reservation enforcement is
 mandatory and validation fails, the deployment **fails safely** with a
@@ -561,7 +584,7 @@ change process.
 availability-zone combinations is initialised as a **seed matrix of
 count-0 reservations** (“**seed reservations**”): every eligible
 combination in the scope file is created in Azure at reserved quantity
-**0** (CAP-009 zero-support) inside the correct regional or per-AZ CRG
+**0** (CAP-009 zero-support) inside the zonal CRG for that zone
 (CAP-023), so reconciliation can scale each up from a known baseline the
 instant allocated demand appears (CAP-007). Populating and expanding
 this matrix is governed by **product-team budget approval** — a SKU/AZ
@@ -572,26 +595,36 @@ owners are configuration-driven (scope file, CAP-019) and versioned.
 *(“Seed reservation” here is a zero-count capacity reservation — not the
 placement **seed record** of PLC-003; see Section 4.)*
 
-**CAP-023 — Regional and per-AZ CRG structure** *(extends CAP-011).* For
-each **environment** (Prod, CVAL/NonProd, DR) within a subscription and
-region, reservations are organised into an explicit CRG structure: **one
-regional (non-zonal) CRG plus one CRG per availability zone** in the
-region. Example (Prod in East US 2, three zones): `crg-pr-eus2-reg`
-(regional, for SKUs without zonal reservation support), `crg-pr-eus2-az1`,
-`crg-pr-eus2-az2`, `crg-pr-eus2-az3`. The per-AZ CRGs hold zone-bound
-reservations and enforce the CAP-011 zone-isolation guarantee
-**structurally** (zone-1 capacity can never be counted as available in
-another zone); the regional CRG holds only SKUs that do not support
-zonal reservations. Environments are **never** mixed within a CRG
-(ENV-003). CRG, resource-group, and subscription names follow the
-OPS-006 / C-12 convention.
+**CAP-023 — Zonal CRG structure** *(extends CAP-011).* For each
+**environment** (Prod, CVAL/NonProd, DR) within a subscription and
+region, the default is **one zonal Capacity Reservation Group**. Its
+zones are declared at creation and cannot be changed later. Inside that
+group there is **one reservation per VM size per zone**. Zone isolation
+(CAP-011) is already structural at the reservation: capacity reserved
+in zone 1 is not available in zone 2. A separate CRG per zone remains
+allowed when a smaller blast radius is required; it is not required to
+keep zones apart.
+
+A group created **with no zones** is not a region-wide pool. Azure
+selects one zone when the first reservation is created, and every VM
+in that group must be deployed without a zone. Zonal and non-zonal
+reservations cannot share a group. Do not seed a no-zone group at
+quantity 0 and expect later VMs to land in a chosen zone — the first
+create pins the zone.
+
+A SKU that cannot take a zonal reservation is ineligible for the zonal
+group (CAP-020). It may be placed only in its own no-zone group, with
+the pinned zone recorded and VMs deployed without a zone property.
+Environments are **never** mixed within a CRG (ENV-003). Names follow
+OPS-006 / C-12. The `reg` name token denotes that no-zone exception,
+not a regional capacity pool.
 
 **CAP-024 — Reactive SKU/AZ discovery reconciled with governance**
 *(reconciles CAP-019).* When reconciliation or a deployment detects an
 **allocated VM of a SKU/AZ combination not yet in the seed matrix**
 (e.g. a product team deployed a new SKU), the engine **auto-creates the
 corresponding reservation** — CRG (if absent) plus reservation sized at
-`allocated + buffer` (CAP-003) in the correct per-AZ or regional CRG
+`allocated + buffer` (CAP-003) in the zonal CRG for that zone
 (CAP-023) — so production is protected immediately, **and simultaneously
 raises a scope-file governance item** (CAP-019) so the discovered SKU/AZ
 is ratified into the scope file with an owning product team and budget
@@ -612,23 +645,36 @@ without quota.
 
 **QUA-002 — Regional & family scope.** Maintain quota inventory by
 subscription, region, VM/quota family, assigned quota, usage, available
-quota, pooled quota, and pending increases.
+quota, pooled quota, and pending increases. Every region has **two**
+caps, and both are consumed when a reservation is created and when a
+VM is deployed: the **VM-family vCPU** quota and the **total regional
+vCPU** quota. A family that still has remaining quota is not deployable
+when the regional total is exhausted.
 
-**QUA-003 — Central pooling (“quota hoarding”).** Where Azure quota
-groups support the scope, eligible subscriptions contribute **unused**
-regional VM-family quota to a centrally governed pool. Azure allocates a
-default (e.g., \~350 vCPU) per region to every subscription; unused
-cross-region quota (e.g., Switzerland quota sitting in a US
-subscription) is collected into the family pool for controlled
-reallocation. This is what enables fast turnaround of quota requests
-(“I’m not requesting quota, I already have it — I’m just allocating
-it”).
+**QUA-003 — Central pooling (“quota hoarding”).** Where Azure Quota
+Groups support the scope, eligible subscriptions contribute **unused**
+quota into a governed group so it can be transferred to the subscription
+that will deploy. Azure allocates a default (e.g., \~350 vCPU) per
+region to every subscription; unused quota in a region where that
+subscription will not deploy is collected for controlled reallocation.
+That transfer is what enables a fast turnaround (“I’m not requesting
+quota from Microsoft, I already have it — I’m moving it onto the
+deploying subscription”).
 
-**QUA-004 — Single governed pool per supported scope.** Prefer **one**
-governed quota group per applicable regional/quota-family scope (prod,
-non-prod, and DR together) to maximise manipulation flexibility, unless
-Azure limits or governance boundaries require separation. Final grouping
-stays configuration-driven.
+The group limit is **not** what a VM create checks. After the transfer,
+deployment and reservation create are checked against the **subscription**
+quota (QUA-007). Quota does not move to another region when it is
+collected (QUA-012): Switzerland quota stays Switzerland quota.
+
+**QUA-004 — One Quota Group, operations per region and family.** A
+subscription belongs to **one** Azure Quota Group. That group object
+may span regions and VM families. Each transfer or increase is scoped
+to **one region and one VM family**. The engine’s accounting grain is
+that region × family cell, covering prod, non-prod, and DR together,
+with logical earmarks so NonProd cannot spend Prod or DR quota (HC-7).
+The cell is not a separate ARM group. Grouping stays inside Azure’s
+limits: IaaS compute, and the subscription offer types Quota Groups
+support.
 
 **QUA-005 — Quota as cost/consumption governor.** Use quota allocation
 to cap deployable capacity by product, environment, subscription,
@@ -648,9 +694,12 @@ reservation. The invalid condition to prevent:
 
     Required Deployment Quota > Available Quota in the Deploying Subscription
 
-Quota may exceed reserved capacity; reserved capacity exceeding
-deployable quota is surfaced as a readiness **risk** (reservation
-without quota cannot deploy).
+“Available quota” is the **lesser** of remaining VM-family vCPU and
+remaining total regional vCPU on that subscription (QUA-002). The Quota
+Group limit is not a substitute for either number. Quota may exceed
+reserved capacity; reserved capacity exceeding deployable quota is
+surfaced as a readiness **risk** (reservation without quota cannot
+deploy).
 
 **QUA-008 — Dynamic allocation.** Allocate quota from the pool to a
 target subscription per policy, deployment demand, production buffer,
@@ -675,14 +724,16 @@ is **not** assumed transferable to the DR region. DR destination quota
 must be planned and present in the destination region. Quota, quota
 groups, and reservations are all region-scoped.
 
-**QUA-013 — Consumer-subscription quota (POC-gated).** Assume a VM
-deployment requires quota in the **consumer/deploying** subscription
-even when capacity is *shared* from a provider subscription. Reading to
-date indicates **quota lives at the subscription level, not the
-reservation group** — a consumer needs its own quota even though the
-shared reservation comes from the provider. This assumption stays
-**POC-validation-required** until confirmed by test and authoritative
-Azure guidance for the selected feature version.
+**QUA-013 — Consumer-subscription quota (documented).** A VM deployment
+requires quota in the **consumer/deploying** subscription even when
+capacity is shared from a provider subscription. Microsoft Learn states
+that the consumer subscription must hold its own quota to deploy into a
+shared reservation group, and the provider subscription must hold quota
+to create or increase the reservation. Quota lives on the subscription,
+not on the reservation group. POC-001 confirms this on the API version
+in use; it no longer decides whether the rule exists. Sharing itself
+remains Preview (CAP-013), so this rule applies on the preview path and
+the same-subscription production path alike.
 
 **QUA-014 — Quota allocation audit.** Log every allocation, reclamation,
 request, approval, rejection, and failed change with before/after
@@ -692,11 +743,14 @@ timestamp.
 ## 10. Combined Capacity & Quota Readiness
 
 **RDY-001 — Deployment readiness gate.** A deployment is capacity-ready
-only when all pass: target region approved; zone supported; SKU
-supported; reservation policy known; reservation exists (if required);
-sufficient reservation or approved over-allocation; sufficient
-consumer-subscription quota; records fresh enough; and no blocking
-policy/exception.
+only when all pass: target region approved; zone supported (physical
+zone, CAP-016); SKU supported; reservation policy known; reservation
+exists (if required); sufficient reservation or approved
+over-allocation; sufficient consumer-subscription quota on **both** the
+VM-family cap and the total regional vCPU cap; records fresh enough;
+and no blocking policy/exception. A production deployment that requires
+a shared reservation while sharing is still Preview fails this gate
+(CAP-013).
 
 **RDY-002 — Readiness states.** Expose a machine-readable state:
 `READY`, `READY_WITH_RISK`, `QUOTA_DEFICIT`, `RESERVATION_DEFICIT`,
@@ -1300,16 +1354,18 @@ patterns:
 
 -   **Resource group:** `rg-odcr-<env>-<region>-<NN>` — e.g.
     `rg-odcr-prod-eus2-01`
--   **CRG:** `crg-<env>-<region>-<scope>` where `scope ∈ {reg, az1, az2,
-    az3}` — e.g. `crg-pr-eus2-reg`, `crg-pr-eus2-az1`,
-    `crg-pr-eus2-az2`, `crg-pr-eus2-az3`
+-   **CRG:** `crg-<env>-<region>-<scope>`. The default scope is `zonal`
+    (one group; zones are declared on the Azure resource, not in the
+    name). Optional per-zone groups use `az1`, `az2`, `az3`. `reg` is
+    only the no-zone exception in CAP-023 — e.g. `crg-pr-eus2-zonal`,
+    `crg-pr-eus2-az1`, `crg-pr-eus2-reg`
 -   **Subscription:** `sub-<org>-<domain>-<purpose>-<NN>` — e.g.
     `sub-jda-cld-core-01`
 
 The convention, tokens, and counter width are configuration-driven
 (**C-12**); the engine validates managed resources against it and flags
-non-conforming names as governance exceptions. The CRG scope tokens map
-directly to the CAP-023 regional/per-AZ CRG structure.
+non-conforming names as governance exceptions. The default name is the
+zonal group in CAP-023. `reg` names the no-zone exception only.
 
 ## 20. Acceptance Criteria
 
@@ -1351,9 +1407,10 @@ The baseline is implementable when all are demonstrated:
     SKU/AZ under product-team budget governance (CAP-022) and, on
     reactive discovery of an unmanaged allocated SKU/AZ, auto-creates the
     reservation while raising a scope-file governance item (CAP-024).**
-19. **Maintains the per-environment regional + per-AZ CRG structure
-    (CAP-023) and validates resources against the naming convention +
-    counter (OPS-006/C-12).**
+19. **Maintains one zonal CRG per environment, with one reservation per
+    VM size per zone (CAP-023), and validates resources against the
+    naming convention (OPS-006/C-12).** A no-zone group is the exception
+    for SKUs that cannot take a zonal reservation.
 20. **Places new VMs toward an even ≈1/zone_count per-zone distribution
     and raises a rebalancing action when zone skew exceeds the configured
     tolerance (PLC-011).**
@@ -1405,21 +1462,21 @@ capacity governance.
 | C-4  | **Reconciliation frequency**      | Ref impl every 6 minutes                                                             | Configurable — prod value TBD          |
 | C-5  | **Failback model**                | Prefer \~1 year run; \~30-day failback alternative                                   | Business decision                      |
 | C-6  | **Onboarding selection mode**     | Exact production region (default); geography (exception)                             | Configurable + exception policy        |
-| C-7  | **Quota grouping model**          | One governed pool preferred                                                          | Configurable                           |
+| C-7  | **Quota grouping model**          | One Quota Group object per subscription; each transfer is one region × one VM family; accounting covers prod, non-prod, and DR in that cell | Configurable within Azure limits |
 | C-8  | **Region catalogue & flags**      | Five geographies (US 3-region; Europe/Australia/Asia Pacific 2-region; **Middle East cross-geo DR — Prod+CVAL local, DR in Europe, DR-020/PLC-010b**); restricted/standard classes; distribution model; per-country `DR_NOT_OFFERED` (DR-014) | Configurable                           |
 | C-9  | **Reservation over-allocation**   | Track allocated; allow over-association                                              | Configurable policy                    |
 | C-10 | **DR drill duration/rotation**    | Annual drill; role flip                                                              | Business decision                      |
 | C-11 | **DR sizing basis**               | **Max over non-concurrent sources** (DR-017); sum available as conservative override | Configurable — max is default          |
-| C-12 | **Resource naming convention & counter** | Deterministic RG/CRG/subscription naming with env/region/purpose tokens + zero-padded instance counter (OPS-006); CRG scope tokens `reg/az1/az2/az3` per CAP-023 | Configurable |
+| C-12 | **Resource naming convention & counter** | Deterministic RG/CRG/subscription naming with env/region/purpose tokens + zero-padded instance counter (OPS-006). Default CRG is zonal (`az` set at creation). The `reg` token is only the no-zone exception in CAP-023, not a region-wide pool | Configurable |
 | C-13 | **Zone-distribution target & tolerance** | Even ≈`1/zone_count` per zone (≈33% in three-zone regions) with configurable skew tolerance before rebalancing (PLC-011) | Configurable |
 
 ## 23. Pending Decisions & Mandatory POCs
 
 | ID          | Item                                             | Required outcome                                                                                                                                                         |
 |-------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **POC-001** | Capacity Reservation **Sharing quota behaviour** | Confirm whether the **consumer** subscription must hold the quota when consuming a shared reservation; document observed Azure behaviour. **(Top technical unknown.)**   |
+| **POC-001** | Capacity Reservation **Sharing quota behaviour** | **Documented (24 Sep 2026):** the consumer subscription must hold its own quota to deploy into a shared group; the provider must hold quota to create or grow the reservation. Remaining work is to confirm that behaviour on the API version in use. Sharing stays Preview (CAP-013, DEP-001). |
 | POC-002     | Sharing **consumption order**                    | How Azure allocates shared capacity when multiple consumers request the same SKU.                                                                                        |
-| POC-003     | **Zone/subscription boundaries**                 | Validate supported sharing combinations for the selected feature version.                                                                                                |
+| POC-003     | **Zone/subscription boundaries**                 | Confirm logical-to-physical zone mapping when a consumer deploys into a provider’s zonal reservation (CAP-016). Sharing combinations stay inside the preview limits in CAP-013. |
 | POC-004     | **Change under throttling**                      | Safe reconciliation + retry behaviour during Azure API throttling.                                                                                                       |
 | POC-005     | **VM association/shutdown states**               | Reservation/guarantee behaviour across allocated/stopped/deallocated/associated/disassociated.                                                                           |
 | POC-006     | **DR subscription topology**                     | Dedicated DR subscription+cluster vs shared production subscription model.                                                                                               |
@@ -1437,8 +1494,9 @@ capacity governance.
 
 ### Assumptions
 
--   Quota lives at the subscription level, not the reservation group
-    (pending POC-001).
+-   Quota lives on the **deploying subscription**, not on the
+    reservation group or the Quota Group limit (QUA-013, documented).
+    Both the VM-family cap and the total regional vCPU cap must be free.
 -   A down region’s VMs/quota/reservations remain bound as left and are
     not reusable during the outage.
 -   Customer workloads distribute across 3–4 regions per geography,
@@ -1467,7 +1525,7 @@ capacity governance.
 
 | Risk                                 | Impact                                      | Mitigation                                                                                           |
 |--------------------------------------|---------------------------------------------|------------------------------------------------------------------------------------------------------|
-| Sharing quota behaviour unknown      | Blocks DR cost model                        | POC-001 + Microsoft confirmation                                                                     |
+| Sharing still Preview                | Production must not depend on cross-subscription sharing | Same-subscription reservation is the production path (CAP-013); track GA on DEP-001 |
 | Cost of DR reserve                   | Multi-region may be cancelled               | Lean bootstrap + configurable buffers + distributed DR + max-not-sum sizing                          |
 | **Two concurrent region failures**   | Overcommitted DR (DR-017) cannot cover both | Accept under DR-001; quantify via POC-011; conservative sum override (C-11) if a customer demands it |
 | API throttling during regional event | Slow recovery                               | Bootstrap headroom + staged acquisition + backoff                                                    |
@@ -1506,9 +1564,11 @@ engine shall:
     product, and business policies change.
 
 The remaining major architectural risks are **Capacity Reservation
-Sharing behaviour (POC-001)**, **DR subscription topology (POC-006)**,
+Sharing still in Preview (DEP-001; production uses a same-subscription
+reservation)**, **DR subscription topology (POC-006)**,
 **bootstrap sizing (POC-007)**, and **max-not-sum overcommit safety
-(POC-011)**. **Middle East DR policy (DEC-001) is now resolved** — DR is
+(POC-011)**. Consumer quota on a shared reservation is documented
+(QUA-013). **Middle East DR policy (DEC-001) is now resolved** — DR is
 offered cross-geo to Europe (DR-020, PLC-010b); the residual item is
 legal residency clearance per customer class (A-ME1) and any per-country
 `DR_NOT_OFFERED` carve-outs (DR-014).
@@ -1580,7 +1640,7 @@ the workload trends toward `1/zone_count` per zone. A deployment or
 growth event that would push `Max Skew` beyond the configured tolerance
 (C-13) triggers a **rebalancing** recommendation/action (PLC-011),
 subject to approval and Azure feasibility. Even distribution bounds
-per-zone failover exposure and keeps per-AZ CRG sizing (CAP-023)
+per-zone failover exposure and keeps per-zone reservation sizing (CAP-023)
 balanced. See the Calculation Logic Reference for a worked three-zone
 example.
 

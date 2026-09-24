@@ -2,7 +2,7 @@
 
 **Workbook:** `acrme_aligned_placement_whatif.xlsx`  
 **Builder:** `build_acrme_aligned_placement.py`  
-**Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.4  
+**Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.5  
 **Status:** Planning mockup. Capacity and quota figures are synthetic. The file does not change the baseline and it is not connected to live Azure.
 
 ---
@@ -23,7 +23,7 @@ Every active SKU line has to fit. A region that can take the large SKU and not t
 | **Region_Catalogue** | The 14 baseline regions, class, and distribution model |
 | **SKU_Catalogue** | Eight managed SKUs, vCPU, and quota family |
 | **Capacity_Reservations** | Mock reservation per region, environment, and SKU. Yellow: Allocated and Buffer |
-| **Quota_Groups** | One pool per region and VM family. Yellow: Limit |
+| **Quota_Groups** | Family cell per region, plus the regional vCPU cap on the Eadsv5 row. Yellow: Limit and Regional vCPU limit |
 | **Line_Check** | Formulas. Per-SKU free cores and quota for each region |
 | **Score_Prod**, **Score_CVAL**, **Score_DR** | Gates, then the placement score |
 | **Allocation** | The decision and the customer seed |
@@ -82,8 +82,10 @@ A line fits an environment only when both of these are true:
 
 ```
 reserved-free for that SKU  >=  cores this line needs
-family quota available      >=  cores this line needs
+lesser of (family quota available, regional vCPU available)  >=  cores this line needs
 ```
+
+Family available is the region × VM-family cell. Regional vCPU available is Quota_Groups column P on that region’s `Eadsv5` row (QUA-002). The shipped regional limit is 50,000 cores, so the sample stays capacity-gated. Lower column N on that row to make the regional cap the binding gate.
 
 The cores DR must cover are the bootstrap quantity for that line, not the full Prod quantity. Prod and CVAL must cover the full line.
 
@@ -290,11 +292,23 @@ What the rule does:
 
 On the shipped US sample, `Y` keeps Prod at West US 3 and moves DR from Canada Central onto Central US, with CVAL. The model label does not change. Set G5 back to `N` to restore three regions.
 
-This is a workbook rule. Baseline v2.4 still co-locates CVAL and DR only in a two-region geography. Middle East is unchanged: cross-geo is tested first, so `Y` there does not pull DR out of Europe.
+This is a workbook rule. The baseline co-locates CVAL and DR only in a two-region geography. Middle East is unchanged: cross-geo is tested first, so `Y` there does not pull DR out of Europe.
 
-## 8. What this mockup does not do
+## 8. What the v2.5 foundation requires, and what this sheet models
 
-- Per-zone reservation groups. Names are `crg-…-reg` only. Allocation shows the even zone share (1 / AZ) and does not place VMs into zones.
+| Foundation rule | In this workbook |
+|---|---|
+| Two quota caps: family and total regional vCPU (QUA-002) | Yes. HC-3 uses the lesser of family available and Regional vCPU available |
+| Quota Group is a transfer; deploy checks the subscription (QUA-003) | The yellow limits stand in for subscription quota after transfer. There is no separate group-limit column |
+| Sharing is Preview; production uses the deploying subscription (CAP-013) | Placement does not assume a shared reservation |
+| Consumer quota is required (QUA-013) | The quota gate is on the placing region’s subscription numbers |
+| One zonal CRG, one reservation per VM size per zone (CAP-023) | Not modelled. Reservations are one row per region, environment, and SKU |
+| Logical zone numbers differ per subscription (CAP-016) | Not modelled. No cross-subscription zone translation |
+| Deallocated associated VMs still hold quota (CAP-004) | Not modelled. Target stays allocated + buffer only |
+
+## 9. What this mockup does not do
+
+- Per-zone reservations inside a zonal group (CAP-023). Names stay regional. Allocation shows the even zone share (1 / AZ) and does not place VMs into zones.
 - A stored seed. Allocation displays the PLC-003 fields for this run.
 - Cumulative quota across lines of the same family at gate time. Each line is compared with the full pool. The combined draw appears on Quota_After.
 - Live Azure inventory, associated-but-deallocated VMs, or `STALE_STATE`.

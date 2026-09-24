@@ -1,4 +1,4 @@
-# ACRME Calculation Logic — Plain English Walkthrough (v2.4)
+# ACRME Calculation Logic — Plain English Walkthrough (v2.5)
 
 > **Document type:** Companion reference — plain-language explanation of every formula in the
 > Calculation Logic Reference. This document does **not** replace the Calculation Logic
@@ -8,9 +8,11 @@
 > **Audience:** Platform engineers, product owners, and architects who need to reason about ACRME
 > behaviour without working through mathematical notation first.
 >
-> **Version:** 1.1 — reconciled to Requirements Baseline **v2.4** (7 September 2026); originally authored 2 September 2026 from the ACRME Q&A design walkthrough session.
+> **Version:** 1.2 — reconciled to Requirements Baseline **v2.5** (24 September 2026).
 >
-> **v2.4 reconciliation note.** **[Amended v2.4]** The geography-aware region model now has **three distribution models**: US three-region (Prod/CVAL/DR distinct); EU/Australia/Asia Pacific two-region co-located (CVAL+DR co-located per PLC-010a); and the **Middle East cross-geo DR model** — Prod+CVAL co-located in a weighted-selected Middle East region, DR placed cross-geo in a weighted-selected **Europe** Standard region (PLC-010b, DR-020, DEC-001 RESOLVED, A-ME1). The Middle East example in Section 3.6a reflects this. v2.4 adds the reservation-model concepts folded from the architecture diagrams — reservation **eligibility** (CAP-020/CAP-021), the **seed-at-0** SKU/AZ matrix (CAP-022), the explicit **regional + per-AZ CRG** structure (CAP-023), **reactive SKU/AZ discovery** (CAP-024), and the **even zone-distribution** target + rebalancing (PLC-011, Appendix A.9). These are explained in plain language in the new Section 5.11.
+> **v2.5 foundation note.** Microsoft Learn corrections: sharing stays Preview and production placement uses a reservation in the deploying subscription; the consumer must hold its own quota (QUA-013, no longer an unknown); quota has a family cap and a regional total cap; a Quota Group transfers quota and the subscription is what deployment checks; a CRG is zonal by default and a no-zone group is pinned to one zone Azure chooses (CAP-023); logical zone numbers differ per subscription (CAP-016); deallocated associated VMs still hold quota until dissociated (CAP-004). Section 4.1 and Section 5.11.3 carry the detail.
+>
+> **v2.4 reconciliation note.** The geography-aware region model has **three distribution models**: US three-region (Prod/CVAL/DR distinct); EU/Australia/Asia Pacific two-region co-located (CVAL+DR co-located per PLC-010a); and the **Middle East cross-geo DR model** — Prod+CVAL co-located in a weighted-selected Middle East region, DR placed cross-geo in a weighted-selected **Europe** Standard region (PLC-010b, DR-020, DEC-001 RESOLVED, A-ME1). The Middle East example in Section 3.6a reflects this. v2.4 added reservation **eligibility** (CAP-020/CAP-021), the **seed-at-0** SKU/AZ matrix (CAP-022), **reactive SKU/AZ discovery** (CAP-024), and the **even zone-distribution** target + rebalancing (PLC-011, Appendix A.9). The CRG shape in Section 5.11.3 is the v2.5 zonal default.
 
 ---
 
@@ -19,10 +21,10 @@
 | Field | Value |
 |---|---|
 | **Title** | ACRME Calculation Logic — Plain English Walkthrough |
-| **Version** | 1.1 (reconciled to Requirements Baseline v2.4) |
+| **Version** | 1.2 (reconciled to Requirements Baseline v2.5) |
 | **Status** | Baseline |
-| **Date** | 7 September 2026 (originally 2 September 2026) |
-| **Source** | ACRME Q&A design walkthrough session; Calculation Logic Reference; Requirements Baseline v2.4 |
+| **Date** | 24 September 2026 (foundation); originally 2 September 2026 |
+| **Source** | ACRME Q&A design walkthrough session; Calculation Logic Reference; Requirements Baseline v2.5 |
 | **Companion documents** | `acrme_calculation_logic_reference.md` (formal notation); `acrme_technical_design_document.md` (component design) |
 
 ---
@@ -776,16 +778,31 @@ decisions, but the decision **process** (hard constraints → scoring → rankin
 
 ### 4.1 Concept
 
-Quota is the Azure-imposed limit on how many vCPUs of a given VM family a subscription can deploy in
-a region. Even if physical capacity exists, deployment fails if the subscription has no quota left.
+Quota is the Azure-imposed limit on how many vCPUs a subscription can deploy in a region. There are
+**two** limits, and a deployment needs room under both:
 
-ACRME manages quota in a **single governed pool per region per VM family**. This pool covers Prod,
-NonProd/CVAL, and DR together. Inside the pool, ACRME uses **logical earmarks** to protect Prod and DR
-space — they are never available for NonProd to consume.
+- the **VM-family** vCPU quota (for example `Eadsv5`)
+- the **total regional** vCPU quota for that subscription in that region
+
+Even if physical capacity exists, deployment fails if either limit is exhausted. Creating a
+reservation consumes the same two quotas.
+
+ACRME accounts for family quota as **one cell per region per VM family**, covering Prod, NonProd/CVAL,
+and DR together. Inside the cell, ACRME uses **logical earmarks** to protect Prod and DR space — they
+are never available for NonProd to consume.
+
+That cell is bookkeeping inside **one Azure Quota Group per subscription**. The group can span
+regions and families, and each transfer is for one region and one family. A VM create does not read
+the group limit. It reads the quota sitting on the deploying subscription after any transfer. A
+family that looks free while the regional total is exhausted is still a quota deficit.
 
 ### 4.2 The Single Pool — Why One Pool?
 
-Older designs used separate quota groups (one for Prod, one for NonProd+DR). The single-pool model
+The “one pool” below is the **accounting cell** (region × VM family, all environments). It is not a
+second Azure object, and it is not the number Azure checks at deploy time. Moving quota onto the
+deploying subscription is still an explicit Quota Group transfer (QUA-003).
+
+Older designs used separate quota groups (one for Prod, one for NonProd+DR). The single-cell model
 was adopted because:
 
 - **Flexibility:** all quota is in one place. If Prod needs more room, there is no inter-group
@@ -968,9 +985,13 @@ cover every running VM *plus* a buffer for expected near-term growth. The buffer
 acquiring new reservation capacity takes time — ACRME stays ahead of demand.
 
 **Important clarification — deallocated VMs (CAP-004):** VMs that are associated with a CRG but
-currently deallocated (stopped/not running) do **not** force the CRG to keep a reservation for them.
-They are reported separately so teams understand restart risk, but they do not add to the Target.
-The risk of a failed restart is acknowledged — it is a cost vs. reservation trade-off.
+currently deallocated (stopped/not running) do **not** raise the capacity target. Target stays
+Allocated + Buffer. They are reported separately so teams understand restart risk.
+
+They **do** still consume the quota charged to the reservation. Azure counts them in
+`virtualMachinesAssociated` until they are dissociated. Reconciliation does not treat that quota as
+free, and it does not shrink the reserved quantity below the associated count while they remain
+associated.
 
 ### 5.3 Reservation Headroom and Deficit
 
@@ -1231,7 +1252,7 @@ Not every VM is eligible for a capacity reservation:
   existing running VM under the reservation model, it must first be placed into an availability zone.
   That means either **deallocating** it and restarting it into a zone, or **redeploying** it to a
   zone. ACRME treats this as an onboarding **precondition**: until the VM is zone-aligned, it cannot
-  join a per-AZ CRG. The engine records this precondition state so operators know exactly what step is
+  join the zonal reservation for that zone. The engine records this precondition state so operators know exactly what step is
   outstanding.
 
 Both facts are captured in a `ReservationEligibility` record (the reason it is or isn't eligible, and
@@ -1253,17 +1274,23 @@ placeholders that say "this SKU is allowed in this zone" without reserving anyth
 A `SeedMatrixEntry` records the SKU, zone, environment, current count, and governance status. A
 reservation is tagged `SEED` (still at/for the placeholder) or `ACTIVE` (funded and holding capacity).
 
-#### 5.11.3 One regional CRG plus one CRG per zone (CAP-023)
+#### 5.11.3 One zonal group per environment (CAP-023)
 
-Earlier sections described three CRGs per region (Prod, NonProd, DR). v2.4 makes the **zonal**
-structure explicit: **each environment** gets
+Earlier sections described three CRGs per region (Prod, NonProd, DR). v2.5 states how those groups
+are built inside Azure.
 
-- **one regional CRG** (named `crg-<env>-<region>-reg`), plus
-- **one CRG per availability zone** (`az1`, `az2`, `az3`).
+Each environment gets **one zonal Capacity Reservation Group**. The region’s zones are set when the
+group is created and cannot be added later. Inside the group, ACRME keeps **one reservation per VM
+size per zone**. Capacity reserved in zone 1 is not available in zone 2. A separate group per zone
+is allowed when a smaller blast radius is wanted; Azure does not require it, because the reservation
+itself is already per zone.
 
-This lets ACRME hold and size reservations **per zone**, which is what makes the even-distribution
-target below meaningful. All names are produced by the deterministic naming convention (OPS-006, see
-Section 5.11.6).
+A group created **without zones** is not a region-wide pool. Azure picks one zone when the first
+reservation is created, and every VM in that group has to be deployed without a zone. Zonal and
+non-zonal reservations cannot sit in the same group. The `reg` name is only for a SKU that cannot
+take a zonal reservation, and the pinned zone is recorded.
+
+Names still come from the naming convention (OPS-006). The default name is `crg-<env>-<region>-zonal`.
 
 #### 5.11.4 Reactive discovery — filling gaps automatically (CAP-024)
 
@@ -1297,13 +1324,14 @@ Rebalance Trigger        = Max Skew > Configured Skew Tolerance (C-13)
 Preferred Placement Zone = the zone with the fewest VMs (argmin)
 ```
 
-Even distribution bounds how exposed a workload is if a single zone fails, and it keeps the per-AZ
-CRGs (5.11.3) balanced. (Formal version: Appendix A.9.)
+Even distribution bounds how exposed a workload is if a single zone fails, and it keeps the per-zone
+reservations (5.11.3) balanced. (Formal version: Appendix A.9.)
 
 #### 5.11.6 Predictable names for everything (OPS-006, C-12)
 
 Finally, v2.4 pins down a **deterministic naming convention** for resource groups, CRGs, and
-subscriptions, backed by a **counter (C-12)** that guarantees uniqueness. In plain terms: given the
+subscriptions, backed by a **counter (C-12)** that guarantees uniqueness. v2.5 names the default
+group `crg-<env>-<region>-zonal`. `reg` is only the no-zone exception. In plain terms: given the
 same inputs, ACRME always produces the **same, collision-free name** — so resources are predictable,
 auditable, and RBAC scopes attach to stable identities instead of ad-hoc names.
 
