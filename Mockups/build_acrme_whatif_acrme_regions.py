@@ -892,5 +892,244 @@ for note in notes:
     fr.row_dimensions[row].height=30
     row+=1
 
+
+# ==================================================================== PHASE 1
+# SKU-LEVEL CAPACITY RESERVATIONS + QUOTA GROUPS (design doc §7/§10, Phase 1)
+# Rulings applied (user, this turn):
+#  - ONE governed quota group per (region × VM/quota family), POOLED across
+#    Prod+NonProd+DR (QUA-004).
+#  - ENV-003 hard separation applies ONLY to CAPACITY reservations (separate
+#    CRGs per environment); QUOTA and CAPACITY are managed on separate planes.
+#  - Quota is HOARDED into one pool per region+family and DISTRIBUTED to
+#    subscriptions on demand (QUA-003).
+#  - Logical lock first; a reconciliation cycle refreshes actual values later
+#    (Phase 3 surfaces the lock; Phase 1 = read-only SKU-grain view).
+# group_availability = MIN(SKU reserved_free , family quota_available)  <-- the join
+import re as _re
+_ORANGE=PatternFill("solid",fgColor="F4B183"); _BLUE=PatternFill("solid",fgColor="DDEBF7")
+
+# --- curated Phase-1 SKU set (real top SKUs; multiple SKUs per family on purpose)
+PHASE1_SKUS=[  # (sku, vcpu/instance, quota family)
+ ("Standard_E32ads_v5",32,"Eadsv5"),
+ ("Standard_E64ads_v5",64,"Eadsv5"),
+ ("Standard_E16ads_v5",16,"Eadsv5"),
+ ("Standard_E32ads_v6",32,"Eadsv6"),
+ ("Standard_D8ads_v5", 8,"Dadsv5"),
+ ("Standard_D16ads_v5",16,"Dadsv5"),
+ ("Standard_D8as_v5",  8,"Dasv5"),
+ ("Standard_D16as_v5",16,"Dasv5"),
+]
+FAM_OF_SKU={s:f for (s,_,f) in PHASE1_SKUS}
+VCPU_OF_SKU={s:v for (s,v,_) in PHASE1_SKUS}
+
+# --- Phase-1 region scope: US + EU (active-modelling geographies with real data)
+#     (region_name, region_id, geography, is_mock)
+PHASE1_REGIONS=[
+ ("West US 3","westus3","US",False),
+ ("Central US","centralus","US",False),
+ ("Canada Central","canadacentral","US",True),   # absent in data -> mock (flagged)
+ ("East US 2","eastus2","US",False),
+ ("Switzerland North","switzerlandnorth","EU",False),
+ ("Sweden Central","swedencentral","EU",False),
+ ("North Europe","northeurope","EU",False),
+ ("West Europe","westeurope","EU",False),
+]
+REGABBR={"westus3":"wus3","centralus":"cus","canadacentral":"cac","eastus2":"eus2",
+         "switzerlandnorth":"chn","swedencentral":"sec","northeurope":"neu","westeurope":"weu"}
+ENVAB={"Prod":"pr","NonProd":"np","DR":"dr"}
+DR_BOOTSTRAP=0.30   # ENV-005: DR is a configurable bootstrap, NOT a full duplicate
+
+# --- read REAL per (region, env, sku) cores from the usage export
+def _isprod(t): t=(t or '').strip().lower(); return t=='prod' and 'non' not in t
+_alloc=defaultdict(float)                       # (region, 'Prod'|'NonProd', sku) -> cores
+_wbP=openpyxl.load_workbook(SRC,data_only=True); _wsP=_wbP['Sheet1']
+for _r in range(2,_wsP.max_row+1):
+    _env=_wsP.cell(_r,1).value; _reg=_wsP.cell(_r,2).value; _sku=_wsP.cell(_r,5).value
+    _cores=_wsP.cell(_r,9).value or 0
+    if _sku in FAM_OF_SKU:
+        _e='Prod' if _isprod(_env) else 'NonProd'
+        _alloc[(_reg,_e,_sku)]+=_cores
+# mock Canada Central = 0.5 x mean(other US real regions) per env/sku
+def _mock_cc(env,sku):
+    src=[ _alloc[(rn,env,sku)] for (rn,rid,g,mk) in PHASE1_REGIONS if g=='US' and not mk ]
+    m=sum(src)/max(1,len(src)); return round(0.5*m)
+def alloc_of(region,is_mock,env,sku):
+    if env=='DR':
+        base=alloc_of(region,is_mock,'Prod',sku); return round(DR_BOOTSTRAP*base)
+    if is_mock: return _mock_cc(env,sku)
+    return round(_alloc.get((region,env,sku),0.0))
+
+def buffer_of(a): return max(8,round(0.12*a))     # C-2 configurable buffer (headroom)
+
+# --- pre-compute static family-used per (region, family) across ALL envs for quota limits
+_famused=defaultdict(float)
+for (rn,rid,g,mk) in PHASE1_REGIONS:
+    for env in ("Prod","NonProd","DR"):
+        for (s,v,f) in PHASE1_SKUS:
+            _famused[(rn,f)]+=alloc_of(rn,mk,env,s)
+# limit factor per family: makes quota the binding constraint for some, capacity for others
+_LIMFACT={"Eadsv5":1.05,"Eadsv6":1.15,"Dadsv5":1.25,"Dasv5":1.45}
+
+# ------------------------------------------------------------ SKU_Family_Map
+fm=wb.create_sheet("SKU_Family_Map"); fm.sheet_view.showGridLines=False
+fm["A1"]="SKU → QUOTA FAMILY MAP (drives all lookups)"; fm["A1"].font=H1; fm.merge_cells("A1:B1")
+fm["A2"]="Capacity reservations are per SKU; quota is per VM/quota family. Many SKUs roll up to one family (QUA-002)."
+fm["A2"].font=Font(italic=True,color="808080"); fm.merge_cells("A2:B2")
+for j,h in enumerate(["SKU","Quota Family"]):
+    c=fm.cell(3,1+j,h); c.font=WHITEB; c.fill=HEADFILL; c.alignment=CTR; c.border=BORDER
+for i,(s,v,f) in enumerate(PHASE1_SKUS):
+    fm.cell(4+i,1,s).border=BORDER; c=fm.cell(4+i,2,f); c.border=BORDER; c.alignment=CTR
+fm.column_dimensions["A"].width=24; fm.column_dimensions["B"].width=16
+
+# ------------------------------------------------------------ SKU_Catalogue
+sc=wb.create_sheet("SKU_Catalogue"); sc.sheet_view.showGridLines=False
+sc["A1"]="SKU CATALOGUE (seed-matrix view, CAP-022)"; sc["A1"].font=H1; sc.merge_cells("A1:G1")
+sc["A2"]="Managed SKU set. Reservation eligibility requires zonal placement or regional where the SKU has no zonal support (CAP-020/CAP-022). 'Real Cores' = total from the usage export (all regions)."
+sc["A2"].font=Font(italic=True,color="808080"); sc.merge_cells("A2:G2")
+sch=["SKU","vCPU / instance","Quota Family","Zonal? (CAP-020)","Eligible?","Real Cores (all regions)","Notes"]
+for j,h in enumerate(sch):
+    c=sc.cell(3,1+j,h); c.font=WHITEB; c.fill=HEADFILL; c.alignment=CTR; c.border=BORDER; c.alignment=WRAP
+# real total cores per sku (all regions)
+_skutot=defaultdict(float)
+for _r in range(2,_wsP.max_row+1):
+    _sku=_wsP.cell(_r,5).value; _c=_wsP.cell(_r,9).value or 0
+    if _sku in FAM_OF_SKU: _skutot[_sku]+=_c
+for i,(s,v,f) in enumerate(PHASE1_SKUS):
+    xr=4+i
+    vals=[s,v,f,"Yes","Yes",round(_skutot.get(s,0)),"General-purpose (D) / memory-optimised (E)"]
+    for j,val in enumerate(vals):
+        c=sc.cell(xr,1+j,val); c.border=BORDER; c.alignment=CTR
+        if j==5: c.number_format="#,##0"
+for col,w in zip("ABCDEFG",[24,15,14,16,10,20,34]): sc.column_dimensions[col].width=w
+
+# ------------------------------------------------------------ Capacity_By_SKU
+cs=wb.create_sheet("Capacity_By_SKU"); cs.sheet_view.showGridLines=False
+cs["A1"]="CAPACITY RESERVATIONS BY SKU  +  GROUP AVAILABILITY DURING ALLOCATION"; cs["A1"].font=H1; cs.merge_cells("A1:P1")
+cs["A2"]=("Grain = Region × Environment × SKU (separate CRG per environment, ENV-003 capacity plane; CAP-023). "
+          "Allocated = real usage from export (DR = 30% bootstrap of Prod, ENV-005; Canada Central = mock, absent in data). "
+          "Reserved = Allocated + Buffer (CAP-003). GROUP AVAILABILITY = MIN(SKU reserved-free, family quota-available) — the number that actually gates a placement.")
+cs["A2"].font=Font(italic=True,color="808080"); cs.merge_cells("A2:P2")
+cs["A3"]=("NOTE: Phase 1 models the CRG at REGIONAL scope (crg-…-reg). Per-availability-zone CRGs (crg-…-az1/az2/az3, CAP-023/CAP-011) are the documented next increment; "
+          "quota has no zone dimension so the join stays at region+family.")
+cs["A3"].font=Font(italic=True,color="C00000"); cs.merge_cells("A3:P3")
+csh=["Region","Geography","Environment","SKU","Family","CRG (CAP-023)","vCPU/inst",
+     "Allocated","Buffer","Reserved","Reserved-Free","Family Quota-Avail",
+     "GROUP AVAIL (MIN)","Binding Constraint","Readiness (RDY-002)","Notes"]
+HR=4
+for j,h in enumerate(csh):
+    c=cs.cell(HR,1+j,h); c.font=WHITEB; c.fill=HEADFILL; c.alignment=CTR; c.border=BORDER; c.alignment=WRAP
+r=HR+1
+for (rn,rid,g,mk) in PHASE1_REGIONS:
+    for env in ("Prod","NonProd","DR"):
+        for (s,v,f) in PHASE1_SKUS:
+            a=alloc_of(rn,mk,env,s); b=buffer_of(a); crg=f"crg-{ENVAB[env]}-{REGABBR[rid]}-reg"
+            note=[]
+            if mk: note.append("mock (absent in data)")
+            if env=='DR': note.append("DR 30% bootstrap (ENV-005)")
+            vals={1:rn,2:g,3:env,4:s,
+                  5:f'=VLOOKUP(D{r},SKU_Family_Map!$A:$B,2,FALSE)',
+                  6:crg,7:v,8:a,9:b,
+                  10:f'=H{r}+I{r}',           # Reserved = Alloc + Buffer
+                  11:f'=J{r}-H{r}',           # Reserved-Free
+                  12:f'=SUMIFS(Quota_Groups!$G:$G,Quota_Groups!$B:$B,A{r},Quota_Groups!$D:$D,E{r})',  # family quota available (pooled)
+                  13:f'=MIN(K{r},L{r})',      # GROUP AVAILABILITY = MIN(reserved_free, family quota avail)
+                  14:f'=IF(K{r}<=L{r},"CAPACITY","QUOTA")',
+                  15:f'=IF(K{r}<=0,"RESERVATION_DEFICIT",IF(L{r}<=0,"QUOTA_DEFICIT",IF(M{r}<I{r}*0.5,"READY_WITH_RISK","READY")))',
+                  16:"; ".join(note)}
+            for col in range(1,17):
+                c=cs.cell(r,col,vals[col]); c.border=BORDER
+                c.alignment=CTR if col not in (16,) else WRAP
+                if col in (8,9,10,11,12,13): c.number_format="#,##0"
+                if col in (10,11,12,13): c.fill=grey
+                elif col in (8,9): c.fill=INFILL
+                elif col==13: pass
+                if col==13: c.fill=_ORANGE; c.font=BOLD
+            r+=1
+cs.freeze_panes="A5"
+for col,w in zip("ABCDEFGHIJKLMNOP",[15,11,12,20,10,18,9,11,9,11,12,14,15,16,20,26]):
+    cs.column_dimensions[col].width=w
+# readiness colour
+last=r-1
+cs.conditional_formatting.add(f"O5:O{last}",CellIsRule(operator="equal",formula=['"READY"'],fill=green))
+cs.conditional_formatting.add(f"O5:O{last}",CellIsRule(operator="equal",formula=['"READY_WITH_RISK"'],fill=INFILL))
+cs.conditional_formatting.add(f"O5:O{last}",FormulaRule(formula=[f'RIGHT(O5,7)="DEFICIT"'],fill=red))
+
+# ------------------------------------------------------------ Quota_Groups
+qg=wb.create_sheet("Quota_Groups"); qg.sheet_view.showGridLines=False
+qg["A1"]="QUOTA GROUPS (hoarded pool per Region × Family, across Prod+NonProd+DR)"; qg["A1"].font=H1; qg.merge_cells("A1:J1")
+qg["A2"]=("ONE governed quota group per region × VM/quota family (QUA-004), POOLED across all environments (Prod+NonProd+DR) — "
+          "quota and capacity are separate planes, so ENV-003 does NOT split quota. Unused quota is HOARDED into the pool (QUA-003) and "
+          "DISTRIBUTED to subscriptions on demand. 'Group Used' sums Allocated across ALL environments for the family (live).")
+qg["A2"].font=Font(italic=True,color="808080"); qg.merge_cells("A2:J2")
+qgh=["Quota Group","Region","Geography","Quota Family","Group Limit (pooled)","Group Used (all envs)",
+     "Group Available","Hoarded Contrib","Pending Increase","Notes"]
+HRq=3
+for j,h in enumerate(qgh):
+    c=qg.cell(HRq,1+j,h); c.font=WHITEB; c.fill=HEADFILL; c.alignment=CTR; c.border=BORDER; c.alignment=WRAP
+qr=HRq+1
+FAMS=["Eadsv5","Eadsv6","Dadsv5","Dasv5"]
+for (rn,rid,g,mk) in PHASE1_REGIONS:
+    for fam in FAMS:
+        used=_famused[(rn,fam)]; lim=round(used*_LIMFACT[fam]); hoard=round(0.10*lim)
+        gname=f"qg-{REGABBR[rid]}-{fam.lower()}"
+        note="mock (absent in data)" if mk else ""
+        vals={1:gname,2:rn,3:g,4:fam,5:lim,
+              6:f'=SUMIFS(Capacity_By_SKU!$H:$H,Capacity_By_SKU!$A:$A,B{qr},Capacity_By_SKU!$E:$E,D{qr})',
+              7:f'=E{qr}-F{qr}',8:hoard,9:0,10:note}
+        for col in range(1,11):
+            c=qg.cell(qr,col,vals[col]); c.border=BORDER; c.alignment=CTR if col!=10 else WRAP
+            if col in (5,6,7,8,9): c.number_format="#,##0"
+            if col in (6,7): c.fill=grey
+            elif col in (5,8,9): c.fill=INFILL
+        qr+=1
+qg.freeze_panes="A4"
+for col,w in zip("ABCDEFGHIJ",[20,15,11,14,18,18,15,15,15,22]): qg.column_dimensions[col].width=w
+qlast=qr-1
+qg.conditional_formatting.add(f"G4:G{qlast}",CellIsRule(operator="lessThanOrEqual",formula=["0"],fill=red))
+qg.conditional_formatting.add(f"G4:G{qlast}",CellIsRule(operator="greaterThan",formula=["0"],fill=green))
+
+# ------------------------------------------------------------ SKU_Grain_ReadMe
+rm=wb.create_sheet("SKU_Grain_ReadMe"); rm.sheet_view.showGridLines=False
+rm.column_dimensions["A"].width=3; rm.column_dimensions["B"].width=118
+def _g(rw,t,st=None,fl=None):
+    c=rm.cell(rw,2,t)
+    if st:c.font=st
+    if fl:c.fill=fl
+    c.alignment=WRAP
+_g(1,"SKU-LEVEL CAPACITY & QUOTA GROUPS — PHASE 1 (read-only SKU-grain view)",H1)
+_g(2,"Design: Design/acrme_sku_level_capacity_quota_design.md  |  Reconciled to baseline v2.4  |  What-if, not a baseline change.",Font(italic=True,color="808080"))
+p1=[("",None,None),
+ ("WHAT PHASE 1 ADDS",H2,SUBFILL),
+ ("The base workbook scored capacity/quota as ONE number per environment per region. Phase 1 surfaces the grain the "
+  "engine actually operates on: capacity reservations BY SKU, and quota as pooled quota GROUPS by VM/quota family.",None,None),
+ ("",None,None),
+ ("THE FOUR NEW SHEETS",H2,SUBFILL),
+ ("• SKU_Family_Map — SKU → quota family (many SKUs → one family). Drives every lookup.",None,None),
+ ("• SKU_Catalogue — managed SKU set (seed-matrix view, CAP-022) with vCPU, family, zonal/eligibility.",None,None),
+ ("• Capacity_By_SKU — reservations at Region × Environment × SKU (separate CRG per env, ENV-003 capacity plane). "
+  "Computes GROUP AVAILABILITY = MIN(SKU reserved-free, family quota-available).",None,None),
+ ("• Quota_Groups — ONE pooled quota group per Region × Family, across Prod+NonProd+DR (QUA-004), hoarded (QUA-003).",None,None),
+ ("",None,None),
+ ("THE CORE JOIN — 'availability by group during allocation'",H2,SUBFILL),
+ ("A placement is gated by the MINIMUM of two independent planes:",None,None),
+ ("   group_availability(SKU) = MIN( reserved_free(SKU's CRG) , quota_available(SKU's family pool) )",Font(name='Courier New',bold=True),_BLUE),
+ ("Capacity is per SKU (CAP-016); quota is per family, pooled across environments (QUA-002/004). Either can bind — the "
+  "'Binding Constraint' column on Capacity_By_SKU shows which.",None,None),
+ ("",None,None),
+ ("RULINGS APPLIED (this turn)",H2,SUBFILL),
+ ("• Quota group is maintained across Prod+NonProd+DR (QUA-004).",None,None),
+ ("• ENV-003 hard separation applies to CAPACITY reservations only; quota & capacity are separate planes.",None,None),
+ ("• Quota is hoarded into one pool and distributed to subscriptions when a need is presented (QUA-003).",None,None),
+ ("• Logical lock first; reconciliation cycle refreshes actual values later (surfaced in Phase 3).",None,None),
+ ("",None,None),
+ ("WHAT IS NOT YET IN (next increments)",H2,SUBFILL),
+ ("• Phase 2 — point the region-scoring α component at per-SKU group availability + emit RDY-002 per candidate.",None,WARNFILL),
+ ("• Phase 3 — freeze & LOGICAL LOCK: commit cores, recompute headroom, LOCKED state + Allocation_Ledger; reconcile later.",None,WARNFILL),
+ ("• Per-AZ CRGs (CAP-023 crg-…-az1/az2/az3). Phase 1 CRG scope = regional; quota has no zone dimension.",None,WARNFILL),
+]
+_rw=3
+for t,st,fl in p1:
+    _g(_rw,t,st,fl); _rw+=1
+
 wb.save(OUT)
 print("Saved",OUT,"regions=",NR)

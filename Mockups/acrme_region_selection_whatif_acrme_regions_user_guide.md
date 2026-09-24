@@ -31,6 +31,7 @@
 8. [Policy Sheet — Tuning Weights and Thresholds](#8-policy-sheet--tuning-weights-and-thresholds)
 9. [Known Limitations and Design Gaps](#9-known-limitations-and-design-gaps)
 10. [Quick Reference Tables](#10-quick-reference-tables)
+11. [SKU-Level Capacity & Quota Groups (Phase 1)](#11-sku-level-capacity--quota-groups-phase-1)
 
 ---
 
@@ -1023,4 +1024,85 @@ Japan East is noted as pending confirmation in baseline v2.4 Section 6 and is no
 
 ---
 
-*End of User Guide — baseline v2.4 · Last updated: 21 Sep 2026*
+## 11. SKU-Level Capacity & Quota Groups (Phase 1)
+
+> **What this is.** Phase 1 adds five new sheets that surface capacity and quota at the **grain the baseline already mandates** — capacity **by SKU** (CAP-022/023) and quota **by VM/quota family** (QUA-002/003/004) — rather than as a single blended per-region number. It is **read-only / feasibility**: it does not change the v2.4 baseline and does not yet feed the Prod/CVAL/DR scoring engine (that is Phase 2). It exists so reviewers can see the SKU→family→quota-group machinery working on real usage data before we wire it into placement.
+
+### 11.1 Why two grains (SKU vs family)
+
+- **Capacity is reserved per SKU.** A Capacity Reservation Group (CRG) holds cores for one specific SKU (e.g. `Standard_E32ads_v5`) in one region/zone. This is the *reservation* grain.
+- **Quota is granted per VM/quota family.** Azure counts your regional vCPU quota against a *family* (e.g. `Eadsv5`), and many SKUs draw on the same family. This is the *quota* grain.
+- A deployment is only placeable when **both** hold. Phase 1 makes this explicit with a join:
+
+  ```
+  GROUP AVAIL = MIN( reserved-free cores for the SKU ,  quota available for its family )
+  ```
+
+  This single MIN is the heart of Phase 1 — it is why capacity and quota must be modelled on separate planes and reconciled per candidate.
+
+### 11.2 The five new sheets
+
+| Sheet | Grain | Role |
+|-------|-------|------|
+| **SKU_Family_Map** | SKU → family | Lookup table (`VLOOKUP` source) mapping each modelled SKU to its quota family. |
+| **SKU_Catalogue** | one row per SKU | The 8 modelled SKUs with vCPU/instance, family, zonal & eligibility flags, real observed cores, notes. |
+| **Capacity_By_SKU** | Region × Environment × SKU | The reservation plane: allocated, buffer, reserved, reserved-free, and the MIN join to quota. 192 rows (8 regions × 3 envs × 8 SKUs). |
+| **Quota_Groups** | Region × Family | The pooled quota plane: one group per region+family, group limit / used / available, hoarded contribution. 32 rows (8 regions × 4 families). |
+| **SKU_Grain_ReadMe** | — | In-workbook explainer for the above. |
+
+### 11.3 Capacity_By_SKU — column reference (header row 4, data from row 5)
+
+| Col | Field | Source / formula |
+|-----|-------|------------------|
+| A–C | Region, Geography, Environment | Seeded (grain keys) |
+| D | SKU | Seeded (`Standard_*`) |
+| E | Family | `=VLOOKUP(D,SKU_Family_Map!$A:$B,2,FALSE)` |
+| F | CRG (CAP-023) | Naming only, `crg-{pr\|np\|dr}-{regabbr}-reg` (regional scope; per-AZ deferred to a later phase) |
+| G | vCPU/inst | From SKU_Catalogue |
+| H | Allocated | Derived from real usage (`SKU_USage.xlsx`); Canada Central is a mock (0.5 × mean of other US regions); DR = 30% of Prod (ENV-005 bootstrap, not a full duplicate) |
+| I | Buffer | `max(8, round(0.12 × Allocated))` (CAP-003 headroom) |
+| J | Reserved | `=H+I` (CAP-003 Target = Allocated + Buffer) |
+| K | Reserved-Free | `=J−H` (free portion of the reservation = buffer headroom) |
+| L | Family Quota-Avail | `=SUMIFS(Quota_Groups!$G:$G, …region, …family)` — pulls the pooled group's available cores |
+| **M** | **GROUP AVAIL (MIN)** | **`=MIN(K,L)`** — the binding capacity∩quota headroom (styled orange) |
+| N | Binding Constraint | `=IF(K<=L,"CAPACITY","QUOTA")` — which plane is the limiter |
+| O | Readiness (RDY-002) | `READY` / `READY_WITH_RISK` / `QUOTA_DEFICIT` / `RESERVATION_DEFICIT` per the baseline's readiness states |
+
+### 11.4 Quota_Groups — column reference (header row 3, data from row 4)
+
+| Col | Field | Source / formula |
+|-----|-------|------------------|
+| A | Quota Group | `qg-{regabbr}-{family}` |
+| B–D | Region, Geography, Quota Family | Grain keys |
+| E | Group Limit (pooled) | One pooled limit per region+family spanning **Prod + NonProd + DR** (per ruling QUA-004: one quota group across all environments) |
+| F | Group Used (all envs) | `=SUMIFS(Capacity_By_SKU!$H:$H, …region, …family)` — sums allocation across **every** environment for that family |
+| G | Group Available | `=E−F` |
+| H | Hoarded Contrib | Portion hoarded into the shared pool for on-demand distribution (QUA-003), modelled at 10% of limit |
+| I | Pending Increase | Placeholder for in-flight Microsoft quota increase requests |
+
+> **No circular reference.** `Capacity_By_SKU!L` → `Quota_Groups!G` → `Quota_Groups!F` → `Capacity_By_SKU!H` (a static seeded value). The chain terminates on a constant, so the workbook recalculates cleanly (verified with a headless recalc: 0 formula errors).
+
+### 11.5 Rulings baked into Phase 1
+
+These reflect the design decisions confirmed for this build:
+
+1. **One pooled quota group across Prod + NonProd + DR** (QUA-004). `Group Used` sums allocation across all three environments.
+2. **Hard environment separation applies to *capacity reservations only*** (ENV-003). Capacity and quota are separate planes; quota is pooled, capacity is per-environment.
+3. **Quota is hoarded into a single pool and distributed on demand** (QUA-003) — represented by the `Hoarded Contrib` column.
+4. Capacity is broken out **by SKU**, quota **by family** — the MIN join reconciles them.
+
+### 11.6 How to read a row (worked example)
+
+- **Central US · Prod · Standard_E32ads_v5** → Reserved-Free 8, Family Quota-Avail 548 → **GROUP AVAIL = MIN(8, 548) = 8**, Binding Constraint **CAPACITY**, Readiness **READY**. Here quota is plentiful; the buffer headroom is the limiter.
+- **West US 3 · Prod · Standard_E32ads_v5** → this region has ~0 observed allocation in the source data, so its quota group limit is 0 → Family Quota-Avail 0 → **GROUP AVAIL = MIN(8, 0) = 0**, Binding Constraint **QUOTA**, Readiness **QUOTA_DEFICIT**. This is the correct signal for a greenfield region that is reserved but has no quota provisioned yet.
+
+### 11.7 What Phase 1 does *not* do (deferred)
+
+- **Phase 2** — feed per-SKU `GROUP AVAIL` and RDY-002 readiness into the Prod/CVAL/DR scoring engine (the α term at SKU grain).
+- **Phase 3** — the post-freeze **logical lock**: an `Allocation_Ledger` that logically locks the environment to a region on freeze, then reconciles to actual Azure values on a later cycle (logical lock first, reconciliation second — per ruling).
+- **Per-AZ CRGs** (`crg-pr-eus2-az1`) — Phase 1 uses regional-scope CRG naming only.
+- **SKU→family authoritative source** — Phase 1 derives families from SKU naming; a canonical Azure mapping would replace `SKU_Family_Map` later.
+
+---
+
+*End of User Guide — baseline v2.4 · Phase 1 SKU-grain sheets added 24 Sep 2026 · Last updated: 24 Sep 2026*
