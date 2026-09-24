@@ -51,6 +51,7 @@ Derived, do not type over them:
 |---|---|
 | B9 | Distribution model for the geography (`3-region`, `2-region`, or `cross-geo`) |
 | B10 | DR scope. Middle East points at EU |
+| B11 | Co-host DR with CVAL, looked up from Policy column G |
 | C13:C20 | vCPU per VM |
 | D13:D20 | Line cores = VM count × vCPU |
 | E13:E20 | Quota family (`Eadsv5`, `Eadsv6`, `Dadsv5`, `Dasv5`) |
@@ -69,9 +70,9 @@ Selection order is fixed: **Prod, then CVAL, then DR**. A region that fails a ga
 
 | Geography | Model | What the engine does |
 |---|---|---|
-| US | 3-region | Prod, CVAL, and DR are three different **Standard** regions |
+| US | 3-region | Prod, CVAL, and DR are three different **Standard** regions, unless Policy co-host is `Y` |
 | EU, Australia, Asia Pacific | 2-region | Prod takes one Standard region. CVAL and DR are the same other region (PLC-010a) |
-| Middle East | cross-geo | Prod and CVAL are the same Middle East region, on separate reservations. DR is the best Europe Standard region (PLC-010b) |
+| Middle East | cross-geo | Prod and CVAL are the same Middle East region, on separate reservations. DR is the best Europe Standard region (PLC-010b). The co-host flag does not apply |
 
 **Restricted** regions (East US 2, North Europe, West Europe) are not in the automatic list. They compete only when Request!B6 names that region as Prod.
 
@@ -240,7 +241,7 @@ Short answers first.
 |---|---|---|
 | US 3-region to a 4-region model | No | There is no 4-region choice. Typing `4-region` into the model table does not turn on a new mode |
 | Restricted region to Standard | Not as a request option | You can type `Standard` over `Restricted` on Region_Catalogue. Scoring reads that cell |
-| Co-locate DR with CVAL while other regions are still free | No separate switch | Co-location happens only when that geography’s model is the text `2-region` |
+| Co-host DR with CVAL while other regions are still free | Yes. Policy column G | The model text stays `3-region`. DR is placed on the CVAL region. HC-6 is not turned on |
 
 ### 3-region to 4-region
 
@@ -269,13 +270,27 @@ That edit is local to this workbook. It does not reclassify the region in the re
 
 ### Co-host DR with CVAL when spare regions exist
 
-There is no Policy flag for “co-locate DR with CVAL even though another region is free.”
+Policy column **G**, “Co-host DR with CVAL”, is that rule. It is separate from the Model column.
 
-Co-location is wired to one test: Request!B9 = `2-region`. That is true today for EU, Australia, and Asia Pacific, which is what PLC-010a requires. For US, B9 is `3-region`, so DR is chosen from the Standard regions that are not Prod and not CVAL.
+| Geography | Model stays | Shipped co-host flag |
+|---|---|---|
+| US | `3-region` | `N` — three different regions |
+| EU, Australia, Asia Pacific | `2-region` | `Y` — already required by PLC-010a |
+| Middle East | `cross-geo` | `N` — ignored. DR stays in Europe |
 
-If you overwrite the US row on Policy from `3-region` to `2-region`, DR will sit on the CVAL region even while other US regions remain. HC-6 turns on as well. That is a side effect of the model text, not a customer-level option, and it disagrees with the baseline for US. The baseline co-locates only where the geography does not have a third Standard region.
+Set the US cell (Policy!G5) to `Y`. Do not change the Model cell. Request!B9 stays `3-region`. Request!B11 shows `Y`.
 
-A configuration item that means “this customer co-hosts DR with CVAL” while the geography stays 3-region is not in this file.
+What the rule does:
+
+- CVAL is still scored across the Standard regions that are not Prod.
+- DR is then that same CVAL region. The other free regions are not DR candidates.
+- Prod and DR remain different regions, so HC-1 still passes.
+- HC-2, HC-3, HC-5, HC-8, and HC-9 still run on that DR region. HC-7 still runs on CVAL. A region that cannot hold the DR bootstrap still fails, and the placement is not forced through.
+- HC-6 does **not** turn on. That combined DR + NonProd floor belongs to the 2-region model only. Co-hosting in a geography with three or more regions does not add it.
+
+On the shipped US sample, `Y` keeps Prod at West US 3 and moves DR from Canada Central onto Central US, with CVAL. The model label does not change. Set G5 back to `N` to restore three regions.
+
+This is a workbook rule. Baseline v2.4 still co-locates CVAL and DR only in a two-region geography. Middle East is unchanged: cross-geo is tested first, so `Y` there does not pull DR out of Europe.
 
 ## 8. What this mockup does not do
 

@@ -72,12 +72,17 @@ REGIONS = [
      (100, 200, 70, 220, 0, 0), 6, 0.0, "Synthetic. Local DR is 0 — DR is placed in Europe (DR-020)."),
 ]
 
+# Geography, distribution model, DR scope, co-host DR with CVAL.
+# The co-host flag is independent of the model. Y places DR on the CVAL
+# region without relabelling a 3-region geography as 2-region, and without
+# turning on the 2-region HC-6 combined floor. Cross-geo ignores the flag:
+# Middle East DR stays in Europe.
 GEO_MODEL = [
-    ("US", "3-region", "US"),
-    ("EU", "2-region", "EU"),
-    ("Australia", "2-region", "Australia"),
-    ("Asia Pacific", "2-region", "Asia Pacific"),
-    ("Middle East", "cross-geo", "EU"),
+    ("US", "3-region", "US", "N"),
+    ("EU", "2-region", "EU", "Y"),
+    ("Australia", "2-region", "Australia", "Y"),
+    ("Asia Pacific", "2-region", "Asia Pacific", "Y"),
+    ("Middle East", "cross-geo", "EU", "N"),
 ]
 
 ABBR = {
@@ -254,7 +259,8 @@ def build_readme(wb):
         "",
         "How a region is chosen",
         "Order is Prod, then CVAL, then DR. A region that fails a hard gate is not scored.",
-        "US (3-region): Prod, CVAL, and DR are three different Standard regions.",
+        "US (3-region): Prod, CVAL, and DR are three different Standard regions, unless that geography's co-host flag is Y.",
+        "Co-host DR with CVAL is a Policy column, not a model change. Y places DR on the CVAL region even when other Standard regions remain. The model text stays 3-region. HC-2, HC-3, HC-5, HC-7, HC-8, and HC-9 still apply to that DR region. HC-6 stays limited to a 2-region model, so this rule does not add the combined DR+NonProd floor.",
         "EU, Australia, Asia Pacific (2-region): Prod takes one Standard region. CVAL and DR co-locate in the other (PLC-010a). HC-6 checks the combined DR + NonProd free pool.",
         "Middle East (cross-geo): Prod and CVAL co-locate in one Middle East region on separate reservations. DR is scored across Europe Standard regions (PLC-010b, DR-020). Local DR quantity is zero.",
         "Restricted regions (East US 2, North Europe, West Europe) are not auto-selected. They are eligible only when Request names them as Prod.",
@@ -274,7 +280,7 @@ def build_readme(wb):
         "HC-2 capacity floor: reserved-free ≥ multiplier × requested cores. The multiplier is policy. This file ships at 1 so the sample fits; the reference write-up uses 2.",
         "HC-3 quota floor: pooled quota can absorb the request and still leave the configured remainder.",
         "HC-5: region has at least 2 availability zones.",
-        "HC-6: applied on DR only in a 2-region geography. DR free + NonProd free ≥ this customer's DR bootstrap.",
+        "HC-6: applied on DR only when the model is 2-region. DR free + NonProd free ≥ this customer's DR bootstrap. The co-host flag does not turn this gate on.",
         "HC-7: applied on CVAL. NonProd headroom after Prod and DR earmarks must cover the request.",
         "HC-8: Prod and CVAL stay in the requested geography. DR stays in that geography, or in Europe when the request is Middle East.",
         "HC-9: Standard regions, or the explicit Prod region even when it is Restricted.",
@@ -355,20 +361,28 @@ def build_policy(wb):
 
     ws["D3"] = "Geography model (REG-003)"
     ws["D3"].font = H2
-    for col, label in enumerate(("Geography", "Model", "DR scope"), 4):
+    for col, label in enumerate(("Geography", "Model", "DR scope", "Co-host DR with CVAL"), 4):
         cell = ws.cell(4, col, label)
         cell.font = WHITE
         cell.fill = HEAD
         cell.alignment = CTR
         cell.border = THIN
-    for i, (geo, model, scope) in enumerate(GEO_MODEL):
+    for i, (geo, model, scope, cohost) in enumerate(GEO_MODEL):
         for col, value in enumerate((geo, model, scope), 4):
             cell = ws.cell(5 + i, col, value)
             paint(cell, TEAL, align=LEFT)
-    ws["D11"] = "Middle East DR scope is EU. CVAL co-locates with Prod. PLC-010a does not apply."
+        co_cell = ws.cell(5 + i, 7, cohost)
+        paint(co_cell, IN)
+    cohost_dv = DataValidation(type="list", formula1='"Y,N"', allow_blank=False)
+    ws.add_data_validation(cohost_dv)
+    cohost_dv.add("G5:G9")
+    ws["D11"] = "Middle East DR scope is EU. CVAL co-locates with Prod. The co-host column does not apply to cross-geo: DR stays in Europe."
     ws["D11"].font = SMALL
+    ws["D12"] = "Co-host Y places DR on the CVAL region without changing the Model column. HC-6 still runs only for a 2-region model. Other hard gates still apply to that DR region."
+    ws["D12"].font = SMALL
+    ws.merge_cells("D12:G12")
 
-    widths(ws, {"A": 78, "B": 22, "C": 3, "D": 22, "E": 16, "F": 18})
+    widths(ws, {"A": 78, "B": 22, "C": 3, "D": 22, "E": 16, "F": 18, "G": 26})
     ws.freeze_panes = "A4"
     ws.sheet_properties.tabColor = "C65911"
     return ws
@@ -404,7 +418,11 @@ def build_request(wb):
     ws["B9"] = '=IF(B4="","",VLOOKUP(B4,Policy!D5:F9,2,FALSE))'
     ws["A10"] = "DR scope geography"
     ws["B10"] = '=IF(B4="","",VLOOKUP(B4,Policy!D5:F9,3,FALSE))'
-    for row in (9, 10):
+    ws["A11"] = "Co-host DR with CVAL"
+    ws["B11"] = '=IF(B4="","",VLOOKUP(B4,Policy!D5:G9,4,FALSE))'
+    ws["C11"] = "From Policy column G. Y does not change B9. Cross-geo ignores it."
+    ws["C11"].font = SMALL
+    for row in (9, 10, 11):
         ws.cell(row, 1).font = BOLD
         paint(ws.cell(row, 2), GREY, align=LEFT)
 
@@ -726,7 +744,7 @@ def candidate_formula(row, kind):
         f'=IF(OR({blocked},Request!$B$8<>"Y",NOT({placed}),'
         f'{cval}="NONE ELIGIBLE"),0,'
         f'IF(Request!$B$9="cross-geo",IF(AND({geo}=Request!$B$10,{cls}="Standard"),1,0),'
-        f'IF(Request!$B$9="2-region",IF({rid}={cval},1,0),'
+        f'IF(OR(Request!$B$9="2-region",Request!$B$11="Y"),IF({rid}={cval},1,0),'
         f'IF(AND({geo}=Request!$B$4,{cls}="Standard",{rid}<>{prod},{rid}<>{cval}),1,0))))'
     )
 
@@ -1077,7 +1095,7 @@ def build_allocation(wb):
         (22, "Co-location",
          '=IF(OR(C9="NONE ELIGIBLE",C10="NONE ELIGIBLE"),"—",'
          'IF(AND(Request!B9="cross-geo",C9=C10),"Prod = CVAL, DR in Europe",'
-         'IF(AND(Request!B9="2-region",C10=C11),"CVAL = DR",'
+         'IF(AND(OR(Request!B9="2-region",Request!B11="Y"),C10=C11),"CVAL = DR",'
          'IF(AND(C9<>C10,C10<>C11,C9<>C11),"Three distinct regions","Check separation"))))'),
         (23, "Policy version", "=Policy!B16"),
         (24, "Snapshot", "MOCK-SNAPSHOT"),
@@ -1098,6 +1116,8 @@ def build_allocation(wb):
          '=IF(OR(C14<>1,C11="NOT_OFFERED"),"—",IF(C9<>C11,"PASS","FAIL"))'),
         (30, "PLC-010a CVAL = DR in a 2-region geography",
          '=IF(OR(C14<>1,Request!B9<>"2-region"),"N/A",IF(C10=C11,"PASS","FAIL"))'),
+        (32, "Co-host rule: DR = CVAL without changing the model",
+         '=IF(OR(C14<>1,Request!B11<>"Y",Request!B9="cross-geo",Request!B9="2-region"),"N/A",IF(AND(C10=C11,C9<>C11),"PASS","FAIL"))'),
         (31, "PLC-010b Middle East DR is in Europe",
          '=IF(OR(C14<>1,Request!B9<>"cross-geo"),"N/A",IF(VLOOKUP(C11,Region_Catalogue!B5:C18,2,FALSE)="EU","PASS","FAIL"))'),
     ]
