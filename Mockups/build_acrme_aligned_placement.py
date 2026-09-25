@@ -260,7 +260,8 @@ def build_readme(wb):
         "2. Prod region is the normal input (PLC-001). Type a region id, including a Restricted region when the customer named it.",
         "3. Leave Prod region blank only when Geography-only selection is an approved exception (PLC-002). Set that flag to Y.",
         "4. Set DR offered to N to record DR_NOT_OFFERED for this customer (DR-014).",
-        "5. Read Allocation. If the placement is READY or READY_WITH_RISK, Post_Allocation and Quota_After show the estate after that placement.",
+        "5. Read Calculations for the formulas behind region selection and the availability gates.",
+        "6. Read Allocation. If the placement is READY or READY_WITH_RISK, Post_Allocation and Quota_After show the estate after that placement.",
         "",
         "How a region is chosen",
         "Order is Prod, then CVAL, then DR. A region that fails a hard gate is not scored.",
@@ -1290,11 +1291,307 @@ def build_quota_after(wb):
     return ws
 
 
+def build_calculations(wb):
+    """Explain region selection and availability checks. Live cells follow the request."""
+    ws = wb.create_sheet("Calculations")
+    ws["A1"] = "How region selection and availability checks are calculated"
+    ws["A1"].font = H1
+    ws["A2"] = (
+        "This sheet is the formula guide for the workbook. Yellow is not used here. "
+        "Column D repeats the current request so the numbers move when Request or Policy changes. "
+        "Score_Prod, Score_CVAL, and Score_DR are where each region is judged. Allocation copies rank 1."
+    )
+    ws["A2"].alignment = WRAP
+    ws.merge_cells("A2:D2")
+    ws.row_dimensions[2].height = 36
+
+    def section(row, title):
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+        cell = ws.cell(row, 1, title)
+        cell.font = H2
+        cell.fill = SUB
+        cell.alignment = LEFT
+        for col in range(1, 5):
+            ws.cell(row, col).fill = SUB
+            ws.cell(row, col).border = THIN
+        return row + 1
+
+    def pair(row, label, formula, note=""):
+        ws.cell(row, 1, label).font = BOLD
+        ws.cell(row, 1).alignment = WRAP
+        value = ws.cell(row, 2, formula)
+        value.alignment = LEFT
+        paint(value, TEAL, align=LEFT)
+        if note:
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=3)
+            ws.cell(row, 4, note).alignment = WRAP
+            ws.cell(row, 4).font = SMALL
+        else:
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=4)
+        ws.row_dimensions[row].height = 32
+        return row + 1
+
+    def prose(row, text, height=32):
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
+        cell = ws.cell(row, 1, text)
+        cell.alignment = WRAP
+        cell.font = SMALL
+        ws.row_dimensions[row].height = height
+        return row + 1
+
+    def table(row, headers, data, heights=None):
+        for col, label in enumerate(headers, 1):
+            cell = ws.cell(row, col, label)
+            cell.font = WHITE
+            cell.fill = HEAD
+            cell.alignment = CTR
+            cell.border = THIN
+        row += 1
+        for i, record in enumerate(data):
+            for col, value in enumerate(record, 1):
+                cell = ws.cell(row, col, value)
+                cell.alignment = WRAP
+                cell.border = THIN
+                cell.fill = GREY if i % 2 else PatternFill("solid", fgColor="FFFFFF")
+            ws.row_dimensions[row].height = 36 if not heights else heights[i]
+            row += 1
+        return row
+
+    row = 4
+    row = section(row, "This request")
+    live = [
+        ("Geography", "=Request!B4", ""),
+        ("Model", "=Request!B9", "From Policy. Co-host does not change this text."),
+        ("Co-host DR with CVAL", "=Request!B11", "Y forces DR onto the CVAL region when the model is not cross-geo."),
+        ("DR offered", "=Request!B8", "N records NOT_OFFERED and adds no DR cores."),
+        ("Bootstrap fraction", "=Policy!B15", "DR need = ROUND(line cores × this, 0)."),
+        ("HC-2 multiplier", "=Policy!B13", "Reserved-free must cover multiplier × need."),
+        ("HC-3 quota floor", "=Policy!B14", "Cores that must remain after the line is placed."),
+        ("α risk threshold", "=Policy!B12", "Eligible and below this α is READY_WITH_RISK."),
+        ("Weight sum", "=Policy!B9", "Must be 1.00 or the run is POLICY_BLOCKED."),
+    ]
+    for label, formula, note in live:
+        row = pair(row, label, formula, note)
+        if label in ("Bootstrap fraction", "Weight sum"):
+            ws.cell(row - 1, 2).number_format = "0.00"
+        elif label == "HC-3 quota floor":
+            ws.cell(row - 1, 2).number_format = "#,##0"
+
+    row += 1
+    for col, label in enumerate(("Environment", "Region chosen", "Placement score", "Readiness"), 1):
+        cell = ws.cell(row, col, label)
+        cell.font = WHITE
+        cell.fill = HEAD
+        cell.alignment = CTR
+        cell.border = THIN
+    for offset, src in enumerate((9, 10, 11)):
+        r = row + 1 + offset
+        ws.cell(r, 1, f"=Allocation!A{src}").font = BOLD
+        ws.cell(r, 2, f'=Allocation!D{src}&" ("&Allocation!C{src}&")"')
+        ws.cell(r, 3, f"=Allocation!E{src}")
+        ws.cell(r, 3).number_format = "0.000"
+        ws.cell(r, 4, f"=Allocation!F{src}")
+        for col in range(1, 5):
+            paint(ws.cell(r, col), TEAL, align=LEFT if col < 3 else CTR)
+    row += 5
+    row = prose(
+        row,
+        "Order is Prod, then CVAL, then DR. CVAL is scored only after Prod is a real region. "
+        "DR is scored only after CVAL is a real region and DR is offered. "
+        "A region that is not a candidate, or that fails a gate, does not receive a placement score.",
+        32,
+    )
+
+    row += 1
+    row = section(row, "1. What each SKU line needs")
+    row = prose(
+        row,
+        "Request rows 13–20. A line is active only when both the SKU and the VM count are filled. "
+        "Duplicate SKUs make the run POLICY_BLOCKED. Blank rows are ignored: they contribute 1 to every MIN, so they cannot fail a region or pull a score down.",
+        32,
+    )
+    row = table(
+        row,
+        ("Quantity", "Formula", "Prod and CVAL", "DR"),
+        [
+            ("Cores", "VM count × vCPU from SKU_Catalogue", "Full cores", "Full cores are still stored; the gate uses the bootstrap"),
+            ("Need", "Cores the environment must cover", "Cores", "ROUND(cores × bootstrap, 0)"),
+            ("Reserved", "Capacity_Reservations reserved quantity for that region, environment, and SKU", "Prod row", "DR row"),
+            ("Reserved-free", "Reserved − allocated, on that same row", "Must cover the need", "Must cover the bootstrap need"),
+        ],
+    )
+
+    row += 1
+    row = section(row, "2. Availability numbers on Line_Check")
+    row = prose(
+        row,
+        "Line_Check has one row per catalogue region. Each active SKU line adds reserved-free, reserved, and quota columns. "
+        "The score sheets read those columns. Group availability for a line is the minimum of reserved-free and the quota number for that environment.",
+        32,
+    )
+    row = table(
+        row,
+        ("Number", "How it is calculated", "Used by", "Fails when"),
+        [
+            (
+                "Family available",
+                "Quota_Groups Available for this region and this VM family. One cell covers Prod, NonProd, and DR.",
+                "Part of quota available",
+                "The family cell cannot take the line",
+            ),
+            (
+                "Regional vCPU available",
+                "Quota_Groups column P on the region's Eadsv5 row. That is the total regional vCPU cap (QUA-002).",
+                "Part of quota available",
+                "The regional total is tighter than the family cell",
+            ),
+            (
+                "Quota available",
+                "MIN(family available, regional vCPU available).",
+                "HC-3, and Meets-all for Prod and DR",
+                "The lesser of the two caps is short",
+            ),
+            (
+                "NonProd headroom",
+                "Family limit − Prod earmark − DR earmark − NonProd used. Earmarks are reserved cores, so CVAL cannot spend Prod or DR quota (HC-7).",
+                "HC-7, and Meets-all for CVAL",
+                "Headroom after the earmarks is short",
+            ),
+        ],
+        heights=[48, 48, 36, 52],
+    )
+
+    row += 1
+    row = section(row, "3. Which regions are allowed to compete")
+    row = prose(
+        row,
+        "Candidate = 1 on the score sheet (column J) before any capacity check. Candidate = 0 is not scored.",
+        20,
+    )
+    row = table(
+        row,
+        ("Environment", "Who is a candidate", "Named Prod region", "Restricted regions"),
+        [
+            (
+                "Prod",
+                "If Request Prod region is blank and the geography-only exception is Y: every Standard region in the geography.",
+                "If a Prod region id is entered: only that region, and it must sit in the requested geography.",
+                "A Restricted region competes for Prod only when Request names it.",
+            ),
+            (
+                "CVAL",
+                "Standard regions in the geography other than Prod. Cross-geo (Middle East): the Prod region itself, on a separate reservation.",
+                "Follows the Prod winner. It does not re-read the Prod region box.",
+                "Never a CVAL candidate.",
+            ),
+            (
+                "DR",
+                "3-region: a Standard region that is neither Prod nor CVAL. 2-region, or co-host = Y: the CVAL region only. Cross-geo: Standard regions in the DR scope (Europe).",
+                "Requires DR offered = Y and a real CVAL winner.",
+                "Never a DR candidate.",
+            ),
+        ],
+        heights=[52, 48, 56],
+    )
+
+    row += 1
+    row = section(row, "4. Availability gates")
+    row = prose(
+        row,
+        "Every active line must pass. One short SKU fails the region. PASS or N/A is a pass. "
+        "Eligible (column T) = 1 only when Candidate = 1 and columns K through S all pass. "
+        "The same column letters are used on Score_Prod, Score_CVAL, and Score_DR.",
+        32,
+    )
+    row = table(
+        row,
+        ("Column", "Gate", "Rule", "Where it applies"),
+        [
+            ("K", "HC-2 capacity floor", "Reserved-free ≥ HC-2 multiplier × need. Prod uses Prod free, CVAL uses NonProd free, DR uses DR free.", "All three score sheets"),
+            ("L", "HC-3 quota floor", "Quota available ≥ need, and quota available − need ≥ the quota floor.", "All three. DR need is the bootstrap quantity."),
+            ("M", "HC-5 zones", "Availability-zone count ≥ 2.", "All three"),
+            ("N", "HC-6 combined floor", "DR free + NonProd free ≥ bootstrap need.", "DR only, and only when the model is exactly 2-region. Otherwise N/A. Co-host does not turn this on."),
+            ("O", "HC-7 DR floor integrity", "NonProd headroom ≥ cores, and headroom − cores ≥ the quota floor.", "CVAL only. N/A on Prod and DR."),
+            ("P", "HC-8 geography", "Prod and CVAL stay in the requested geography. DR stays in the DR scope.", "All three. Middle East DR scope is Europe."),
+            ("Q", "HC-9 class", "Prod: Standard, or the region named on the request. CVAL and DR: Standard only.", "All three"),
+            ("R", "HC-4 separation", "DR region ≠ Prod region. A cross-geo DR in the DR scope passes.", "DR only"),
+            ("S", "Meets-all", "MIN(reserved-free, quota number) ≥ need. CVAL uses NonProd headroom as the quota number. Prod and DR use quota available.", "All three"),
+        ],
+        heights=[40, 36, 28, 48, 40, 40, 40, 36, 48],
+    )
+
+    row += 1
+    row = section(row, "5. Placement score")
+    row = prose(
+        row,
+        "PS = (α weight × α) + (β weight × β) + (γ weight × γ) + (δ weight × δ) + (ε weight × ε). "
+        "Weights are Policy B4:B8. A component is the minimum of that ratio across the active SKU lines, clamped between 0 and 1. "
+        "Components are shown for every candidate (columns U–Y). The placement score (column Z) is filled only when Eligible = 1.",
+        48,
+    )
+    row = table(
+        row,
+        ("Term", "Weight cell", "Prod", "CVAL and DR"),
+        [
+            ("α capacity headroom", "Policy!B4", "NonProd reserved-free ÷ Prod reserved", "CVAL: NonProd free ÷ NonProd reserved. DR: DR free ÷ DR reserved."),
+            ("β quota headroom", "Policy!B5", "Quota available ÷ family quota limit", "Same on CVAL and DR. The divisor is the family limit, not the regional vCPU cap."),
+            ("γ fairness", "Policy!B6", "1 − customers in the region ÷ total_customers", "Same. total_customers is Policy!B17 (assumed; v2.5 does not define the source)."),
+            ("δ DR readiness", "Policy!B7", "DR coverage ratio on the region, clamped to 1", "CVAL repeats α. DR is coverage ÷ bootstrap, clamped to 1."),
+            ("ε zone diversity", "Policy!B8", "Availability zones ÷ 3, clamped to 1", "Same"),
+        ],
+        heights=[36, 40, 40, 40, 32],
+    )
+
+    row += 1
+    row = section(row, "6. Who wins")
+    row = prose(
+        row,
+        "Among Eligible regions, rank 1 is the highest placement score. An equal score goes to the earlier row in the Section 6 catalogue. "
+        "Allocation takes that rank-1 region id from Score_Prod, then Score_CVAL, then Score_DR. "
+        "If no region is Eligible, the environment is NONE ELIGIBLE.",
+        36,
+    )
+
+    row = section(row, "7. Readiness")
+    row = table(
+        row,
+        ("State", "On the score row (column AB)", "On Allocation overall", "What to change"),
+        [
+            ("RESERVATION_DEFICIT", "An active SKU has reserved quantity 0 in that environment.", "Read the environment row. Overall does not use this name.", "Add a reservation for that SKU."),
+            ("QUOTA_DEFICIT", "HC-3 failed.", "A missing environment is reported as CAPACITY_UNAVAILABLE. Read column F on Allocation for the specific state.", "Raise the family limit or the regional vCPU limit, or shrink the request."),
+            ("CAPACITY_UNAVAILABLE", "HC-2 failed, or any other gate failed, or the region is not eligible.", "Also used when Prod, CVAL, or an offered DR has no winner.", "Free reserved cores, or pick a region that passes."),
+            ("READY_WITH_RISK", "Eligible, and α is below the risk threshold.", "Overall is READY_WITH_RISK if any placed environment is.", "The placement is still applied."),
+            ("READY", "Eligible, and α is at or above the risk threshold.", "Every placed environment is READY.", "Post_Allocation and Quota_After include the request."),
+            ("POLICY_BLOCKED", "Not a score-row state.", "Weights do not sum to 1, a SKU is duplicated, or Prod is blank without the exception.", "Fix Request or Policy. Nothing is allocated."),
+            ("NOT_OFFERED", "DR candidates are all 0.", "DR region is NOT_OFFERED when DR offered = N.", "No DR cores are added."),
+        ],
+        heights=[40, 48, 44, 36, 36, 44, 36],
+    )
+
+    row += 1
+    row = section(row, "8. What a successful allocation changes")
+    row = prose(
+        row,
+        "Post_Allocation and Quota_After move only when Allocation overall readiness is READY or READY_WITH_RISK. "
+        "Prod and CVAL gain the full line cores on the winning region. DR gains the rounded bootstrap cores. "
+        "Allocated rises and reserved-free falls by those cores. The family cell’s used cores rise by the sum of every line of that family placed in that region. "
+        "Buffer is left as it was. A later reconciliation would rebuild it; this workbook does not.",
+        52,
+    )
+
+    widths(ws, {"A": 28, "B": 62, "C": 56, "D": 62})
+    ws.freeze_panes = "A4"
+    ws.sheet_properties.tabColor = "1F4E79"
+    ws.auto_filter.ref = None
+    return ws
+
+
 def build():
     cap_rows = capacity_rows()
     limits = quota_limits(cap_rows)
     wb = Workbook()
     build_readme(wb)
+    build_calculations(wb)
     build_request(wb)
     build_policy(wb)
     build_catalogue(wb)
@@ -1312,7 +1609,7 @@ def build():
     wb.calculation.calcMode = "auto"
     wb.calculation.fullCalcOnLoad = True
     order = [
-        "ReadMe", "Request", "Policy", "Region_Catalogue", "SKU_Catalogue",
+        "ReadMe", "Calculations", "Request", "Policy", "Region_Catalogue", "SKU_Catalogue",
         "Capacity_Reservations", "Quota_Groups", "Line_Check",
         "Score_Prod", "Score_CVAL", "Score_DR", "Allocation",
         "Post_Allocation", "Quota_After",

@@ -11,13 +11,14 @@
 
 Given a customer, a geography, and one or more VM SKUs, which region should host **Prod**, which should host **CVAL**, and which should host **DR** — and what do the mock reservations and quota pools look like after that placement is accepted.
 
-Every active SKU line has to fit. A region that can take the large SKU and not the small one is out.
+Every active SKU line has to fit. A region that can take the large SKU and not the small one is out. The **Calculations** sheet writes the same rules next to the current request’s result.
 
 ## 2. Sheets, in the order Excel uses them
 
 | Sheet | What you do with it |
 |---|---|
 | **ReadMe** | Short orientation |
+| **Calculations** | The formulas for region selection, the availability gates, the score, and readiness |
 | **Request** | The deployment. Yellow cells only |
 | **Policy** | Weights and thresholds. Yellow cells. Geography model table is also here |
 | **Region_Catalogue** | The 14 baseline regions, class, and distribution model |
