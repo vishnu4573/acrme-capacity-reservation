@@ -36,6 +36,7 @@ This document defines the **skill inventory** — the reusable, structured proce
 | SK-10 | [Readiness Gate Check](#sk-10--readiness-gate-check) | Architect / Implementation Engineer | — Reference skill |
 | SK-11 | [Region Model Validation](#sk-11--region-model-validation) | Architect | — Reference skill |
 | SK-12 | [Documentation Completeness Review](#sk-12--documentation-completeness-review) | Documentation Steward | ✅ Recommended |
+| SK-13 | [Grounded Research & Design](#sk-13--grounded-research--design) | Architect (research & design mode) | ✅ Built — `grounding-acrme-research-design` |
 
 > **Platform Skill:** A skill marked ✅ is a candidate for Abacus AI platform skill registration — it encodes a critical, frequently-used procedure that must be applied consistently and is worth a single-click invocation. Reference skills are procedural definitions used by agents; they are not registered as platform skills unless usage frequency justifies it.
 
@@ -869,6 +870,33 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 ---
 
+### SK-13 — Grounded Research & Design
+
+**Purpose:** Wrapper procedure that keeps every ACRME research finding and design output traceable to the current baseline and Microsoft Learn. It sequences SK-01, SK-02, SK-03, SK-06 and SK-09 and adds baseline-version resolution, evidence tagging, an open-items register, output templates, and an automated lint.
+
+**Trigger:** Any Azure capacity/quota/zone/sharing research question, or any new or revised design note, ADR, reference doc, or mockup logic.
+
+**Implementation (executable — the procedure lives there, not here):**
+
+| Item | Path |
+|---|---|
+| Skill | `.github/skills/grounding-acrme-research-design/SKILL.md` |
+| Source map | `.github/skills/grounding-acrme-research-design/references/source-map.md` |
+| Evidence tags, locked facts, open items | `.github/skills/grounding-acrme-research-design/references/evidence-and-gaps.md` |
+| Output templates | `.github/skills/grounding-acrme-research-design/references/output-templates.md` |
+| Lint / baseline resolver | `.github/skills/grounding-acrme-research-design/scripts/check_grounding.py` |
+| Agent persona that runs it | `.github/agents/acrme-research-designer.agent.md` |
+
+**Outputs:** Research Brief or Design Note with header block, gate block, WAF block, and a clean `check_grounding.py` run (0 errors).
+
+**Owner:** Azure Capacity & Platform Architect
+
+**Platform Skill Registration:** ✅ Built — `grounding-acrme-research-design`
+
+> **Note on HC numbering:** the HC table in SK-03 above uses older labels. The authoritative HC-1..HC-11 names are in `Reference-Material/reference/acrme_hard_constraints_reference.md` Part 2 (REGION_SEPARATION … AVAILABILITY_SET_INELIGIBLE); SK-13 uses those.
+
+---
+
 ## Skill Dependency Graph
 
 ```
@@ -934,5 +962,6 @@ The following skills are recommended for Abacus AI platform skill registration �
 | SK-10 Readiness Gate Check | ✅ Primary | ✅ Required | — | — | — |
 | SK-11 Region Model Validation | ✅ Primary | ⚪ As needed | — | ⚪ Review | — |
 | SK-12 Documentation Completeness | ✅ Required | — | — | ✅ Primary | — |
+| SK-13 Grounded Research & Design | ✅ Primary | ⚪ As needed | ⚪ As needed | ✅ Required | ⚪ As needed |
 
 `✅ Primary` = skill owner / primary user  `✅ Required` = mandatory for this agent's outputs  `⚪ As needed` = applies when relevant  `—` = not applicable

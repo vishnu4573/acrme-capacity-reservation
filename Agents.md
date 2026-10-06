@@ -98,6 +98,12 @@ Azure Capacity & Platform Architect   ◄── Requirements Baseline (single so
 | Calculation Logic Reference | `Reference-Material/reference/acrme_calculation_logic_reference.md` |
 | Requirements Baseline | `Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` |
 | ADRs | `Architecture/adr/` |
+| Research & design agent profile | `.github/agents/acrme-research-designer.agent.md` |
+| Grounding skill (SK-13) | `.github/skills/grounding-acrme-research-design/` |
+
+#### Research & Design Mode
+
+For research, design, formula, and review work this agent runs as `.github/agents/acrme-research-designer.agent.md`, which executes skill SK-13 (`grounding-acrme-research-design`): resolve the current baseline version, map sources, tag evidence, gate against baseline/HC/WAF, and lint the output with `check_grounding.py` before delivery.
 
 ---
 
