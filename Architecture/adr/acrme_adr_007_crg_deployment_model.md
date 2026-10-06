@@ -112,7 +112,7 @@ The following requirements constrain this ADR. All are mandatory unless tagged [
 
 `[Baseline Requirement — GOV-001–003]` Least-privilege identity, separation of duties, and automation scoped by tenant/MG/subscription/RG/region/zone/SKU.
 
-`[Baseline Requirement — POC-001 — POC-gated]` Quota behaviour in consumer subscriptions when consuming a shared reservation is unconfirmed. QUA-013 assumes quota lives in the consumer subscription; this remains a top technical unknown requiring POC validation before production reliance.
+`[Baseline Requirement — POC-001 → QUA-013 — Documented]` Quota behaviour in consumer subscriptions when consuming a shared reservation is now documented in Requirements Baseline v2.5 (QUA-013): the consumer subscription must hold its own quota; the provider needs quota to create/grow the reservation. Confirmation of the specific API version implementing this behaviour remains pending POC validation.
 
 `[Baseline Requirement — POC-006 — POC-gated]` DR subscription topology (dedicated DR subscription vs shared production subscription) is an open decision. This ADR makes a recommendation but marks it POC-gated.
 
@@ -1004,13 +1004,15 @@ The baseline has no requirement governing the provider subscription model. This 
 
 ### 16.3 Unresolved Decisions
 
+> **Note:** DEC-002 and DEC-003 are baseline-registered open decisions (see Requirements Baseline v2.5 § Open Decisions). The remaining items use ADR-007-local tracking notation (ADR-007-DEC-XX) pending registration in the baseline's decision register.
+
 | Decision ID | Question | Options | Due |
 |-------------|----------|---------|-----|
 | DEC-002 | **What is the workload domain taxonomy?** How many domains, what are their codes, how do they map to MGs? | Product group alignment vs platform layer alignment | Platform Architecture |
 | DEC-003 | **Shard registry storage** — where is the canonical shard registry stored? (Options: Azure Table Storage, Cosmos DB, config file in key vault, ACRME state store) | TBD | Engineering Design |
-| DEC-004 | **VMSS on shared CRG** — should VMSS be prohibited from shared CRGs while FC-08 (Preview VMSS limitation) is active? | Prohibit VMSS on shared CRGs (safer) vs accept risk with documented limitation | Architecture Review |
-| DEC-005 | **DR sub: dedicated vs shared** — POC-006 outcome drives this. If shared, ENV-003 requires VMs to be classifiable by environment within the shared subscription. | Dedicated DR sub (recommended pending POC) vs shared with VM tagging | POC-006 |
-| DEC-006 | **Break-glass CRG modification** — should the break-glass path allow direct CR quantity changes without engine intermediation? | Direct ARM (faster but unlogged in engine) vs engine-mediated with break-glass flag | Security/SRE |
+| ADR-007-DEC-01 | **VMSS on shared CRG** — should VMSS be prohibited from shared CRGs while FC-08 (Preview VMSS limitation) is active? | Prohibit VMSS on shared CRGs (safer) vs accept risk with documented limitation | Architecture Review |
+| ADR-007-DEC-02 | **DR sub: dedicated vs shared** — POC-006 outcome drives this. If shared, ENV-003 requires VMs to be classifiable by environment within the shared subscription. | Dedicated DR sub (recommended pending POC) vs shared with VM tagging | POC-006 |
+| ADR-007-DEC-03 | **Break-glass CRG modification** — should the break-glass path allow direct CR quantity changes without engine intermediation? | Direct ARM (faster but unlogged in engine) vs engine-mediated with break-glass flag | Security/SRE |
 
 ---
 

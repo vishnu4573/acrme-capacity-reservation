@@ -308,9 +308,11 @@ so the arithmetic is reproducible.
 | `prod_crg.quota_limit` (vCPU) | 1000 | 1000 | 1000 | β (denominator) |
 | `prod_crg.quota_headroom` (vCPU free below limit) | 700 | 550 | 300 | β (numerator) |
 | `prod_customer_count` (customers already in region) | 40 | 25 | 20 | γ |
-| `total_customers` (across all regions) | 100 | 100 | 100 | γ |
+| `total_customers` (across all regions) ⚠️ | 100 | 100 | 100 | γ |
 | `dr_crg.coverage_ratio` (DR coverage already in place) | 0.50 | 0.45 | 0.60 | δ |
 | `az_count` (Availability Zones) | 3 | 3 | 2 | ε |
+
+> ⚠️ **SPEC GAP (GAP-γ):** The `total_customers` term in the γ component is **undefined** in Requirements Baseline v2.5. Its source (customer registry? subscription count? tenant-level aggregate?), scope (all customers or only those with Prod workloads?), and data type are not specified. The γ formula `1 - prod_customer_count / total_customers` cannot be implemented without resolving this gap. See the **OPEN ISSUE** section in `acrme_calculation_logic_comprehensive_walkthrough.md` for four potential interpretations and a proposed resolution action plan. Values shown here (100) are illustrative placeholders only.
 
 > **Note on "starter" values.** These are illustrative seed values for the walkthrough, not baseline
 > defaults. The only true baseline defaults are the *weights* (Section 3.3) and the *configurable
