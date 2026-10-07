@@ -367,8 +367,9 @@ for t in [
     para(tf, t, 13, INK, bullet=True, space_after=4)
 tb, tf = textbox(s, Inches(7.0), Inches(1.75), Inches(5.7), Inches(4.5))
 para(tf, "The protected capacity floor", 16, AZURE, bold=True, first=True, space_after=6)
-para(tf, "A calculated minimum that must stay available for recovery (design "
-         "placeholder 30–40%). Enforced by ACRME — not a native cloud sub-reservation.",
+para(tf, "A calculated minimum that must stay available for recovery: sized to the "
+         "largest single source region it protects (max-not-sum), not a fixed % of "
+         "Prod. Enforced by ACRME — not a native cloud sub-reservation.",
      13, INK, space_after=8)
 para(tf, "An independent detector recalculates the floor and blocks non-production "
          "expansion if the two calculations disagree (fail-closed).", 13, INK,
@@ -453,7 +454,7 @@ risk_cats = [
     ("Commercial", [
         "Discounts assumed that don't apply → per-customer scope validation",
         "Over-reservation persists in Phase 1 → accepted cost of safety",
-        "DR coverage ratio mis-set → 30–40% is placeholder; needs policy",
+        "DR bootstrap target mis-set → configurable per product/region; needs policy",
     ], AMBER),
     ("Customer", [
         "Zone mismatch makes reservation useless → mandatory zone map",
@@ -496,7 +497,8 @@ decs = [
      "consented managed identity with narrow, resource-group-scoped roles — never "
      "subscription-wide admin. Tier 3 stays blocked until security approves."),
     ("3", "Set the disaster recovery floor policy",
-     "How much capacity is held for DR is a business decision. 30–40% is a placeholder. "
+     "DR holds only a lean, configurable bootstrap — never a fixed % copy of Prod; "
+     "the rest is acquired in stages on activation. The bootstrap level per product is a business decision. "
      "Recommendation: customer-specific recovery analysis for critical workloads."),
 ]
 dy = Inches(1.75)
