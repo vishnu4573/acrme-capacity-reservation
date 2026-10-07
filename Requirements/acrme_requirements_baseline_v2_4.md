@@ -26,6 +26,7 @@
 | Version | Date           | Change                                                                                                                                                                                                                                                                                                                                             |
 |---------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 2.5     | 24 Sep 2026    | **Foundation aligned to Microsoft Learn.** Sharing stays **Preview**: production placement uses a reservation in the deploying subscription until Capacity Reservation Sharing is GA (CAP-013, DEP-001). **QUA-013** is documented, not an unknown: the consumer subscription must hold its own quota; POC-001 is now a version-confirmation test. Quota has **two caps** — VM-family vCPU and total regional vCPU (QUA-002, RDY-001). A Quota Group **transfers** quota; deploy-time checks the subscription (QUA-003, QUA-004, QUA-007). **CAP-023**: one zonal CRG per environment with zones fixed at creation and one reservation per VM size per zone; a CRG with no zones is pinned by Azure to a single zone and is not a region-wide pool. **CAP-016**: logical zone numbers are per subscription. **CAP-004**: deallocated associated VMs do not raise the capacity target, and they still consume reservation quota until dissociated. |
+| 2.5 (amended) | 7 Oct 2026 | **γ fairness denominator defined — geography customer count.** Added **PLC-012**: `total_customers(g)` is the count of distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of geography *g*. It is one live count per geography, shared by PS_Prod, PS_NonProd and PS_DR, and it is incremented when a new customer environment is provisioned or deployed in the geography. **Zero rule:** γ = 1 when the count is zero. Added Section 4 term **Total customers (geography)**, Appendix A **A.10** formula, and a DAT-002 derived-value note. Closes spec gap GAP-γ. |
 | 2.4 (amended) | 11 Sep 2026 | **Middle East DR offering resolved — cross-geography DR to Europe.** DEC-001 is **decided**: DR **is now offered** for Middle East. Prod and CVAL co-locate in a selected **Middle East** Standard region; **DR is placed cross-geo in a selected Europe Standard region**, both chosen by the **weighted capacity placement model**. Added **DR-020** (cross-geography DR: Middle East → Europe), **PLC-010b** (cross-geo DR override — supersedes the two-region CVAL/DR co-location for Middle East). Amended **REG-002** (Europe cross-geo DR region is weighted-selected, not fixed to Switzerland North), **REG-003** (third distribution model: cross-geo DR), **PLC-010a** (Middle East carved out), **ENV-003** (co-location-in-region vs capacity-sharing clarified), **DR-002**, **DR-014** (per-country flag retained; Middle East default no longer `DR_NOT_OFFERED`), **DEC-001** (resolved), **C-8**, Section 2 strategic drivers, Section 6 catalogue. Region-selection rules changed for **Middle East** and **Europe**. Data-residency caveat recorded (A-ME1). |
 | 2.4     | 7 Sep 2026     | **Reservation-model gaps folded into baseline** from the reviewed architecture diagrams (Reservation Model, Reservation Creation, Reservation Decommissioning). Added **CAP-020** (Availability-Set VMs ineligible for reservations), **CAP-021** (deallocate-or-migrate-to-AZ onboarding precondition), **CAP-022** (seed-at-0 eligible-SKU/AZ matrix + product-team budget governance, extends CAP-009), **CAP-023** (explicit regional + per-AZ CRG structure per environment, extends CAP-011), **CAP-024** (reactive SKU/AZ discovery auto-create reconciled with CAP-019 governance), **PLC-011** (even ≈1/zone_count zone-distribution target + rebalancing action), **OPS-006** and **C-12/C-13** (deterministic RG/CRG/subscription naming convention + counter; zone-distribution target/tolerance). Updated **CAP-001** (core subscription = all production classification, CAP-001a), **CAP-008/CAP-010** (decommissioning-workflow boundary vs automatic buffer scale-down), **CAP-009** (cross-ref seed matrix), **CAP-011** (cross-ref per-AZ CRG structure), **CAP-019** (reactive-discovery reconciliation). Added Section 4 glossary disambiguation of **seed reservation** (count-0 capacity reservation) vs **seed record / placement seed** (PLC-003), plus Availability Set, core subscription, and regional/per-AZ CRG terms. Added Appendix A **A.9** even zone-distribution formula. |
 | 2.3     | 7 Sep 2026     | **Region scope expanded to five geographies** (US, Europe, Australia, Asia Pacific, Middle East) with an authoritative in-scope catalogue in Section 6. **US is the only three-region geography; all others use a two-region distribution model.** Generalised the CVAL/DR co-location mechanism to all two-region geographies (new **PLC-010a**), reconciled REG-003, DR-002, PLC-002, and Section 2 strategic drivers. Region catalogue reaffirmed as a configurable item (REG-001). Australia and Asia Pacific back in scope; Japan East pending confirmation. |
@@ -212,6 +213,7 @@ v1 to v2.
 | **Quota pool / quota group**         | An Azure Quota Group moves unused quota onto a member subscription. Deploy-time checks that subscription’s **VM-family** vCPU and **total regional** vCPU, not the group limit. One subscription belongs to one group; each transfer is scoped to one region and one VM family (QUA-003, QUA-004). |
 | **Quota hoarding**                   | Governance practice of collecting default per-region quota into a family pool for controlled reallocation. |
 | **Seed record** (a.k.a. **placement seed**) | Authoritative customer record holding production, CVAL, and DR regional placement (PLC-003). *Distinct from a **seed reservation** (a count-0 capacity reservation, CAP-022) — "seed record/placement seed" is about **where** a customer is placed; "seed reservation" is a **zero-count reservation object** waiting to scale.* |
+| **Total customers (geography)** | Count of distinct customers with at least one environment (Prod, CVAL or DR) provisioned or being deployed in any region of a geography. Denominator of the γ distribution-fairness term; one live count per geography, shared by all environments (PLC-012, A.10). |
 | **SKU scope**                        | The SKU/VM-family × region × zone × subscription × environment combination managed by policy.              |
 | **AEP**                              | The provisioning/automation entry point that triggers region selection and deployment.                     |
 | **Source region**                    | A production region whose workload fails over on outage.                                                   |
@@ -912,6 +914,33 @@ that a new VM does not push any zone above the even share before placing
 it; without an explicit target the ε zone-diversity term only nudges
 scoring and cannot trigger a rebalance.)*
 
+**PLC-012 — Geography customer count (γ fairness denominator).** The
+distribution-fairness term γ in the placement scores (PS_Prod, PS_NonProd,
+PS_DR; PLC-007 live weighting) divides a region's environment customer
+count by `total_customers(g)`, defined as follows:
+
+-   **Definition:** the total number of customers in geography *g* — the
+    count of **distinct customers** (one seed record per customer, PLC-003)
+    with at least one environment (Prod, CVAL or DR) **provisioned or being
+    deployed** in any region of *g*.
+-   **Scope and unit:** a count (integer ≥ 0) calculated **per
+    geography**, so that environment distribution across the regions of a
+    geography stays fair. One count per geography is shared by all three
+    scores; only the numerator is environment-specific (the region's
+    Prod, CVAL or DR customer count).
+-   **Source and refresh:** derived live from the authoritative placement
+    state (seed records, DAT-002). When a new customer environment is
+    provisioned or is being deployed in any region of the geography, the
+    count is incremented. It is not a configurable constant or a forecast.
+-   **Zero rule:** when `total_customers(g) = 0`, **γ = 1** for every
+    region of *g* (a geography with no customers is perfectly fair).
+
+See Appendix A.10 for the formula. *(Rationale: without a defined
+denominator the γ term — weight 0.25 in the Calculation Logic Reference —
+could not be computed consistently; a geography-scoped count keeps the
+fairness signal comparable between candidate regions of the same
+geography.)*
+
 ## 12. Disaster Recovery Capacity Requirements
 
 **DR-001 — Single-region failure basis.** The default model plans for
@@ -1219,7 +1248,10 @@ families; CRGs/reservations; provider/consumer sharing relationships;
 allocated/associated VMs; quota pools + subscription assignments;
 buffers/policies; customer seed records; **source→destination DR index
 (DR-018)**; DR distribution plans; deployment intents; reconciliation
-runs; alerts/exceptions; audit events.
+runs; alerts/exceptions; audit events. *Derived value:* the per-geography
+customer count `total_customers(g)` (PLC-012) is computed from customer
+seed records and deployment intents; it is not stored as a configurable
+constant.
 
 **DAT-003 — Freshness metadata.** Every observation carries collection
 time, source, region, subscription, and status; derived readiness
@@ -1643,6 +1675,21 @@ subject to approval and Azure feasibility. Even distribution bounds
 per-zone failover exposure and keeps per-zone reservation sizing (CAP-023)
 balanced. See the Calculation Logic Reference for a worked three-zone
 example.
+
+**A.10 Geography customer count & γ fairness term (PLC-012)**
+
+    Total Customers(g)   = COUNT DISTINCT customers c
+                           where c has ≥ 1 environment (Prod, CVAL or DR)
+                           provisioned or being deployed in any region r ∈ g
+    Env Customers(r,env) = customers with environment env in region r     (prod / nonprod / dr customer count)
+    γ(r,env)             = 1                                               if Total Customers(g) = 0
+                         = Clamp( 1 − Env Customers(r,env) / Total Customers(g), 0, 1 )   otherwise
+
+*Rationale:* the denominator is one geography-level count, shared by
+PS_Prod, PS_NonProd and PS_DR; the numerator is the environment-specific
+count for the region being scored, and *g* is the geography of that region.
+The count increments when a new customer environment is provisioned or
+deployed in the geography (PLC-012).
 
 ## Appendix B — Worked Cost Examples (illustrative)
 

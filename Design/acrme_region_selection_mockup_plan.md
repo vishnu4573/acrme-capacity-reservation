@@ -38,7 +38,7 @@ The tool's primary purpose is to **validate and communicate the algorithm** — 
 | FR-09 | Tool highlights which factor most influenced the winning region ("α headroom drove this choice") |
 | FR-10 | Mock data is editable (region snapshot values) — changes re-trigger the full scoring run |
 | FR-11 | Tool supports all five geographies: US (3-region), EU, AU, APAC, ME (with cross-geo DR) |
-| FR-12 | Tool surface the `total_customers` design gap with a selectable denominator mode |
+| FR-12 | Tool shows `total_customers(g)` as the live geography count (PLC-012), read-only, with γ = 1 when it is zero |
 
 ### 1.2 Non-Functional Requirements
 
@@ -184,17 +184,11 @@ Both follow the same 2-region co-location pattern as EU. Pre-loaded with symmetr
 | D8s_v5 | 8 | ✅ |
 | D16s_v5 | 16 | ✅ |
 
-### 2.8 The `total_customers` Design Gap — UI Treatment
+### 2.8 `total_customers` — Decided Definition (PLC-012) and UI Treatment
 
-The `total_customers` denominator in the γ component is **undefined in the baseline** (documented open issue in all three source documents). The mockup exposes this ambiguity explicitly and gives the user a chooser:
+The γ denominator was decided on 7 Oct 2026 and recorded in baseline v2.5 (amended) as PLC-012 / A.10 `[Decided]`. `total_customers(g)` is the total number of customers in geography *g*: distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of *g*. It is one live count per geography, shared by PS_Prod, PS_NonProd and PS_DR, and it goes up when a new customer environment is provisioned or deployed. **γ = 1 when the count is zero.**
 
-| Mode | Denominator | Behaviour |
-|---|---|---|
-| **Live geography total** (default) | Sum of `prod_customer_count` across all Standard regions in the geography | Changes with every new placement; derived from snapshot — no external input |
-| **Policy constant** | Configurable integer (e.g. 20 for US, 15 for EU) | Static target; represents maximum intended customers per geography |
-| **Manual entry** | User types a value | Useful for reproducing the walkthrough examples exactly |
-
-A yellow annotation in the UI labels γ calculations with a footnote: _"⚠ total_customers is an unresolved design term — see baseline open issue."_
+The mockup shows this value read-only, per geography, beside the γ row. The earlier Constant and Manual modes are removed because the baseline defines the count as live, not configurable. A tooltip cites PLC-012.
 
 ---
 
@@ -205,7 +199,7 @@ A yellow annotation in the UI labels γ calculations with a footnote: _"⚠ tota
 ```
 α_component = Clamp(nonprod_crg.effective_free / prod_crg.quantity)
 β_component = Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)
-γ_component = Clamp(1 − prod_customer_count / total_customers)
+γ_component = 1 if total_customers(g) = 0 else Clamp(1 − prod_customer_count / total_customers(g))
 δ_component = Clamp(dr_crg.coverage_ratio)
 ε_component = Clamp(az_count / 3)
 
@@ -217,7 +211,7 @@ PS_Prod(r) = α×α_component + β×β_component + γ×γ_component + δ×δ_com
 ```
 α_component = Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)
 β_component = Clamp(nonprod_crg.quota_headroom / nonprod_crg.quota_limit)  [reuse NonProd quota pool]
-γ_component = Clamp(1 − prod_customer_count / total_customers)             [same γ — known design gap]
+γ_component = 1 if total_customers(g) = 0 else Clamp(1 − nonprod_customer_count / total_customers(g))   [PLC-012]
 δ_component = Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)     [duplicate of α — known design gap]
 ε_component = Clamp(az_count / 3)
 
@@ -231,7 +225,7 @@ PS_NonProd(r) = α×α_component + β×β_component + γ×γ_component + δ×δ_
 ```
 α_component = Clamp(dr_crg.free_slots / dr_crg.quantity)
 β_component = Clamp(dr_crg_quota_headroom / dr_quota_limit)
-γ_component = Clamp(1 − prod_customer_count / total_customers)
+γ_component = 1 if total_customers(g) = 0 else Clamp(1 − dr_customer_count / total_customers(g))
 δ_component = Clamp(dr_crg.coverage_ratio / dr_crg.dr_coverage_target)
 ε_component = Clamp(az_count / 3)
 
@@ -337,7 +331,7 @@ if |α + β + γ + δ + ε − 1.0| > 0.001:
 └─────────────────────────────────────────┘
 ```
 
-There is also a persistent **Policy Panel** (collapsible sidebar) available from any screen that exposes scoring weights (with live validation), `total_customers` mode, and the auto-increase threshold reference values.
+There is also a persistent **Policy Panel** (collapsible sidebar) available from any screen that exposes scoring weights (with live validation), the read-only `total_customers(g)` per geography (PLC-012), and the auto-increase threshold reference values.
 
 ### 4.2 Screen 1 — Customer & Workload Setup
 
@@ -526,7 +520,7 @@ Rationale:
     HCGateTable.tsx      ← Screen 2
     ScoringTable.tsx     ← Screens 3, 4, 5
     SeedRecord.tsx       ← Screen 6 + DR sizing panel
-    PolicyPanel.tsx      ← Collapsible sidebar: weight editor, total_customers mode
+    PolicyPanel.tsx      ← Collapsible sidebar: weight editor, total_customers(g) display
     ComponentBreakdown.tsx ← Stacked bar chart per component
   /app
     page.tsx             ← Main orchestration
@@ -563,7 +557,7 @@ All computation is synchronous and runs on state change — no async calls.
 The **Policy Panel** sidebar allows:
 
 1. **Weight editor**: α, β, γ, δ, ε sliders (0.00–1.00, step 0.01) with a live sum display. Weight sum validation runs on every change; error banner shown if out of tolerance.
-2. **total_customers mode**: radio buttons (Live Geography Total / Policy Constant / Manual Entry)
+2. **total_customers(g)**: read-only live count per geography (PLC-012); γ = 1 when zero
 3. **Region data editor**: expandable cards for each region with editable snapshot fields. All arithmetic in Screens 2–6 re-runs on field change.
 4. **Scenario loader**: dropdown that resets all mock data to a named scenario state.
 
@@ -573,7 +567,6 @@ The following known gaps from the source documents are **annotated inline**, not
 
 | Gap | Location in UI | Display Treatment |
 |---|---|---|
-| `total_customers` undefined | γ component row in scoring table | Yellow ⚠ icon with tooltip linking to the open issue description |
 | PS_NonProd δ duplicates α | δ row in NonProd scoring table | Blue ℹ icon: "Known design gap — δ mirrors α for NonProd. Baseline v2.4 does not yet resolve this." |
 | `dr_bootstrap_qty` is TBD | HC-6 gate row | Field shows default (configurable), annotation: "Baseline value is TBD per workload" |
 | `dr_coverage_target` is TBD | δ row in PS_DR table | Same annotation pattern |
@@ -599,7 +592,7 @@ This is **sufficient to exercise all formula paths** without overwhelming the UI
 
 | # | Question | Impact | Recommendation |
 |---|---|---|---|
-| OQ-1 | `total_customers` definition — which interpretation does the team want modelled as the **default** in the mockup? | γ values change materially | Default to "Live Geography Total" (sum of region_customer_counts); expose all modes via the chooser |
+| OQ-1 | `total_customers` definition | — | **Closed 7 Oct 2026:** live geography count, γ = 1 at zero (PLC-012, A.10) |
 | OQ-2 | PS_NonProd δ component — is the duplicate of α intentional or a spec gap to be resolved? | Affects NonProd scoring fidelity | Show duplicate as-is with annotation; flag as design gap for discussion |
 | OQ-3 | `dr_bootstrap_qty` concrete values — what should the mock data use? | HC-6 pass/fail depends on this | Use 40–60 vCPU range in mock data (lean, per baseline guidance ~5–20%); make configurable |
 | OQ-4 | `dr_coverage_target` concrete values — what normalization target for δ in PS_DR? | δ_component = coverage_ratio / target | Use 0.80 as starter in mock data (editable) |
@@ -617,7 +610,7 @@ This is **sufficient to exercise all formula paths** without overwhelming the UI
 - PS_Prod / PS_NonProd / PS_DR scoring
 - Prod → CVAL → DR sequential selection
 - CustomerSeedRecord + readiness state output
-- Policy Panel (weights, total_customers mode)
+- Policy Panel (weights, total_customers(g) display)
 - 6 pre-loaded demo scenarios
 - Design gaps annotated inline
 

@@ -38,7 +38,7 @@ A higher-rank source wins. If Microsoft Learn contradicts the baseline, do not s
 ### Step 3 — Research and tag every claim
 Apply the tag rules and check the open-items register in `references/evidence-and-gaps.md`. Hard rules:
 - Every Azure-behaviour claim carries a tag and, for `[Documented]`, a Learn URL or baseline code.
-- Any formula term without a defined source, scope, and data type is a **spec gap** — flag it as a blocker, never invent a definition (e.g. `total_customers` in γ).
+- Any formula term without a defined source, scope, and data type is a **spec gap** — flag it as a blocker, never invent a definition. (`total_customers` in γ was such a gap; it is now decided — PLC-012, A.10.)
 - Preview features (Capacity Reservation Sharing, DEP-001) are never a production dependency.
 - Prefer Microsoft Learn via `web_search` / `scrape_url_content`; record the URL and access date.
 

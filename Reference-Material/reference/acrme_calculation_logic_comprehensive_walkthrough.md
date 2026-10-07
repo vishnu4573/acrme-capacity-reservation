@@ -41,20 +41,20 @@ Think of each row as the current state of each office building before our custom
 
 | Region | Total Pool (vCPU) | Prod Already Used | NonProd Already Used | DR Earmark | Headroom Left | Existing Customers | Floors (AZs) |
 |---|---|---|---|---|---|---|---|
-| West US 3 | 500 | 120 | 80 | 60 | 240 | 8 of 20 ⚠️ | 3 |
-| Central US | 500 | 160 | 100 | 80 | 160 | 12 of 20 ⚠️ | 3 |
-| Canada Central | 500 | 80 | 60 | 32 | 328 | 5 of 20 ⚠️ | 2 |
+| West US 3 | 500 | 120 | 80 | 60 | 240 | 8 of 20 | 3 |
+| Central US | 500 | 160 | 100 | 80 | 160 | 12 of 20 | 3 |
+| Canada Central | 500 | 80 | 60 | 32 | 328 | 5 of 20 | 2 |
 
-> ⚠️ **"of 20"** — this `total_customers` denominator is an **undefined term** in the baseline. See the [Open Issue on `total_customers`](#️-open-issue--total_customers-in-the-γ-distribution-fairness-component) above. The value 20 is used here for illustrative arithmetic only.
+> **"of 20"** — 20 is `total_customers(US)`: the distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in the US geography (PLC-012, A.10) `[Decided]`. The numbers themselves are illustrative `[Assumed]`. See [`total_customers` — decided definition](#total_customers-in-the-γ-distribution-fairness-component--decided-plc-012) below.
 
 **EU Geography — 2 Standard buildings available:**
 
 | Region | Total Pool (vCPU) | Prod Already Used | NonProd Already Used | DR Earmark | Headroom Left | Existing Customers | Floors (AZs) |
 |---|---|---|---|---|---|---|---|
-| Switzerland North | 300 | 100 | 60 | 40 | 100 | 6 of 15 ⚠️ | 3 |
-| Sweden Central | 300 | 80 | 50 | 32 | 138 | 4 of 15 ⚠️ | 3 |
+| Switzerland North | 300 | 100 | 60 | 40 | 100 | 6 of 15 | 3 |
+| Sweden Central | 300 | 80 | 50 | 32 | 138 | 4 of 15 | 3 |
 
-> ⚠️ **"of 15"** — same undefined `total_customers` term. See the [Open Issue](#️-open-issue--total_customers-in-the-γ-distribution-fairness-component) above.
+> **"of 15"** — 15 is `total_customers(EU)`, the Europe geography count under the same rule (PLC-012). Illustrative value `[Assumed]`.
 
 **Minimum floor (safety net — always kept free regardless):**
 
@@ -84,52 +84,37 @@ All five add to exactly **1.0 (100%)**. They are policy defaults stored in confi
 
 ---
 
-### ⚠️ OPEN ISSUE — `total_customers` in the γ (Distribution Fairness) Component
+### `total_customers` in the γ (Distribution Fairness) Component — DECIDED (PLC-012)
 
 The distribution fairness component γ appears in all three scoring formulas (PS\_Prod, PS\_NonProd, PS\_DR) as:
 
 ```
-γ_component = 1 - (region_customer_count / total_customers)
+γ_component = 1                                              if total_customers(g) = 0
+            = Clamp(1 - region_env_customer_count / total_customers(g))   otherwise
 ```
 
-For example, in the US snapshot below, the γ calculation for Central US shows `1 - (12/20) = 0.40`, where **12** is the number of customers already placed in Central US and **20** is `total_customers`.
+For example, in the US snapshot above, the γ calculation for Central US shows `1 - (12/20) = 0.40`, where **12** is the number of customers already placed in Central US for the environment being scored and **20** is `total_customers(US)`.
 
-#### What is `total_customers`?
+#### What is `total_customers`? `[Decided]`
 
-**It is undefined.** The Requirements Baseline v2.4 does not define this term — not in the Terminology (Section 4), not in Appendix A (Core Formulas), not in the Configurable Items Register (Section 22), and not in the Placement requirements (Section 11). The Calculation Logic Reference uses it in the PS\_Prod, PS\_NonProd, and PS\_DR formulas (marked `[Decided]`) but never specifies its source, scope, or refresh mechanism.
+The design owner decided this on 7 Oct 2026. It is recorded in Requirements Baseline v2.5 (amended) as **PLC-012**, Section 4 term *Total customers (geography)*, and Appendix **A.10**:
 
-#### Why does this matter?
+| Aspect | Decision |
+|---|---|
+| **Definition** | Total number of customers in a geography: the count of distinct customers (one seed record each, PLC-003) with at least one environment (Prod, CVAL or DR) in any region of the geography. |
+| **Scope and unit** | A count (integer ≥ 0), calculated per **geography** so that environment distribution across that geography's regions stays fair. One count per geography is shared by PS\_Prod, PS\_NonProd and PS\_DR. Only the numerator is environment-specific. |
+| **Source and refresh** | Live, derived from placement state (seed records and deployment intents, DAT-002). When a new customer environment is provisioned or is being deployed in any region of the geography, the count goes up. It is not a configurable constant or a forecast, so there is no Section 22 item. |
+| **Zero rule** | γ = 1 when the count is zero. |
 
-The value of `total_customers` fundamentally changes what γ measures and how it behaves:
+#### Why the region counts don't add up to the total
 
-| If `total_customers` means… | γ behaviour | Problem |
-|---|---|---|
-| **All customers with a seed record** (actual, current count across ALL regions in the geography) | γ measures the **share of existing customers** in this region vs the total estate. It changes with every new placement. | This is a **relative share** signal — it gets weaker as the estate grows (at 1000 customers, adding 1 to a region barely moves γ). Works for fairness but becomes **insensitive at scale**. |
-| **A forecast / target** (expected future customer count — a planning number) | γ measures **how full this region is relative to a capacity plan**. It stays meaningful at scale because the denominator is a planning target, not an ever-growing count. | **Where does the forecast come from?** Who sets it? How often is it updated? Is it per-geography or global? The baseline does not say. This is the core of your question — assuming a known customer target presumes we know demand, but **no two customers are alike**. |
-| **A configurable policy constant** (e.g. "20" as a soft target per geography) | γ becomes a **governance lever** — the team decides how many customers a geography should absorb before scoring penalises concentration. | Must be defined, versioned, and documented in the Configurable Items Register (Section 22). Currently absent. |
-| **Sum of region\_customer\_counts** (i.e., the total across the candidate set) | γ computes a **simple proportion** of the geography's customers in each region. This is always fresh (derived from the snapshot) and needs no external input. | Mathematically valid but potentially a different design intent than "fairness against a target." |
+The region column counts customers placed in that region. One customer can have environments in several regions of a geography (for example, Prod in one region and CVAL + DR in another) but counts **once** in `total_customers(g)`. The geography count also includes customers whose environment is still being deployed. So the region counts do not need to sum to the total, but no single region count can exceed it. `[Derived]`
 
-#### What this walkthrough assumes (and why it may be wrong)
+#### Points not settled by the decision `[Assumed]`
 
-The worked examples in this document use **20** as `total_customers` for US and **15** for EU. These numbers were chosen to make the arithmetic illustrative. They could represent:
-
-- The count of distinct Customer IDs with an approved seed record in that geography at snapshot time, OR
-- A planning target, OR
-- An arbitrary example value
-
-**The walkthrough does not know which interpretation is correct, because the baseline does not say.** The γ component arithmetic shown below is mechanically accurate for any definition — the formula works the same way regardless — but the *meaning* of the score depends entirely on what `total_customers` actually is.
-
-#### What needs to happen
-
-This is a **design gap** that must be resolved before the scoring engine can be implemented:
-
-1. **Define `total_customers`** — add it to Section 4 (Terminology) and Appendix A of the Requirements Baseline v2.4.
-2. **Specify its source** — is it a snapshot field (derived from seed records at scoring time), a configurable policy constant, or a forecast input?
-3. **Specify its scope** — is it per-geography, per-environment, or global?
-4. **Add it to the Configurable Items Register** (Section 22) if it is a policy input.
-5. **Validate with a POC** — does γ actually spread customers evenly? At what estate size does it become too weak to influence scoring? Should a different fairness metric (e.g., Gini coefficient, max-region cap) replace or complement it?
-
-> **Bottom line:** The examples below demonstrate the scoring *mechanics* faithfully. But the `total_customers` denominator is an **unresolved design question**, not a settled parameter. Treat the absolute γ values as illustrative until the baseline defines this term.
+- **Decrement:** the decision only says the count goes up. These documents assume a customer leaves the count when their last environment in the geography is retired through the decommission workflow (CAP-010).
+- **Cross-geography DR (Middle East → Europe, PLC-010b):** the geography is the geography of the region being scored, so Europe candidate regions use `total_customers(Europe)`. Whether a Middle East customer's DR environment in Europe also adds to the Europe count has not been decided.
+- **Sensitivity at scale:** with a live count, each new placement moves γ less as the geography grows. A POC should confirm γ still spreads customers evenly at production estate sizes.
 
 ---
 

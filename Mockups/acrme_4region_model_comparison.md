@@ -118,7 +118,7 @@ DR_req = MAX over all source_regions of (customers_in_source × vCPU_per_custome
 |-----------|------------------------|---------------------|
 | **α (Efficient Free)** | Same formula | Same formula |
 | **β (Quota Headroom)** | Same formula | Same formula |
-| **γ (Distribution Fairness)** | `1 - (customers_in_region / total_customers)` normalized over **2 regions** | `1 - (customers_in_region / total_customers)` normalized over **4 regions** |
+| **γ (Distribution Fairness)** | `1 - (customers_in_region / total_customers(g))` normalized over **2 regions** | `1 - (customers_in_region / total_customers(g))` normalized over **4 regions** — `total_customers(g)` = live geography count, γ = 1 at zero (PLC-012) |
 | **δ (DR Coverage)** | CVAL region scores for DR too | **Separate DR scoring** |
 | **ε (Zone Diversity)** | Same formula | Same formula |
 

@@ -70,8 +70,10 @@ However, **α** and **δ** have **different semantic meanings** per environment 
 **Semantic (same for all environments):**
 
 ```
-γ = 1 - (customer_count_in_this_region / total_customers)
+γ = 1 - (customer_count_in_this_region / total_customers(g))     # γ = 1 if total_customers(g) = 0
 ```
+
+**Denominator `[Decided]` (PLC-012, A.10):** `total_customers(g)` = distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of the scored region's geography *g*; one live count per geography shared by all three scores. It goes up whenever a new customer environment is provisioned or deployed in the geography.
 
 | Environment | γ Measures | Formula |
 |-------------|-----------|---------|
@@ -79,7 +81,7 @@ However, **α** and **δ** have **different semantic meanings** per environment 
 | **PS_NonProd** | NonProd region fairness | `1 - (consumer_count_nonprod / total_customers)` |
 | **PS_DR** | DR region fairness | `1 - (consumer_count_dr / total_customers)` |
 
-**Why γ = 0.25:** Equal to capacity in importance. As a region accumulates customers its γ score drops, redirecting future placements away from it until all regions reach roughly equal count (steady-state expected count per region per env type = `total_customers / 3`). Increase γ toward 0.35 if score convergence results in uneven loading; decrease toward 0.15 if capacity constraints should dominate fairness.
+**Why γ = 0.25:** Equal to capacity in importance. As a region accumulates customers its γ score drops, redirecting future placements away from it until all regions reach roughly equal count (steady-state expected count per region per env type ≈ `total_customers(g) / number of regions in g`). Increase γ toward 0.35 if score convergence results in uneven loading; decrease toward 0.15 if capacity constraints should dominate fairness.
 
 **Note:** The PRR (Section 28) updates Distribution to use **demand units** rather than customer count: `1 - (Region_Assigned_Demand / Total_Assigned_Demand)`.
 

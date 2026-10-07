@@ -203,7 +203,7 @@ Five new/changed sheets on top of the existing workbook:
 
 ## 9. Open issues / gaps — need your ruling before this is authoritative
 
-Flagged rather than assumed (consistent with prior `total_customers` handling):
+Flagged rather than assumed:
 
 1. **Quota-group ↔ environment scope.** QUA-004 prefers **one** governed quota group covering **prod + non-prod + DR together** (max flexibility), but ENV-003 forbids **capacity** sharing across prod/DR. Confirm the intended split: *quota pooled across environments while reservations stay separate* — the model assumes this, but it should be decided, not inferred.
 2. **SKU → quota-family mapping source.** The map in Section 3 is derived from SKU naming (`Dadsv5`, `Eadsv5`). Is there an authoritative Azure family table we should ingest, or is naming-derived acceptable for the mockup? (169 distinct SKUs in the data.)
@@ -211,7 +211,7 @@ Flagged rather than assumed (consistent with prior `total_customers` handling):
 4. **Over-allocation at freeze (CAP-018).** On freeze, do we lock **guaranteed = reserved_free** only, or allow committing into the over-allocation allowance? Affects the `_after` math.
 5. **Zone selection within the frozen region.** Capacity is zonal (CAP-011). A freeze picks a **zone** inside the environment’s zonal CRG (one reservation per VM size per zone, CAP-023). A no-zone group is only for a SKU that cannot take a zonal reservation, and Azure pins that group to one zone.
 6. **Consumer-subscription quota (QUA-013, documented).** The deploying subscription must hold its own quota, including when the reservation is shared. The Quota Group limit is not the deploy-time check. Sharing remains Preview, so production placement uses a reservation in the deploying subscription (CAP-013).
-7. *(Carried over)* **`total_customers`** in the γ distribution term remains undefined in v2.4 — unaffected by this change but still open.
+7. *(Closed 7 Oct 2026)* **`total_customers`** in the γ distribution term is now decided: the live count of customers in the geography, γ = 1 when zero (baseline v2.5 amended, PLC-012, A.10). This change does not affect it.
 
 ---
 

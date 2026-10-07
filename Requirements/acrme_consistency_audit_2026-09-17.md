@@ -72,6 +72,6 @@ While the Calculation Logic Reference already sized DR with **max-not-sum** (A.6
 
 ## Known open design gaps (not inconsistencies — noted for awareness)
 
-- **`total_customers` denominator** in the γ (fairness) term is not defined in the baseline. Already captured as an OPEN ISSUE in `Reference-Material/reference/acrme_calculation_logic_comprehensive_walkthrough.md` (prior commit) — left as-is.
+- **`total_customers` denominator** in the γ (fairness) term is not defined in the baseline. Already captured as an OPEN ISSUE in `Reference-Material/reference/acrme_calculation_logic_comprehensive_walkthrough.md` (prior commit) — left as-is. **Resolved 7 Oct 2026:** defined in baseline v2.5 (amended) as PLC-012 / A.10 (live geography count; γ = 1 at zero).
 - **PS_NonProd design-of-record** intentionally combines α and δ signal (0.45); flagged in the PRR with a corrected pilot variant — intentional, not an error.
 - **Scenario 15** (fixed `dr_ratio`) is now **RETIRED** and every live HC-6/HC-7 formula has been converted to max-not-sum (see Finding 3). Historical rationale retained by design.

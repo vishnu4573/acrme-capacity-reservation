@@ -276,7 +276,7 @@ def build_readme(wb):
         "Components are the minimum across the active SKU lines (one thin SKU binds the region).",
         "α Prod = NonProd reserved-free ÷ Prod reserved. α CVAL = NonProd free ÷ NonProd reserved. α DR = DR free ÷ DR reserved.",
         "β = family quota available ÷ family quota limit.",
-        "γ = 1 − customers in the region ÷ total_customers. total_customers is not defined in v2.4; Policy holds an assumed value of 100.",
+        "γ = 1 − customers in the region ÷ total_customers(g), the live count of customers in the region's geography (PLC-012, A.10). γ = 1 when that count is zero.",
         "δ Prod = DR coverage ratio. δ CVAL repeats α. That duplicate is the documented design of record, not a new metric.",
         "δ DR = coverage ÷ the bootstrap fraction, clamped to 1.",
         "ε = availability-zone count ÷ 3.",
@@ -350,12 +350,15 @@ def build_policy(wb):
         (13, "HC-2 capacity-floor multiplier", 1, "0"),
         (14, "HC-3 minimum quota left after the placement (cores)", 20, "#,##0"),
         (15, "DR bootstrap fraction of requested cores (DR-007)", 0.10, "0.00"),
-        (17, "total_customers (assumed — undefined in v2.4)", 100, "#,##0"),
     ]
     for row, label, value, fmt in knobs:
         ws.cell(row, 1, label).font = BOLD
         cell = ws.cell(row, 2, value)
         paint(cell, IN, fmt)
+    ws["A17"] = "total_customers source"
+    ws["A17"].font = BOLD
+    ws["B17"] = "Live geography count (PLC-012); γ = 1 when zero"
+    paint(ws["B17"], GREY, align=LEFT)
     ws["A16"] = "Policy version"
     ws["A16"].font = BOLD
     ws["B16"] = "v2.4-aligned-mock"
@@ -731,7 +734,9 @@ def component_block(row, kind):
             f'Line_Check!{line_col(i, "q_avail")}{row}/Line_Check!{line_col(i, "q_limit")}{row})'
         ),
     )
-    gamma = f'IF(Policy!$B$17<=0,0,MAX(0,MIN(1,1-H{row}/Policy!$B$17)))'
+    # PLC-012 / A.10: live per-geography customer count shared by all scores; γ = 1 when it is zero
+    total = f'SUMIFS($H$5:$H$18,$C$5:$C$18,C{row})'
+    gamma = f'IF({total}=0,1,MAX(0,MIN(1,1-H{row}/{total})))'
     if kind == "prod":
         delta = f"MAX(0,MIN(1,I{row}))"
     elif kind == "cval":
@@ -1535,7 +1540,7 @@ def build_calculations(wb):
         [
             ("α capacity headroom", "Policy!B4", "NonProd reserved-free ÷ Prod reserved", "CVAL: NonProd free ÷ NonProd reserved. DR: DR free ÷ DR reserved."),
             ("β quota headroom", "Policy!B5", "Quota available ÷ family quota limit", "Same on CVAL and DR. The divisor is the family limit, not the regional vCPU cap."),
-            ("γ fairness", "Policy!B6", "1 − customers in the region ÷ total_customers", "Same. total_customers is Policy!B17 (assumed; v2.5 does not define the source)."),
+            ("γ fairness", "Policy!B6", "1 − customers in the region ÷ total_customers", "Same. total_customers(g) = sum of Customers over the geography's regions on the score sheet (live, PLC-012); γ = 1 when zero."),
             ("δ DR readiness", "Policy!B7", "DR coverage ratio on the region, clamped to 1", "CVAL repeats α. DR is coverage ÷ bootstrap, clamped to 1."),
             ("ε zone diversity", "Policy!B8", "Availability zones ÷ 3, clamped to 1", "Same"),
         ],

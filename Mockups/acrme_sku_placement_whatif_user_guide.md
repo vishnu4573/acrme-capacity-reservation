@@ -166,7 +166,7 @@ To test a single-SKU scenario, clear lines 2–8 (leave B9:C15 blank) and update
 - **CRG scope is regional** (`crg-…-reg`); per-AZ CRGs (CAP-023, `crg-…-az1`) are a later increment.
 - **Freeze & logical lock** (the `LOCKED` state + `Allocation_Ledger`, logical-vs-physical CAP-002 distinction) is **Phase 3** — not in this file.
 - **SKU→family map is naming-derived**; a canonical Azure family table would replace `SKU_Family_Map`.
-- `total_customers` (γ distribution term) remains undefined in v2.4 — not used by this model, still an open baseline issue.
+- `total_customers` (γ distribution term) is not used by this model. It is now defined as the live count of customers in the geography, with γ = 1 at zero (PLC-012, A.10).
 
 ---
 

@@ -33,7 +33,7 @@ One tag per claim. The set unifies `Agents.md` (Documented/Tested/Derived/Assume
 
 ## Azure facts locked by the baseline
 
-Current as of baseline v2.5 (24 Sep 2026). Re-read the baseline if its version moved.
+Current as of baseline v2.5 (24 Sep 2026; amended 7 Oct 2026). Re-read the baseline if its version moved.
 
 | Fact | Code | Tag |
 |---|---|---|
@@ -52,6 +52,7 @@ Current as of baseline v2.5 (24 Sep 2026). Re-read the baseline if its version m
 | Middle East DR is cross-geo into a weighted-selected Europe Standard region | DEC-001, DR-020, PLC-010b, A-ME1 | Decided (residency clearance Assumed) |
 | Reconciliation reference interval 6 min, configurable | CAP-006 | Configurable |
 | No multi-cloud; all-of-Azure-down out of scope | §2, §24 | Decided |
+| γ denominator `total_customers(g)` = distinct customers with any env (Prod/CVAL/DR) provisioned or deploying in geography g; one live count shared by PS_Prod/PS_NonProd/PS_DR; γ = 1 when the count is 0 | PLC-012, A.10 | Decided (7 Oct 2026; decrement on decommission and cross-geo DR counting Assumed) |
 
 ## Open-items register
 
@@ -72,7 +73,7 @@ Any output touching these must flag them, not resolve them silently.
 | DEC-002 | DR drill duration & failback | Open | Support both extended run and early failback |
 | DEC-003 | Geography-exception approver | Open | Model the approval as a pluggable step |
 | DEP-001 | Sharing Preview → GA | External | Design must work with and without sharing |
-| GAP-γ | `total_customers` in γ = 1 − prod_customer_count / total_customers has no defined source, scope, or type | Spec gap | γ term (and any score using it) is partial; see `acrme_calculation_logic_comprehensive_walkthrough.md` OPEN ISSUE |
+| GAP-γ | `total_customers` in γ | **Closed 7 Oct 2026** — decided as PLC-012 / A.10 | Cite PLC-012; see the locked-facts table above |
 | GAP-JPE | Japan East in-scope status | Pending confirmation | Treat as configurable catalogue entry |
 | GAP-SAE | Saudi Arabia East (future region, GA target Q4 2026 per mockup builder) | `[Assumed]` timing | Keep future-dated; do not place customers |
 

@@ -108,7 +108,7 @@ PS = 0.30α + 0.20β + 0.25γ + 0.15δ + 0.10ε
 | δ | DR coverage ratio | same value as α | coverage ÷ bootstrap fraction, clamped at 1 |
 | ε | availability zones ÷ 3 | same | same |
 
-`total_customers` is an assumed 100 on Policy!B17. Baseline v2.4 does not define that source. Weights must sum to 1.00 or the run is `POLICY_BLOCKED`. A tie goes to the earlier region in the catalogue.
+`total_customers(g)` is the live count of customers in the region's geography (baseline v2.5 amended, PLC-012, A.10). The workbook computes it as the sum of the Customers column over that geography's regions on each score sheet. γ = 1 when the count is zero. Policy!B17 shows the source and is read-only. Weights must sum to 1.00 or the run is `POLICY_BLOCKED`. A tie goes to the earlier region in the catalogue.
 
 ### Readiness
 

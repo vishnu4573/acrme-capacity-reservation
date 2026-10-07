@@ -65,7 +65,7 @@ The workbook contains 10 sheets in processing order:
 | 1 | **How_To_Use** | Navigation guide and colour legend | No |
 | 2 | **Usage_Source** | Raw source data imported from `SKU_USage.xlsx` and `sku_usage_prod_v1.xlsx` | No |
 | 3 | **Setup** | Scenario inputs: geography, SKU, VM count, customer ID | **Yellow cells only** |
-| 4 | **Policy** | Weight parameters, headroom thresholds, total_customers mode | **Yellow cells only** |
+| 4 | **Policy** | Weight parameters, headroom thresholds, total_customers source (read-only, PLC-012) | **Yellow cells only** |
 | 5 | **Capacity_Usage** | Capacity and quota state for all 14 ACRME regions | **Specific columns** (see §5.1) |
 | 6 | **HC_Gate** | Hard-constraint eligibility checks for each region | No — all formulas |
 | 7 | **Scoring_Prod** | Weighted placement scoring for the Prod environment | No — all formulas |
@@ -676,14 +676,12 @@ Fraction of production quota still available. A value of 1.0 means no quota is u
 #### γ_raw (K) — Distribution Fairness
 
 ```excel
-=IFERROR(1 - Capacity_Usage!U{r} / F{r}, 0)
+=IF(F{r}=0, Policy!$B$11, 1 - Capacity_Usage!U{r} / F{r})
 ```
 
-`1 − (Cust Count / total_customers_for_geo)`
+`1 − (Cust Count / total_customers(g))`, where `F{r}` on the scoring sheet is `total_customers(g)` = `SUMIFS(Capacity_Usage!U, Capacity_Usage!C, <this region's geography>)`.
 
-Wait — the formula uses `F{r}` (Prod Reserved) as the denominator, **not** a total_customers value. This is actually `1 − (Cust Count / Prod Reserved)`, which approximates how saturated the region is relative to its capacity size.
-
-> **Design note:** The `total_customers` variable (referenced in Policy!B10–B11) is not yet resolved in the baseline (see §9). The current formula uses Prod Reserved as a normalising denominator, which gives a per-vCPU saturation ratio. A region with 150 customers and 154,178 Prod Reserved vCPU (East US 2) scores: `1 − 150/154,178 ≈ 0.999` — very high, because Prod Reserved dwarfs the customer count. This is a known gap documented in the design.
+> **Decided (baseline v2.5 amended, PLC-012 / A.10):** `total_customers(g)` is the total number of customers in the geography: customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of that geography. It is a live count, shared by Scoring_Prod, Scoring_CVAL and Scoring_DR. When it is zero, γ = 1 (Policy!B11). The workbook has one Cust Count per region, so the geography sum stands in for the distinct-customer count. Example: US = 226 customers, so East US 2 (150 customers) scores `1 − 150/226 ≈ 0.34`.
 
 #### γ_c (L)
 
@@ -921,15 +919,14 @@ Sum = 1.00 ✓
 | B15 | Min Prod headroom vCPU | 20 | Quota buffer required after Prod deployment (HC-3 Prod condition 2) |
 | B16 | Min NonProd headroom vCPU | 20 | Quota buffer required after NonProd deployment (HC-3 NonProd condition 2) |
 
-### total_customers Mode (B10:B11, D11:E15)
+### total_customers Source (B10:B11) — PLC-012
 
-| Cell | Parameter | Values |
+| Cell | Parameter | Value |
 |------|-----------|--------|
-| B10 | Mode selector | 1 = Live / geography sum of Cust Count; 2 = Constant from table; 3 = Manual |
-| B11 | Manual total_customers | Numeric — used when B10 = 3 |
-| D11:E15 | Geography → Constant table | Per-geography constants — used when B10 = 2 |
+| B10 | total_customers source | `Live geography count (PLC-012)`, read-only. The Constant and Manual modes were removed because the baseline defines the count as live, not configurable. |
+| B11 | γ when total_customers = 0 | `1`, the zero rule from PLC-012 |
 
-> **Note:** In the current workbook, the γ_raw formula uses `Prod Reserved` as its denominator rather than `total_customers` (see §9). The B10/B11 mode selector is present in the policy design but is not yet wired into the Scoring sheet γ formula.
+Scoring sheet column F holds `total_customers(g)` for each region; γ_raw (column K) uses it.
 
 ---
 
@@ -937,12 +934,10 @@ Sum = 1.00 ✓
 
 These are **documented**, expected limitations of the v2.4 mockup — not bugs.
 
-### 1. total_customers Not Wired Into γ_raw
+### 1. total_customers — resolved (PLC-012)
 
-**Expected design:** γ_raw = `1 − (Cust Count / total_customers_for_geo)`, where `total_customers` is fetched from Policy (B10–B11) or computed as a geography sum.  
-**Current state:** γ_raw uses `Prod Reserved` as the denominator: `1 − U{r}/F{r}`. Because Prod Reserved (O(10⁵) vCPU) is orders of magnitude larger than Cust Count (O(1)–O(150)), γ_c is always near 1.0 for all regions, making γ effectively a constant and not a discriminating factor in placement.  
-**Impact:** Placement decisions are driven by α, β, δ, and ε. Distribution fairness is not yet a live differentiator.  
-**Action:** Define and agree `total_customers` per geography (Policy!B10–B11 mode), then update the γ_raw formula accordingly.
+**Design:** γ_raw = `1 − (Cust Count / total_customers(g))`, with `total_customers(g)` the live geography count (scoring column F) and γ = 1 when it is zero.  
+**Remaining simplification:** the workbook has a single Cust Count per region, not one per environment. So all three scoring sheets use the same numerator, and the geography sum stands in for the distinct-customer count. A customer with environments in two regions is counted twice here. `[Assumed]`
 
 ### 2. δ Duplicates α in Scoring_CVAL
 

@@ -196,7 +196,7 @@ rows=[
  ("2. Usage_Source — the REAL aggregated usage by region from the uploaded files (read-only provenance), with the "
   "geography roll-up and which regions fold in.",None),
  ("3. Setup — pick Geography, SKU, VM count, optional customer-supplied Prod region (required for Middle East), Customer ID.",None),
- ("4. Policy — the five weights (sum=1.0), total_customers mode, DR bootstrap / target, min headroom floors.",None),
+ ("4. Policy — the five weights (sum=1.0), total_customers source (live, PLC-012), DR bootstrap / target, min headroom floors.",None),
  ("5. Capacity_Usage — the ACRME catalogue regions with distributed usage + a Class column (Standard / Restricted). "
   "Yellow = editable; grey = computed; green Class cell = Restricted (Middle East).",None),
  ("6. HC_Gate — HC-3 / HC-6 / HC-7 pass/fail and eligibility per region.",None),
@@ -224,7 +224,7 @@ rows=[
   "exercised. Saudi Arabia East is a FUTURE REGION (not yet GA; Microsoft target Q4 2026, Eastern Province; no real "
   "usage data will exist until launch). UAE North is GA but absent from ACRME source data. "
   "Japan East (Asia Pacific) is 'pending' in the catalogue and is excluded.",None,SYNFILL),
- ("• total_customers is undefined in baseline v2.4 — mode selector on Policy (Live/Constant/Manual). γ values illustrative.",None,WARNFILL),
+ ("• total_customers(g) = live count of customers in the geography (PLC-012, A.10); γ = 1 when it is zero. Cust Count values are illustrative.",None),
  ("• PS_NonProd δ duplicates its α (baseline design-of-record). DR bootstrap / target are configurable placeholders.",None,WARNFILL),
 ]
 r=3
@@ -337,19 +337,17 @@ for i,(n,v) in enumerate(weights):
     lbl(pol,f"A{2+i}",n); inp(pol,f"B{2+i}",v)
 lbl(pol,"A7","Weight sum"); pol["B7"]="=SUM(B2:B6)"; pol["B7"].font=BOLD; pol["B7"].alignment=CTR
 lbl(pol,"A8","Validation"); pol["B8"]='=IF(ABS(B7-1)<=0.001,"VALID","INVALID — must sum to 1.0")'; pol["B8"].alignment=CTR
-lbl(pol,"A10","total_customers mode (1=Live 2=Constant 3=Manual)"); inp(pol,"B10",1)
-lbl(pol,"A11","Manual total_customers"); inp(pol,"B11",300)
+lbl(pol,"A10","total_customers source"); pol["B10"]="Live geography count (PLC-012)"; pol["B10"].border=BORDER
+lbl(pol,"A11","γ when total_customers = 0"); pol["B11"]=1; pol["B11"].border=BORDER
 lbl(pol,"A13","DR bootstrap qty (vCPU)"); inp(pol,"B13",40)
 lbl(pol,"A14","DR coverage target"); inp(pol,"B14",0.80)
 lbl(pol,"A15","Min Prod headroom (vCPU)"); inp(pol,"B15",20)
 lbl(pol,"A16","Min NonProd headroom (vCPU)"); inp(pol,"B16",20)
 lbl(pol,"A17","Min DR headroom (vCPU)"); inp(pol,"B17",16)
-pol["D10"]="Geography"; pol["E10"]="Constant"
-for c in ("D10","E10"): pol[c].font=WHITEB; pol[c].fill=HEADFILL; pol[c].alignment=CTR
-consts=[("US",150),("EU",90),("Australia",40),("Asia Pacific",50),("Middle East",10)]
-for i,(g,v) in enumerate(consts):
-    pol.cell(row=11+i,column=4,value=g).border=BORDER
-    pol.cell(row=11+i,column=5,value=v).border=BORDER
+pol["D10"]=("total_customers(g) = customers in geography g with any environment provisioned or being deployed "
+            "(baseline v2.5 amended, PLC-012 / A.10). Live, not configurable. Workbook stand-in: sum of Cust Count over the geography's regions.")
+pol["D10"].font=Font(italic=True,color="808080",size=9); pol.merge_cells("D10:H11")
+pol["D10"].alignment=Alignment(wrap_text=True,vertical="top")
 pol.conditional_formatting.add("B8",CellIsRule(operator="equal",formula=['"VALID"'],fill=green))
 pol.conditional_formatting.add("B8",FormulaRule(formula=['LEFT(B8,7)="INVALID"'],fill=red))
 
@@ -426,8 +424,8 @@ hc.column_dimensions["A"].width=20
 
 # ============================================================ Scoring builder
 def total_cust_formula(cur):
-    return (f'=IF(Policy!$B$10=1,SUMIFS(Capacity_Usage!$U${FIRST}:$U${LAST},Capacity_Usage!$C${FIRST}:$C${LAST},'
-            f'Capacity_Usage!C{cur}),IF(Policy!$B$10=2,VLOOKUP(Capacity_Usage!C{cur},Policy!$D$11:$E$15,2,FALSE),Policy!$B$11))')
+    # PLC-012: live geography count, shared by Prod/CVAL/DR scoring (no constant/manual override)
+    return f'=SUMIFS(Capacity_Usage!$U${FIRST}:$U${LAST},Capacity_Usage!$C${FIRST}:$C${LAST},Capacity_Usage!C{cur})'
 
 def build_scoring(name,alpha_num,alpha_den,beta_num,beta_den,delta_expr,elig_col,scope_ref,exclude_prod,title):
     s=wb.create_sheet(name); s.sheet_view.showGridLines=False
@@ -452,7 +450,7 @@ def build_scoring(name,alpha_num,alpha_den,beta_num,beta_den,delta_expr,elig_col
         s.cell(row=xr,column=8,value=f"=MIN(MAX(G{xr},0),1)")
         s.cell(row=xr,column=9,value=f"=IFERROR(Capacity_Usage!{beta_num}{cur}/Capacity_Usage!{beta_den}{cur},0)")
         s.cell(row=xr,column=10,value=f"=MIN(MAX(I{xr},0),1)")
-        s.cell(row=xr,column=11,value=f"=IFERROR(1-Capacity_Usage!U{cur}/F{xr},0)")
+        s.cell(row=xr,column=11,value=f"=IF(F{xr}=0,Policy!$B$11,1-Capacity_Usage!U{cur}/F{xr})")
         s.cell(row=xr,column=12,value=f"=MIN(MAX(K{xr},0),1)")
         s.cell(row=xr,column=13,value="=IFERROR("+delta_expr.format(cur=cur,xr=xr)[1:]+",0)")
         s.cell(row=xr,column=14,value=f"=MIN(MAX(M{xr},0),1)")

@@ -434,22 +434,24 @@ both invalid-sum directions, IEEE 754 rounding tolerance, and the tolerance boun
 ```text
 PS_Prod(r)    = 0.30·Clamp(nonprod.effective_free / prod.quantity)
               + 0.20·Clamp(prod.quota_headroom / prod.quota_limit)
-              + 0.25·Clamp(1 - prod_customer_count / total_customers)
+              + 0.25·Clamp(1 - prod_customer_count / total_customers(g))
               + 0.15·Clamp(dr.coverage_ratio)
               + 0.10·Clamp(az_count / 3)
 
 PS_NonProd(r) = 0.30·Clamp(nonprod.effective_free / nonprod.quantity)
               + 0.20·Clamp(nonprod.quota_headroom / nonprod.quota_limit)
-              + 0.25·Clamp(1 - nonprod_customer_count / total_customers)
+              + 0.25·Clamp(1 - nonprod_customer_count / total_customers(g))
               + 0.15·Clamp(nonprod.effective_free / nonprod.quantity)
               + 0.10·Clamp(az_count / 3)
 
 PS_DR(r)      = 0.30·Clamp(dr.free_slots / dr.quantity)
               + 0.20·Clamp(dr.quota_headroom / dr.quota_limit)
-              + 0.25·Clamp(1 - dr_customer_count / total_customers)
+              + 0.25·Clamp(1 - dr_customer_count / total_customers(g))
               + 0.15·min(1.0, dr.coverage_ratio / dr_ratio_target)
               + 0.10·Clamp(az_count / 3)
 ```
+
+**γ denominator (PLC-012, A.10) `[Decided]`:** `total_customers(g)` is the count of distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of the scored region's geography *g*. It is one live count per geography, shared by all three scores. **γ = 1 when it is zero.**
 
 **Note on the PS_DR δ term:** `dr.coverage_ratio` is `dr.quantity / Destination_DR_Requirement(region)`, where `Destination_DR_Requirement(region) = MAX(source portions)` (max-not-sum, A.6/DR-017). The `dr_ratio_target` divisor here is only a **configurable normalization reference for the coverage-health signal** — it is **not** the retired fixed 30–40% DR-to-Prod sizing ratio (Calc Logic Reference Scenario 15 → 17). DR sizing itself uses max-not-sum, never a fixed ratio.
 

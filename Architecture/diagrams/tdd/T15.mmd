@@ -1,5 +1,5 @@
 flowchart TD
-    SNAP["Regional Snapshot (per candidate region r)<br/>free_slots · reserved_quantity · quota_headroom · quota_limit<br/>customer_count · total_customers · dr_coverage_ratio · az_count"]
+    SNAP["Regional Snapshot (per candidate region r)<br/>free_slots · reserved_quantity · quota_headroom · quota_limit<br/>customer_count · total_customers(g) (geo count, PLC-012) · dr_coverage_ratio · az_count"]
 
     SNAP --> COMP
 
@@ -7,7 +7,7 @@ flowchart TD
       direction TB
       A["α_comp = Clamp(nonprod_crg.effective_free / prod_crg.quantity)<br/>NonProd headroom signal"]
       B["β_comp = Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)<br/>Prod quota headroom"]
-      G["γ_comp = Clamp(1 − prod_customer_count / total_customers)<br/>Distribution fairness"]
+      G["γ_comp = Clamp(1 − prod_customer_count / total_customers(g))<br/>γ = 1 if total_customers(g) = 0 · Distribution fairness"]
       D["δ_comp = Clamp(dr_crg.coverage_ratio)<br/>DR readiness signal"]
       E["ε_comp = Clamp(az_count / 3)<br/>Zone diversity"]
     end

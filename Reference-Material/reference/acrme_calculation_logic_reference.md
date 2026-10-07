@@ -202,10 +202,12 @@ changes the seed**. Cannot be invoked without a recorded exception reference. `[
 PS_Prod(r) =
     0.30 × Clamp(nonprod_crg.effective_free / prod_crg.quantity)     ← α: NonProd headroom signal
   + 0.20 × Clamp(prod_crg.quota_headroom  / prod_crg.quota_limit)    ← β: Prod quota headroom
-  + 0.25 × Clamp(1 - prod_customer_count  / total_customers)         ← γ: distribution fairness
+  + 0.25 × Clamp(1 - prod_customer_count  / total_customers(g))      ← γ: distribution fairness (γ=1 if total_customers(g)=0)
   + 0.15 × Clamp(dr_crg.coverage_ratio)                              ← δ: DR readiness signal
   + 0.10 × Clamp(az_count / 3)                                       ← ε: zone diversity
 ```
+
+**γ denominator `total_customers(g)` (PLC-012, A.10) `[Decided]`:** the count of distinct customers with at least one environment (Prod, CVAL or DR) provisioned or being deployed in any region of the geography *g* of the region being scored. It is one live count per geography, shared by PS_Prod, PS_NonProd and PS_DR, and it goes up whenever a new customer environment is provisioned or deployed in the geography. **Zero rule:** if `total_customers(g) = 0`, γ = 1. Decrement on decommission is `[Assumed]`.
 
 `PS_Prod` is **dual-purpose**: derives the Prod region in Scenario 1 and is reused for post-selection
 validation in Scenario 2. Every candidate score and the policy version are written to the
@@ -293,7 +295,7 @@ Standard regions.
 PS_NonProd(r) =
     0.30 × Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)      ← α: effective NonProd headroom
   + 0.20 × Clamp(nonprod_crg.quota_headroom / nonprod_crg.quota_limit)   ← β: NonProd quota headroom
-  + 0.25 × Clamp(1 - nonprod_customer_count / total_customers)           ← γ: distribution fairness
+  + 0.25 × Clamp(1 - nonprod_customer_count / total_customers(g))        ← γ: distribution fairness (γ=1 if total_customers(g)=0)
   + 0.15 × Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)      ← δ: overflow capacity health
   + 0.10 × Clamp(az_count / 3)                                           ← ε: zone diversity
 ```
@@ -332,7 +334,7 @@ live CVAL headroom and available DR headroom. The `CVALEarmarkRecord` tracks thi
 PS_DR(r) =
     0.30 × Clamp(dr_crg.free_slots / dr_crg.quantity)                   ← α: DR CRG headroom
   + 0.20 × Clamp(dr_crg.quota_headroom / dr_crg.quota_limit)           ← β: DR quota headroom
-  + 0.25 × Clamp(1 - dr_customer_count / total_customers)              ← γ: distribution fairness
+  + 0.25 × Clamp(1 - dr_customer_count / total_customers(g))           ← γ: distribution fairness (γ=1 if total_customers(g)=0)
   + 0.15 × min(1.0, dr_crg.coverage_ratio / dr_coverage_target)        ← δ: coverage-ratio health
   + 0.10 × Clamp(az_count / 3)                                         ← ε: zone diversity
 ```

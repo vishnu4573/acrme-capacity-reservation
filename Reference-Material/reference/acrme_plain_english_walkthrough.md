@@ -308,11 +308,11 @@ so the arithmetic is reproducible.
 | `prod_crg.quota_limit` (vCPU) | 1000 | 1000 | 1000 | β (denominator) |
 | `prod_crg.quota_headroom` (vCPU free below limit) | 700 | 550 | 300 | β (numerator) |
 | `prod_customer_count` (customers already in region) | 40 | 25 | 20 | γ |
-| `total_customers` (across all regions) ⚠️ | 100 | 100 | 100 | γ |
+| `total_customers(US)` (distinct customers in the US geography, PLC-012) | 100 | 100 | 100 | γ |
 | `dr_crg.coverage_ratio` (DR coverage already in place) | 0.50 | 0.45 | 0.60 | δ |
 | `az_count` (Availability Zones) | 3 | 3 | 2 | ε |
 
-> ⚠️ **SPEC GAP (GAP-γ):** The `total_customers` term in the γ component is **undefined** in Requirements Baseline v2.5. Its source (customer registry? subscription count? tenant-level aggregate?), scope (all customers or only those with Prod workloads?), and data type are not specified. The γ formula `1 - prod_customer_count / total_customers` cannot be implemented without resolving this gap. See the **OPEN ISSUE** section in `acrme_calculation_logic_comprehensive_walkthrough.md` for four potential interpretations and a proposed resolution action plan. Values shown here (100) are illustrative placeholders only.
+> **γ denominator — decided (PLC-012, A.10, 7 Oct 2026):** `total_customers(g)` is the total number of customers in the geography: distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of the geography. It is a live count, shared by PS_Prod, PS_NonProd and PS_DR, and it goes up each time a new customer environment is provisioned or deployed there. If the count is zero, γ = 1. The value 100 is illustrative `[Assumed]`. It is larger than the sum of the Prod counts (40 + 25 + 20 = 85) because it also counts US customers whose only environments here are CVAL or DR, or are still being deployed.
 
 > **Note on "starter" values.** These are illustrative seed values for the walkthrough, not baseline
 > defaults. The only true baseline defaults are the *weights* (Section 3.3) and the *configurable
@@ -330,7 +330,7 @@ is clamped to [0, 1] via `Clamp(x) = max(0, min(1, x))`.
 β_component = Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)
             = Clamp(700 / 1000) = Clamp(0.70) = 0.70
 
-γ_component = Clamp(1 − prod_customer_count / total_customers)
+γ_component = Clamp(1 − prod_customer_count / total_customers(g))      # γ = 1 if total_customers(g) = 0
             = Clamp(1 − 40 / 100) = Clamp(0.60) = 0.60
 
 δ_component = Clamp(dr_crg.coverage_ratio)

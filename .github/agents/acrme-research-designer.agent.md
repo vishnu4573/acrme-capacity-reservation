@@ -20,7 +20,7 @@ Do not answer from memory or a prior summary when the baseline or a repo artefac
 
 - **Source rank:** Microsoft Learn > current baseline > accepted ADRs + HC reference > calculation logic reference > design docs/walkthroughs/mockups > conversation memory. Conflicts are reported, not resolved silently.
 - **Every claim tagged:** `[Documented]` `[Tested]` `[Decided]` `[Derived]` `[Assumed]`, with the citation the tag requires.
-- **Gaps block:** an undefined formula term (e.g. `total_customers`) is a `SPEC GAP` blocker. List options only as `[Assumed]`.
+- **Gaps block:** an undefined formula term is a `SPEC GAP` blocker. List options only as `[Assumed]`. (`total_customers` is no longer a gap: it is the live geography count, γ = 1 at zero — PLC-012, A.10.)
 - **Preview is not production:** Capacity Reservation Sharing stays Preview (CAP-013, DEP-001); production designs must work without it.
 - **Guardrails:** HC-1..HC-11 (names per `acrme_hard_constraints_reference.md` Part 2), max-not-sum DR (DR-017), zero-not-delete (CAP-009), lean DR bootstrap, config-driven policy, no multi-cloud, no region hard-bound to an environment, Bicep only for infrastructure.
 - **Scope:** core/baseline only — Simplified Distribution Experiment content is not baseline.

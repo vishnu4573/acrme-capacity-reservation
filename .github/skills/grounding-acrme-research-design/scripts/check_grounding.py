@@ -39,9 +39,14 @@ AZURE_CLAIM_RE = re.compile(
     r"requires?|limit(?:ed)?|allows?|only|maximum|up to|guarantee[sd]?)\b",
     re.I,
 )
-GAP_TERMS = {"total_customers": "γ distribution-fairness term (no defined source/scope/type)"}
+# Formula terms that were spec gaps and are now decided in the baseline: term -> (citation regex, decision).
+DECIDED_TERMS = {
+    "total_customers": (re.compile(r"PLC-012|A\.10|geograph", re.I),
+                        "γ denominator = distinct customers per geography, zero rule γ=1 (PLC-012, A.10)"),
+}
+STALE_GAP_RE = re.compile(r"SPEC GAP|OPEN ISSUE|spec(?:ification)? gap|UNDEFINED|not defined|undefined", re.I)
+RESOLVED_RE = re.compile(r"PLC-012|A\.10|resolved|decided|closed", re.I)
 PROPOSED_RE = re.compile(r"propos|\badd\b|\bnew\b|candidate", re.I)
-GAP_FLAG_RE = re.compile(r"SPEC GAP|OPEN ISSUE|spec(?:ification)? gap|undefined|\[Assumed|blocker", re.I)
 ANTI_PATTERNS = [
     (re.compile(r"\b(recommend|adopt|use|propose)\w*\b[^.\n]{0,60}\bmulti-?cloud\b", re.I),
      "multi-cloud DR proposed — rejected at ELT (baseline §2)"),
@@ -153,11 +158,14 @@ def lint(path, repo, current_version, codes):
             for rx, msg in ANTI_PATTERNS:
                 if rx.search(chunk) and not re.search(r"\b(not|never|rejected|don't|do not|avoid)\b", chunk, re.I):
                     errors.append(f"L{ln}: {msg}")
-    # A gap term must be flagged somewhere in the doc, next to the term.
-    for term, why in GAP_TERMS.items():
+    # A formerly-undefined term must cite its decision, and must not still be described as a gap.
+    for term, (cite_re, why) in DECIDED_TERMS.items():
         uses = [(ln, p) for ln, p in paragraphs(text) if term in p]
-        if uses and not any(GAP_FLAG_RE.search(p) for _, p in uses):
-            errors.append(f"L{uses[0][0]}: `{term}` used {len(uses)}x, never flagged as SPEC GAP — {why}")
+        for ln, p in uses:
+            if STALE_GAP_RE.search(p) and not RESOLVED_RE.search(p):
+                errors.append(f"L{ln}: `{term}` still described as a spec gap — now decided: {why}")
+        if uses and not any(cite_re.search(p) for _, p in uses):
+            warns.append(f"L{uses[0][0]}: `{term}` used {len(uses)}x without citing PLC-012/A.10 — {why}")
     return errors, warns
 
 

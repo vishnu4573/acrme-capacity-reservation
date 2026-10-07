@@ -187,7 +187,7 @@ rows=[
  ("3. Setup — pick Geography, then add one or more SKU line items (SKU + VM count) for the SAME Customer ID & Geography/Region. "
   "vCPU/VM auto-fills from the SKU catalogue and Requested vCPU (total) auto-sums across all lines. Optional customer-supplied "
   "Prod region (required for Middle East), Customer ID.",None),
- ("4. Policy — the five weights (sum=1.0), total_customers mode, DR bootstrap / target, min headroom floors.",None),
+ ("4. Policy — the five weights (sum=1.0), total_customers source (live, PLC-012), DR bootstrap / target, min headroom floors.",None),
  ("5. Capacity_Usage — the ACRME catalogue regions with distributed usage + a Class column (Standard / Restricted). "
   "Yellow = editable; grey = computed; green Class cell = Restricted (Middle East).",None),
  ("6. HC_Gate — HC-3 / HC-6 / HC-7 pass/fail and eligibility per region.",None),
@@ -210,7 +210,7 @@ rows=[
   "exercised. Saudi Arabia East is a FUTURE REGION (not yet GA; Microsoft target Q4 2026, Eastern Province; no real "
   "usage data will exist until launch). UAE North is GA but absent from ACRME source data. "
   "Japan East (Asia Pacific) is 'pending' in the catalogue and is excluded.",None,SYNFILL),
- ("• total_customers is undefined in baseline v2.4 — mode selector on Policy (Live/Constant/Manual). γ values illustrative.",None,WARNFILL),
+ ("• total_customers(g) = live count of customers in the geography (PLC-012, A.10); γ = 1 when it is zero. Cust Count values are illustrative.",None),
  ("• PS_NonProd δ duplicates its α (baseline design-of-record). DR bootstrap / target are configurable placeholders.",None,WARNFILL),
 ]
 r=3
@@ -365,19 +365,17 @@ for i,(n,v) in enumerate(weights):
     lbl(pol,f"A{2+i}",n); inp(pol,f"B{2+i}",v)
 lbl(pol,"A7","Weight sum"); pol["B7"]="=SUM(B2:B6)"; pol["B7"].font=BOLD; pol["B7"].alignment=CTR
 lbl(pol,"A8","Validation"); pol["B8"]='=IF(ABS(B7-1)<=0.001,"VALID","INVALID — must sum to 1.0")'; pol["B8"].alignment=CTR
-lbl(pol,"A10","total_customers mode (1=Live 2=Constant 3=Manual)"); inp(pol,"B10",1)
-lbl(pol,"A11","Manual total_customers"); inp(pol,"B11",300)
+lbl(pol,"A10","total_customers source"); pol["B10"]="Live geography count (PLC-012)"; out(pol,"B10")
+lbl(pol,"A11","γ when total_customers = 0"); pol["B11"]=1; out(pol,"B11")
 lbl(pol,"A13","DR bootstrap qty (vCPU)"); inp(pol,"B13",40)
 lbl(pol,"A14","DR coverage target"); inp(pol,"B14",0.80)
 lbl(pol,"A15","Min Prod headroom (vCPU)"); inp(pol,"B15",20)
 lbl(pol,"A16","Min NonProd headroom (vCPU)"); inp(pol,"B16",20)
 lbl(pol,"A17","Min DR headroom (vCPU)"); inp(pol,"B17",16)
-pol["D10"]="Geography"; pol["E10"]="Constant"
-for c in ("D10","E10"): pol[c].font=WHITEB; pol[c].fill=HEADFILL; pol[c].alignment=CTR
-consts=[("US",150),("EU",90),("Australia",40),("Asia Pacific",50),("Middle East",10)]
-for i,(g,v) in enumerate(consts):
-    pol.cell(row=11+i,column=4,value=g).border=BORDER
-    pol.cell(row=11+i,column=5,value=v).border=BORDER
+pol["D10"]=("total_customers(g) = customers in geography g with any environment provisioned or being deployed "
+            "(baseline v2.5 amended, PLC-012 / A.10). Live, not configurable. Workbook stand-in: sum of Cust Count over the geography's regions.")
+pol["D10"].font=Font(italic=True,color="808080",size=9); pol.merge_cells("D10:H11")
+pol["D10"].alignment=Alignment(wrap_text=True,vertical="top")
 pol.conditional_formatting.add("B8",CellIsRule(operator="equal",formula=['"VALID"'],fill=green))
 pol.conditional_formatting.add("B8",FormulaRule(formula=['LEFT(B8,7)="INVALID"'],fill=red))
 
@@ -452,8 +450,8 @@ hc.column_dimensions["A"].width=20
 
 # ============================================================ Scoring builder
 def total_cust_formula(cur):
-    return (f'=IF(Policy!$B$10=1,SUMIFS(Capacity_Usage!$U${FIRST}:$U${LAST},Capacity_Usage!$C${FIRST}:$C${LAST},'
-            f'Capacity_Usage!C{cur}),IF(Policy!$B$10=2,VLOOKUP(Capacity_Usage!C{cur},Policy!$D$11:$E$15,2,FALSE),Policy!$B$11))')
+    # PLC-012: live geography count, shared by Prod/CVAL/DR scoring (no constant/manual override)
+    return f'=SUMIFS(Capacity_Usage!$U${FIRST}:$U${LAST},Capacity_Usage!$C${FIRST}:$C${LAST},Capacity_Usage!C{cur})'
 
 def build_scoring(name,alpha_num,alpha_den,beta_num,beta_den,delta_expr,elig_col,scope_ref,exclude_prod,title):
     s=wb.create_sheet(name); s.sheet_view.showGridLines=False
@@ -476,7 +474,7 @@ def build_scoring(name,alpha_num,alpha_den,beta_num,beta_den,delta_expr,elig_col
         s.cell(row=xr,column=8,value=f"=MIN(MAX(G{xr},0),1)")
         s.cell(row=xr,column=9,value=f"=IFERROR(Capacity_Usage!{beta_num}{cur}/Capacity_Usage!{beta_den}{cur},0)")
         s.cell(row=xr,column=10,value=f"=MIN(MAX(I{xr},0),1)")
-        s.cell(row=xr,column=11,value=f"=IFERROR(1-Capacity_Usage!U{cur}/F{xr},0)")
+        s.cell(row=xr,column=11,value=f"=IF(F{xr}=0,Policy!$B$11,1-Capacity_Usage!U{cur}/F{xr})")
         s.cell(row=xr,column=12,value=f"=MIN(MAX(K{xr},0),1)")
         s.cell(row=xr,column=13,value="=IFERROR("+delta_expr.format(cur=cur,xr=xr)[1:]+",0)")
         s.cell(row=xr,column=14,value=f"=MIN(MAX(M{xr},0),1)")
@@ -671,8 +669,8 @@ prod_components=[
      "Distribution fairness (load balancing)",
      "Clamp(1 - prod_customer_count / total_customers)",
      "0.25",
-     "Rewards regions with fewer existing Prod customers, promoting even distribution of workload across the geography. A region with lower customer count scores higher, preventing concentration in a single region. ⚠️ Note: total_customers is currently UNDEFINED in baseline v2.4 (scope and source unspecified).",
-     "Capacity_Usage: U (Cust Count)\nScoring_Prod: F (total_cust for denominator), K (γ_raw), L (γ_c)\n⚠️ total_customers scope: geography-level (most likely) or global (pending clarification)"),
+     "Rewards regions with fewer existing Prod customers, promoting even distribution of workload across the geography. A region with lower customer count scores higher, preventing concentration in a single region. total_customers(g) = live count of customers in the geography (PLC-012, A.10); γ = 1 when it is zero.",
+     "Capacity_Usage: U (Cust Count)\nScoring_Prod: F (total_cust for denominator), K (γ_raw), L (γ_c)\ntotal_customers scope: geography (PLC-012); γ = 1 when zero"),
     ("δ",
      "DR readiness signal (destination DR coverage)",
      "Clamp(dr_crg.coverage_ratio)",
@@ -747,8 +745,8 @@ nonprod_components=[
      "Distribution fairness (load balancing)",
      "Clamp(1 - nonprod_customer_count / total_customers)",
      "0.25",
-     "Rewards regions with fewer existing NonProd customers, promoting even CVAL distribution. Identical logic to PS_Prod but evaluated against NonProd customer counts. ⚠️ total_customers scope undefined.",
-     "Capacity_Usage: U (Cust Count)\nScoring_CVAL: F (total_cust for denominator), K (γ_raw), L (γ_c)\n⚠️ total_customers scope: geography-level (most likely) or global (pending clarification)"),
+     "Rewards regions with fewer existing NonProd customers, promoting even CVAL distribution. Identical logic to PS_Prod but evaluated against NonProd customer counts. Same geography denominator (PLC-012).",
+     "Capacity_Usage: U (Cust Count)\nScoring_CVAL: F (total_cust for denominator), K (γ_raw), L (γ_c)\ntotal_customers scope: geography (PLC-012); γ = 1 when zero"),
     ("δ",
      "Overflow capacity health (redundant with α)",
      "Clamp(nonprod_crg.effective_free / nonprod_crg.quantity)",
@@ -823,8 +821,8 @@ dr_components=[
      "Distribution fairness (load balancing)",
      "Clamp(1 - dr_customer_count / total_customers)",
      "0.25",
-     "Rewards regions with fewer existing DR customers, promoting even DR distribution. Prevents DR concentration in a single destination region. ⚠️ total_customers scope undefined.",
-     "Capacity_Usage: U (Cust Count)\nScoring_DR: F (total_cust for denominator), K (γ_raw), L (γ_c)\n⚠️ total_customers scope: geography-level (most likely) or global (pending clarification)"),
+     "Rewards regions with fewer existing DR customers, promoting even DR distribution. Prevents DR concentration in a single destination region. Same geography denominator (PLC-012).",
+     "Capacity_Usage: U (Cust Count)\nScoring_DR: F (total_cust for denominator), K (γ_raw), L (γ_c)\ntotal_customers scope: geography (PLC-012); γ = 1 when zero"),
     ("δ",
      "Coverage ratio health (DR sizing adequacy)",
      "min(1.0, dr_crg.coverage_ratio / dr_coverage_target)",
@@ -880,7 +878,7 @@ notes=[
     "1. Clamp(x) = MIN(MAX(x, 0), 1) — ensures all component values stay in [0, 1] range to prevent outliers from dominating.",
     "2. Weight sum constraint: α + β + γ + δ + ε = 1.0 (enforced by Policy sheet validation).",
     "3. The three PS formulas are IDENTICAL across all region models (2-region, 3-region, 4-region, cross-geo). What changes: number of argmax passes, candidate pool, HC gate constraints.",
-    "4. ⚠️ OPEN ISSUE: total_customers (γ component) is UNDEFINED in baseline v2.4 — no source, scope, or data type specified. Geography-level scope is most likely.",
+    "4. total_customers (γ denominator) is DECIDED in baseline v2.5 amended (PLC-012, A.10): live count of customers with any environment provisioned or deploying in the geography, shared by all three scores; γ = 1 when the count is zero.",
     "5. PS_NonProd α and δ are identical (design-of-record v2.4) — combined weight 0.45. A pilot variant exists that removes this duplication.",
     "6. PS_DR δ uses min(1.0, ...) instead of Clamp() for coverage-ratio normalization.",
     "7. Column references: _raw = unclamped component; _c = clamped component; PS = final placement score.",

@@ -2,7 +2,7 @@
 
 **Document Type:** Master Research & Design Prompt\
 **Intended For:** AI assistants, new architects, platform engineers, and technical researchers picking up this project cold\
-**Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.4 (amended)\
+**Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.5 (amended 7 Oct 2026)\
 **Repo:** `vishnu4573/acrme-capacity-reservation` (branch: `master`)\
 **Last updated:** 6 October 2026
 
@@ -129,7 +129,7 @@ Before any customer is deployed, ACRME scores candidate regions using a weighted
 ```
 PS_Prod(r) = α·Clamp(nonprod_crg.effective_free / prod_crg.quantity)
            + β·Clamp(prod_crg.quota_headroom / prod_crg.quota_limit)
-           + γ·(1 − prod_customer_count / total_customers)          [total_customers: UNDEFINED in v2.4 — spec gap]
+           + γ·(1 − prod_customer_count / total_customers)          [total_customers(g): geography count, PLC-012]
            + δ·dr_crg.coverage_ratio
            + ε·(az_count / 3)
 ```
@@ -139,7 +139,7 @@ Default weights: α=0.30, β=0.20, γ=0.25, δ=0.15, ε=0.10. All components cla
 **Critical design decision — why α uses NonProd headroom (not Prod headroom):**\
 Using Prod headroom in α would be circular (measuring the thing you're about to allocate against itself) and would create high correlation between α and β (combined 0.50 weight measuring the same Prod dimension). NonProd headroom is an independent signal of regional capacity health and provides forward-looking overflow/failover capacity. See `Reference-Material/reference/ps_prod_nonprod_headroom_design_rationale.md` for the full worked rationale.
 
-**`total_customers` is an open specification gap.** The γ term references `total_customers` which has no defined source, scope, or data type in baseline v2.4. This is a blocker for γ in production scoring. Flag this gap in any design output.
+**`total_customers` is defined (baseline v2.5 amended, 7 Oct 2026 — PLC-012, A.10).** `total_customers(g)` = distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of the scored region's geography *g*; one live count per geography shared by all three scores; γ = 1 when the count is zero (PLC-012, A.10) `[Decided]`. It goes up whenever a new customer environment is provisioned or deployed in the geography. Decrement on decommission and whether Middle East DR placements in Europe add to the Europe count are still `[Assumed]`.
 
 **Environment-specific PS functions:** `PS_NonProd` and `PS_DR` use the same weight structure with the relevant environment's CRG metrics substituted.
 
@@ -269,7 +269,7 @@ DR failover proceeds in staged waves: `associated → allocated`. Standby VMs ar
 
 ## Section 6 — Open POCs and Specification Gaps
 
-These items are **unresolved** in baseline v2.4. Any design output must flag them explicitly rather than assuming a resolution.
+These items are **unresolved** in baseline v2.5. Any design output must flag them explicitly rather than assuming a resolution.
 
 ### Critical Open POCs
 
@@ -288,7 +288,6 @@ These items are **unresolved** in baseline v2.4. Any design output must flag the
 
 | Gap | Impact |
 | --- | --- |
-| `total_customers` undefined | γ term in PS_Prod/PS_NonProd/PS_DR is uncomputable. Scoring is partial until this is defined. |
 | Capacity Reservation Sharing is Preview | Production use requires GA confirmation or explicit Microsoft supportability agreement (DEP-001) |
 | DR drill duration and failback (DEC-002) | Extended run vs earlier failback not yet decided |
 | Geography exception approver (DEC-003) | Binding customer acknowledgement process not defined |
@@ -452,15 +451,15 @@ TASK: Validate the PS_Prod scoring formula against the stated design
 Questions to answer:
 1. Under what conditions does the γ (distribution fairness) term 
    dominate the score and produce a non-intuitive result?
-2. If total_customers is defined as "currently active customers in the 
-   geography", how does the score behave when a geography has 1 customer 
+2. With total_customers(g) defined as the live count of customers in the
+   geography (PLC-012, γ = 1 at zero), how does the score behave when a geography has 1 customer 
    vs 100 customers?
 3. What weight configuration produces the most stable ranking across 
    the US three-region model?
 
 Produce a worked numeric example for each question using the US three-
 region model (West US 3, Central US, Canada Central).
-Tag all assumptions. Flag the total_customers spec gap explicitly.
+Tag all assumptions. Cite PLC-012 / A.10 for total_customers.
 ```
 
 ---
@@ -533,7 +532,7 @@ Every architectural recommendation must be evaluated against all five WAF pillar
 
 6. **Do not generate production code before architecture is understood.** Follow the research → design → POC → implementation sequence.
 
-7. **Do not define `total_customers` without flagging it as a spec gap.** It has no authoritative definition in baseline v2.4.
+7. **Use the decided definition of `total_customers`.** It is the live per-geography customer count (PLC-012, A.10), with γ = 1 at zero. Do not replace it with a constant, forecast or per-environment count.
 
 8. **Do not propose a fixed large DR reserve.** This has been rejected for cost reasons. Minimal bootstrap + dynamic reconciliation is the only approved DR model.
 

@@ -162,11 +162,11 @@ The `PS_Prod` formula already has a **Prod-specific signal**:
 | --- | --- | --- | --- |
 | **α** | `nonprod_crg.effective_free / prod_crg.quantity` | 0.30 | Regional NonProd health + overflow capacity |
 | **β** | `prod_crg.quota_headroom / prod_crg.quota_limit` | 0.20 | Direct Prod quota readiness |
-| **γ** | `1 - prod_customer_count / total_customers` | 0.25 | Distribution fairness ⚠️ |
+| **γ** | `1 - prod_customer_count / total_customers(g)` | 0.25 | Distribution fairness |
 | **δ** | `dr_crg.coverage_ratio` | 0.15 | DR readiness |
 | **ε** | `az_count / 3` | 0.10 | Zone diversity |
 
-> ⚠️ **SPEC GAP (GAP-γ):** The `total_customers` term in the γ component is undefined in Requirements Baseline v2.5. Its source, scope, and data type are not specified. See `acrme_calculation_logic_comprehensive_walkthrough.md` OPEN ISSUE section for details and proposed resolution options.
+> **γ denominator (decided 7 Oct 2026, GAP-γ closed):** `total_customers(g)` = distinct customers with any environment (Prod, CVAL or DR) provisioned or being deployed in any region of the scored region's geography *g*; one live count per geography shared by all three scores; γ = 1 when the count is zero (PLC-012, A.10) `[Decided]`.
 
 **Result:** Multi-dimensional scoring across 5 independent signals.
 
@@ -178,11 +178,11 @@ The `PS_Prod` formula already has a **Prod-specific signal**:
 | --- | --- | --- | --- |
 | **α** | `prod_crg.effective_free / prod_crg.quantity` | 0.30 | Direct Prod capacity headroom |
 | **β** | `prod_crg.quota_headroom / prod_crg.quota_limit` | 0.20 | Direct Prod quota headroom |
-| **γ** | `1 - prod_customer_count / total_customers` | 0.25 | Distribution fairness ⚠️ |
+| **γ** | `1 - prod_customer_count / total_customers(g)` | 0.25 | Distribution fairness |
 | **δ** | `dr_crg.coverage_ratio` | 0.15 | DR readiness |
 | **ε** | `az_count / 3` | 0.10 | Zone diversity |
 
-> ⚠️ **SPEC GAP (GAP-γ):** The `total_customers` term is undefined (see note above).
+> **γ denominator:** same geography count `total_customers(g)` as above (PLC-012).
 
 **Problems:**
 
