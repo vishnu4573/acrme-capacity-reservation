@@ -364,7 +364,7 @@ Derived from multi_region_placement_design.md Section 27–28.
 ### Could (Phase 2+ — Nice-to-have future capabilities)
 
 ```
-❌ Automated Tier 2 (requires POC-31/32 validation)
+❌ Automated Tier 2 (requires POC-001 validation of consumer quota after a Quota Group transfer — QUA-003, QUA-004, QUA-007; ADR-003)
 ❌ Advanced forecasting models (ML-based demand prediction)
 ❌ Sovereign-cloud deployment (Azure Government, China)
 ❌ Cross-tenant support
@@ -392,8 +392,8 @@ Derived from multi_region_placement_design.md Section 27–28.
 
 | Issue | Blocker | POC Gate | Resolution |
 |---|---|---|---|
-| Azure Quota Groups functionality in target tenant/region | Quota architecture foundation | POC-30 | GA availability check; if 404 → escalate to Azure Support |
-| Quota pool release behavior on CR reduction (Tier 2/3 quota-neutral claim) | Two-group model depends on group pool reallocation | POC-31 | Measure release latency; confirm < 5 min for Tier RTO |
+| Azure Quota Groups functionality in target tenant/region | Quota architecture foundation (QUA-003, QUA-004) | DEP-001 | Track `groupQuotas` / `groupType` maturity; GA availability check; if 404 → escalate to Azure Support |
+| Quota pool release behavior on CR reduction (Tier 2/3 quota-neutral claim) | Single-pool model depends on quota returning to the pool and reaching the deploying subscription (QUA-007) | POC-001 | Confirm consumer quota after transfer on the API version in use; measure release latency against the Tier RTO `[Assumed]` |
 
 ---
 

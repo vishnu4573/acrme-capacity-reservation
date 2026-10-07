@@ -50,13 +50,17 @@ PROPOSED_RE = re.compile(r"propos|\badd\b|\bnew\b|candidate", re.I)
 ANTI_PATTERNS = [
     (re.compile(r"\b(recommend|adopt|use|propose)\w*\b[^.\n]{0,60}\bmulti-?cloud\b", re.I),
      "multi-cloud DR proposed — rejected at ELT (baseline §2)"),
-    (re.compile(r"\bsum of (all )?(the )?source", re.I),
+    (re.compile(r"\bsum[- ]of[- ](all )?(the )?source", re.I),
      "DR sized as a sum of sources — baseline requires max-not-sum (DR-017)"),
     (re.compile(r"\bdelete (the |a |an )?(capacity )?reservation\b", re.I),
      "reservation deletion — use set-to-zero (CAP-009) or decommission workflow (CAP-010)"),
     (re.compile(r"\bBicep\b[^.\n]{0,80}\b(runtime|reconcil|engine logic)", re.I),
      "Bicep for engine runtime logic — Bicep is infrastructure layer only"),
 ]
+# Lines that quote a rejected/superseded rule on purpose (e.g. baseline App. D "❌ over-provisions",
+# hard-constraints "Superseded — do not use") are documentation of the rejection, not a recommendation.
+REJECTED_MARK_RE = re.compile(
+    r"❌|\b(superseded|retired|deprecated|rejected|do not use|over-provisions|original formula|version 2\.0|v2\.0)\b", re.I)
 SHARED_RES = r"(?:reservation sharing|sharing (?:the )?(?:CRG|reservation|capacity)|shared (?:CRG|reservation|capacity reservation|reservation group))"
 SHARING_PROD_RE = re.compile(
     rf"{SHARED_RES}[^.\n]{{0,60}}\bproduction\b|\bproduction\b[^.\n]{{0,60}}{SHARED_RES}",
@@ -156,7 +160,8 @@ def lint(path, repo, current_version, codes):
             if SHARING_PROD_RE.search(chunk) and not SHARING_SAFE_RE.search(para):
                 warns.append(f"L{ln}: shared reservation tied to production without Preview/DEP-001/CAP-013 caveat")
             for rx, msg in ANTI_PATTERNS:
-                if rx.search(chunk) and not re.search(r"\b(not|never|rejected|don't|do not|avoid)\b", chunk, re.I):
+                if (rx.search(chunk) and not REJECTED_MARK_RE.search(chunk)
+                        and not re.search(r"\b(not|never|rejected|don't|do not|avoid)\b", chunk, re.I)):
                     errors.append(f"L{ln}: {msg}")
     # A formerly-undefined term must cite its decision, and must not still be described as a gap.
     for term, (cite_re, why) in DECIDED_TERMS.items():

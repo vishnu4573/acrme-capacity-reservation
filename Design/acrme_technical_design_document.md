@@ -735,7 +735,7 @@ All metrics carry region/environment/scope dimensions and policy version for rep
 | POC-007 | Lean bootstrap sizing is sufficient to initiate recovery | DR-007 bootstrap targets | Required |
 | **POC-011** | max-not-sum overcommit is safe at platform scale | DR-017 sizing; overcommit safety ceiling; FIN-006..008 | Required before production dependency |
 | POC-005 | VM state semantics (associated/allocated/deallocated) | DR-019 activation staging | Dependency |
-| POC-031/032 | Tier 2 quota-neutral transfer within a group/pool | Section 13 baseline Tier 2 | Required |
+| POC-001 (Tier 2 use) | Tier 2 quota-neutral transfer within the single pool: after a Quota Group transfer, does the deploying (consumer) subscription hold enough VM-family and total regional vCPU? (QUA-003, QUA-004, QUA-007) | ADR-003 "Relationship to Emergency Tiers"; Section 9 Tier 2 | Required — Tier 2 stays approval-gated until proven (ADR-003) |
 
 Production reliance on max-not-sum DR sizing and single-pool consumer-quota behaviour is **gated** on POC-011 and POC-001 respectively; until then, readiness validates consumer quota explicitly and DR sizing carries the SUM-override safety option. `[Decided]`
 
