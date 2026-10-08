@@ -1,10 +1,12 @@
 # ACRME Hard Constraints Reference
 
 **Classification:** Principal Cloud Architect — Placement Engine Design  
-**Version:** 1.0  
-**Date:** August 2026  
+**Version:** 1.1  
+**Date:** 8 Oct 2026  
 **Status:** Production Ready
 
+> **v3.0 reconciliation note (8 Oct 2026).** Requirements Baseline **v3.0** folds in the multi-domain customer model while leaving **all hard constraints (HC-1..HC-11) unchanged** (Baseline §11.1). v3.0 restructures *where existing gates apply* into **two evaluation scopes** rather than introducing any new gate: region selection is **customer-scoped** — the Customer Region Vector `CRV(C,G) = (geography, distribution model, prod, cval, dr)` (PLC-013) resolves **once per customer × geography** and is cached and reused by every domain group; instance groups and capacity are **domain-group-scoped** — the Domain Placement Binding `DPB(D,E)` (PLC-014) is resolved **per domain × environment × region** on that domain's ig subscription. Region-level gates (HC-1, HC-4, HC-5, HC-8, HC-9, HC-10) are evaluated when the CRV is resolved (customer scope); capacity/quota/floor gates (HC-2, HC-3, HC-6, HC-7) are evaluated per domain ig when the DPB is resolved (domain scope), with quota drawn from the customer's **central quota group** spanning all domain subscriptions (QUA-015, per region × VM-family cell, 85% replenishment thresholds). Enforcement ordering is governed by **PLC-015** (CRV strictly precedes DPB; a domain never re-runs region selection). v3.0 boundary rules are **scoping rules, not new hard constraints** (per user standing constraint "keep all existing hard constraints intact"): **DOM-004** domain-bounded sharing (a CVAL/DR shared CRG never crosses domain boundaries), **CAP-025** CRG-set separation (prod / cvdr / drf set types per Domain × Environment × Region, never mixed), **PLC-015** two-phase resolution gate. The **DR Foundation** (DR-021, dedicated always-present bootstrap CRG set per domain) is covered by the same HC-6/HC-7 floor accounting without double-counting the CVAL/DR shared set. New v3.0 scoping validation rules **VR-12..VR-14**, POCs **POC-012/013**, configurable items **C-14..C-16**, and decision **DEC-004** are carried below; see Baseline §11.1, §11A, CAP-025, QUA-015, DR-021.
+>
 > **v2.4 reconciliation note (7 Sep 2026).** Requirements Baseline **v2.4** adds a new hard constraint **HC-11 AVAILABILITY_SET_INELIGIBLE** (**CAP-020**): Availability-Set VMs are ineligible for zonal on-demand capacity reservations and are rejected from the zonal reservation / per-AZ CRG path at onboarding. It pairs with the CAP-021 deallocate/redeploy-to-AZ onboarding precondition. See HC-11 in Part 1 and the summary table in Part 2; normative detail is in ADR-002 v2.4 and TDD §8.1. All prior hard constraints (HC-1..HC-10) are unchanged.
 >
 > **v2.2 reconciliation note (2 Sep 2026).** Under Requirements Baseline v2.2 and ADR-002 v2.2 the **single governed quota pool** is the **primary** model: one pool per region/quota family covers Prod + NonProd/CVAL + DR, with Prod and DR protected by **logical earmarks** (`Prod_Reserved_Floor`, `DR_Earmark_vCPU`) rather than physical group separation. The **Two-Group Quota Architecture** referenced by HC-3 and HC-7 below is retained as the sanctioned **exception topology** (used only when Azure Quota Group limits or a mandatory Prod-isolation boundary make one pool impossible). The HC-3/HC-7 arithmetic is unchanged and remains correct; in the single-pool model the terms map as `Effective_NonProd_Ceiling → Allocatable_NonProd`, `NonProd_DR_Group_Limit → Pool_Limit`, and `DR_Floor_vCPU → DR_Earmark_vCPU` (max-not-sum, DR-017). Also: the EU cross-geo DR extension region is **Switzerland North** (REG-002). See ADR-002 v2.2, the Calculation Logic Reference v2.2 (Scenario 8/9), the FDD Section 4.2, and the TDD Section 8.3.
@@ -869,6 +871,28 @@ Regions surviving HC-1..HC-10 enter scoring:
 
 ---
 
+### Stage 4 — Two-Scope Evaluation (v3.0)
+
+Requirements Baseline **v3.0** splits hard-constraint evaluation across **two scopes** without changing any HC definition (Baseline §11.1; standing constraint: HC-1..HC-11 intact):
+
+**Customer scope — CRV resolution (PLC-013).**
+Region-level gates are evaluated **once per customer × geography**, when the Customer Region Vector is resolved (or re-validated on migration, PLC-005):
+- Stage 1 pre-filtering: **HC-8** (geography containment), **HC-9** (Standard regions only)
+- Region gates: **HC-1** (region separation), **HC-4** (DR separation class), **HC-5** (zone availability), **HC-10** (cross-geo extension path)
+
+The resolved CRV `(geography, distribution model, prod, cval, dr)` is cached on the seed record and reused by **all** of the customer's domain groups; a domain never re-runs region selection (PLC-015, VR-14).
+
+**Domain scope — DPB resolution (PLC-014).**
+Capacity and quota gates are evaluated **per domain × environment × region**, each time a domain's Domain Placement Binding is resolved on its ig subscription:
+- Capacity gates: **HC-2** (capacity floor) against the domain's CRG set per CAP-025 (Prod-dedicated / CVAL-DR shared / DR Foundation set types)
+- Quota gates: **HC-3**, **HC-7** against the customer's **central quota group** (QUA-015) per region × VM-family cell, spanning all domain ig subscriptions (DOM-002); 85% replenishment thresholds
+- DR coverage: **HC-6** evaluated per domain — the DR Foundation set (DR-021) plus the domain's own CVAL/DR shared set, never double-counting the shared set
+- VM-level: **HC-11** applied at onboarding per domain ig
+
+**Ordering (PLC-015).** CRV resolution strictly precedes DPB resolution for every deployment; cross-domain independence (DOM-003) and domain-bounded sharing (DOM-004) are guaranteed by scoping, not by any new gate.
+
+---
+
 ## Part 4 — Validation Rules (VR) Cross-Reference
 
 The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** that enforce hard constraints:
@@ -886,6 +910,9 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 | **VR-9** | **[Amended v2.4]** If all weighted Europe Standard regions fail HC-1..HC-10 for a Middle East cross-geo DR placement, block placement with ops alert | HC-1..10 |
 | **VR-10** | Restricted region requested by customer → Scenario 2 exception path only | HC-9 |
 | **VR-11** | Cross-Geo Extension DR path must be explicitly approved in active PlacementPolicy | HC-10 |
+| **VR-12** *(v3.0)* | CVAL/DR shared CRGs (CAP-025 `crg-cvdr-*`) never cross domain boundaries; sharing is domain-bounded (DOM-004), enforced at DPB scope | Scoping rule (DOM-004) — not a new gate |
+| **VR-13** *(v3.0)* | Prod / CVAL-DR / DR Foundation CRG set types (CAP-025 `crg-pr-*`, `crg-cvdr-*`, `crg-drf-*`) are never mixed within a domain ig; DR Foundation is never shared with CVAL until an approved DR declaration (DR-021) | Scoping rule (CAP-025/DR-021) — not a new gate |
+| **VR-14** *(v3.0)* | CRV resolution strictly precedes DPB resolution; a domain group never re-runs region selection (PLC-015, PLC-013) | Scoping rule (PLC-015) — not a new gate |
 
 ---
 
@@ -902,6 +929,8 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 
 **POC-01 through POC-10:** Hard constraint validation (HC-1..HC-10)  
 **POC-11:** Middle East cross-geo DR (HC-10) — **[Amended v2.4] active** (DEC-001 RESOLVED); validates weighted DR selection over Europe Standard regions and max-not-sum sizing at the Europe destination (DR-020, PLC-010b)  
+**POC-12 (v3.0):** Domain-scoped CRG sharing validation — CVAL/DR shared CRG set stays within one domain (DOM-004, CAP-025); attempts to share across domains must fail (Baseline §23, POC-012)  
+**POC-13 (v3.0):** Two-scope flow against a live multi-domain customer — CRV resolved once at customer scope, DPB evaluation per domain ig, PLC-015 ordering, QUA-015 central quota group draws (Baseline §23, POC-013)  
 **POC-30:** Quota Groups API integration (HC-3, HC-7)  
 **POC-31:** Quota pool release latency (HC-7 emergency transfer dependency)
 
@@ -927,6 +956,25 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
       }
     },
     "separation_class_overrides": {}
+  },
+  "two_scope_v3_0": {
+    "crv_scope": {
+      "description": "Customer-scoped region vector (PLC-013) — region gates evaluated once per customer × geography",
+      "stages": ["HC-8", "HC-9", "HC-1", "HC-4", "HC-5", "HC-10"]
+    },
+    "dpb_scope": {
+      "description": "Domain Placement Binding (PLC-014) — capacity/quota gates per domain × environment × region",
+      "stages": ["HC-2", "HC-3", "HC-6", "HC-7", "HC-11"]
+    },
+    "resolution_order": "CRV strictly precedes DPB (PLC-015, VR-14)",
+    "domain_taxonomy_tokens": "wl-* per domain group (DOM-001); optional function-group <fn> (C-14, DEC-004)",
+    "dr_foundation_sizing_basis": "configurable bootstrap per product/domain/region/zone/SKU (C-16, DR-021, ENV-005/DR-007)",
+    "combined_region_load_observation_threshold": "deviation threshold for cross-domain region-level alert (C-15, PLC-016/OBS-002)",
+    "quota_group": {
+      "model": "customer-central quota group per region × VM-family cell (QUA-015) spanning all domain ig subscriptions",
+      "GROUP_REPLENISH_THRESHOLD": "0.85 (default 85%)",
+      "SUB_REPLENISH_THRESHOLD": "0.85 (default 85%)"
+    }
   }
 }
 ```
@@ -942,6 +990,13 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 | **min_zone_count** | 2 | ✅ Yes | HC-5 |
 | **allow_single_zone_dev** | false | ✅ Yes | HC-5 |
 | **cross_geo_extension_paths** | {} | ✅ Yes | HC-10 |
+| **crv_scope_gates** *(v3.0)* | HC-8, HC-9, HC-1, HC-4, HC-5, HC-10 evaluated once per customer × geography (PLC-013) | ✅ Yes (config lists) | HC-1, HC-4, HC-5, HC-8, HC-9, HC-10 |
+| **dpb_scope_gates** *(v3.0)* | HC-2, HC-3, HC-6, HC-7, HC-11 evaluated per domain × environment × region (PLC-014) | ✅ Yes (config lists) | HC-2, HC-3, HC-6, HC-7, HC-11 |
+| **resolution_order** *(v3.0)* | CRV strictly precedes DPB (PLC-015) | ✅ Yes (gate) | — (ordering; VR-14) |
+| **domain_taxonomy_tokens** *(v3.0)* | `wl-*` per domain group; optional `<fn>` (DOM-001) | ✅ Yes (C-14, DEC-004) | — (scoping) |
+| **combined_region_load_observation_threshold** *(v3.0)* | Deviation alert threshold across a customer's domains (PLC-016/OBS-002) | ✅ Yes (C-15) | — (observation only) |
+| **dr_foundation_sizing_basis** *(v3.0)* | Configurable bootstrap per product/domain/region/zone/SKU (ENV-005/DR-007); never a fixed % (DR-021) | ✅ Yes (C-16) | HC-6, HC-7 (floor coverage) |
+| **GROUP_REPLENISH_THRESHOLD / SUB_REPLENISH_THRESHOLD** *(v3.0)* | 0.85 / 0.85 — central quota group replenishment at group and subscription level (QUA-015) | ✅ Yes | HC-3, HC-7 (headroom) |
 
 ---
 
@@ -967,8 +1022,15 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 - [ ] Middle East placement validated: Prod+CVAL co-located in a weighted-selected Middle East region; `dr_region` = weighted-selected Europe region (cross-geo)
 - [ ] Middle East cross-geo DR validated: weighted Europe selection + max-not-sum sizing at Europe destination (HC-6/HC-7/HC-10, DR-017)
 - [ ] Exception deployment workflow (HC-9 Restricted region override) tested
+- [ ] ***(v3.0)*** Two-scope evaluation implemented: CRV-scope gates (HC-8/9/1/4/5/10) resolved once per customer × geography; DPB-scope gates (HC-2/3/6/7/11) per domain × environment × region (PLC-013/014)
+- [ ] ***(v3.0)*** PLC-015 ordering enforced — CRV strictly precedes DPB; domain groups never re-run region selection (VR-14)
+- [ ] ***(v3.0)*** Per-domain CRG-set separation validated (CAP-025: `crg-pr-*` / `crg-cvdr-*` / `crg-drf-*` never mixed; DR Foundation not shared with CVAL before approved DR declaration) (VR-13)
+- [ ] ***(v3.0)*** Domain-bounded sharing validated (DOM-004) — cross-domain CVAL/DR sharing attempts rejected (VR-12)
+- [ ] ***(v3.0)*** Central quota group across domain ig subscriptions (QUA-015) wired into HC-3/HC-7 evaluation; 85% group/subscription replenishment thresholds
+- [ ] ***(v3.0)*** DR Foundation floor coverage (DR-021) verified: HC-6/HC-7 account both DR layers per domain without double-counting the shared CVAL/DR set
+- [ ] ***(v3.0)*** POC-012 (domain-scoped CRG sharing) and POC-013 (two-scope flow on live multi-domain customer) executed
 - [ ] HC rejection reasons logged to OperationRecord for audit
-- [ ] Validation Rules VR-1..VR-11 traced to HC enforcement points
+- [ ] Validation Rules VR-1..VR-14 traced to HC enforcement points
 
 ---
 
@@ -979,6 +1041,7 @@ The Production Readiness Review defines **11 Validation Rules (VR-1..VR-11)** th
 | **D8** | HC-1, HC-6 | Removed `DR_region ≠ NonProd_region` constraint; added HC-6 to operationalise co-location |
 | **D1, D2** | HC-3, HC-7 | Introduced Two-Group Quota Architecture; HC-3 now reads from Quota Groups; HC-7 enforces DR floor |
 | **D9** | HC-9, HC-10 | Introduced Standard/Restricted region classification; added HC-9 and HC-10 governance gates |
+| **DEC-004** *(v3.0)* | None (scoping only) | Domain-group taxonomy — `wl-*` workload-domain tokens per domain group (DOM-001), optional function-group `<fn>` refinement; configurable via **C-14**. No hard-constraint arithmetic change (HC-1..HC-11 intact); drives CRV/DPB scoping and per-domain CRG naming (CAP-025, C-12) |
 
 ---
 
@@ -994,5 +1057,5 @@ All hard constraints carry one of four evidence tags:
 ---
 
 **Document Status:** Production Ready  
-**Next Review:** After POC-30 and POC-31 completion (Quota Groups GA validation)
+**Next Review:** After POC-30 and POC-31 completion (Quota Groups GA validation) and POC-12/POC-13 (v3.0 two-scope + domain-scoped sharing validation)
 
