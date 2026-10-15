@@ -1,0 +1,54 @@
+---
+title: "ACRME Region Selection & Placement — End-to-End Pipeline"
+---
+flowchart TB
+    subgraph REQUEST["Placement Request"]
+        A["Customer C, Geography G\nSKU family, VM count, vCPU per VM\n(e.g. Contoso, US, E32ads_v5 × 20 = 640 vCPU)"]
+    end
+
+    subgraph INPUTS["Data Inputs"]
+        direction LR
+        B1["Region Catalogue\n(REG-001)\nStandard / Restricted"]
+        B2["Capacity_Usage\nProd/NP/DR Reserved,\nAllocated, Free per region"]
+        B3["Quota Data\nProd/NP Q-Limit, Q-Used,\nQ-Headroom per region"]
+        B4["Customer Distribution\nEnv Customers per region,\nTotal Customers per geography"]
+        B5["Policy\nWeights α β γ δ ε,\nThresholds (bootstrap, headroom)"]
+    end
+
+    subgraph CRV_PHASE["Phase 1 — Customer Region Vector (CRV)"]
+        direction TB
+        C["InScope Filter\nRegion.Geography = G\nRegion.Class = Standard\n(REG-001)"]
+        D["HC Gate\n(HC-3, HC-6, HC-7)\nEliminate ineligible regions"]
+        E["Scoring Engine\nPS = α·α_c + β·β_c + γ·γ_c + δ·δ_c + ε·ε_c\nPer environment (Prod / CVAL / DR)"]
+        F["Distribution Model\n(REG-003)\n3-region | 2-region | cross-geo"]
+        G["CRV Output\n(G, model, R_p, R_c, R_d)\nCached per C × G"]
+    end
+
+    subgraph DPB_PHASE["Phase 2 — Domain Placement Binding (DPB)"]
+        direction TB
+        H["PLC-015 Gate\nConsume CRV — no re-scoring"]
+        I["Per domain D in customer C:\nig subscription lookup (DOM-002, C-12)"]
+        J["CRG Set Verification\n(CAP-025)\nProd-dedicated | CVDR-shared | DRF"]
+        K["Reservation Sizing\nF.1 Target = Alloc + Buffer\nF.2 Headroom = Reserved − Alloc\nF.3 Deficit = max(0, Target − Reserved)"]
+        L["Zone Distribution\nF.9 Target per zone = round(VMs / ZoneCount)\nSkew check vs tolerance (C-13)"]
+        M["Quota Resolution\nF.4 Available = Limit − Used\nF.5 Deficit = max(0, Requested − Available)\nDraw from central pool (QUA-015)"]
+    end
+
+    subgraph READINESS["Readiness Gate (RDY-001)"]
+        N["Per-dimension check:\nRegion ✓  Zone ✓  SKU ✓\nReservation ✓  Quota ✓\nFreshness ✓  Policy ✓"]
+        O{"All dimensions\nREADY?"}
+        P["READY"]
+        Q["READY_WITH_RISK\n(deficit reconciling)"]
+    end
+
+    A --> B1 & B2 & B3 & B4 & B5
+    B1 & B2 & B3 & B4 & B5 --> C
+    C --> D --> E --> F --> G
+    G --> H --> I --> J --> K --> L --> M
+    M --> N --> O
+    O -->|Yes| P
+    O -->|Deficit > 0| Q
+
+    style CRV_PHASE fill:#e6f3ff,stroke:#0066cc,stroke-width:2px
+    style DPB_PHASE fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style READINESS fill:#fff8e1,stroke:#f57f17,stroke-width:2px
