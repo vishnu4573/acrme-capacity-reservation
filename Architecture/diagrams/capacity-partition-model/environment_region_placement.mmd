@@ -1,0 +1,96 @@
+flowchart TB
+    AEP["<b>AEP Intent</b><br/>customer/realm · domain group<br/>product · environment · region"]
+
+    AEP -->|"S1 — resolve or reuse CRV<br/>(PLC-015 gate)"| CRV_RES
+
+    subgraph CRV_RES["CRV Resolution (PLC-013 · F.11)"]
+        direction TB
+        Q1{"CRV(C,G)<br/>already exists?"}
+        Q1 -->|"Yes"| REUSE["Reuse cached CRV<br/>PLC-004 · PLC-009"]
+        Q1 -->|"No — first placement"| SEL
+
+        subgraph SEL["Region Selection Engine"]
+            direction TB
+            EXACT{"Exact region<br/>provided?<br/>(PLC-013a)"}
+            EXACT -->|"Yes"| LOCK["Lock: R_p = provided<br/>Restricted regions allowed"]
+            EXACT -->|"No"| WEIGHT["Weighted selection<br/>from Standard regions<br/>(REG-002 · PLC-007/008)"]
+            WEIGHT --> BIND
+            LOCK --> BIND
+            BIND["Bind R_p · R_c · R_d<br/>per distribution model"]
+        end
+        REUSE --> OUT
+        BIND --> OUT
+        OUT["CRV(C,G) = G, mod, R_p, R_c, R_d"]
+    end
+
+    CRV_RES -->|"S2 — resolve DPB per D × E<br/>using pre-bound CRV regions"| ENV_MAP
+
+    subgraph ENV_MAP["Environment → Region Mapping"]
+        direction TB
+        NOTE["Each environment E reads<br/>its region from the CRV:"]
+        E_P["<b>Prod</b> → R_p"]
+        E_C["<b>CVAL</b> → R_c"]
+        E_D["<b>DR</b> → R_d"]
+        NOTE --- E_P
+        NOTE --- E_C
+        NOTE --- E_D
+    end
+
+    subgraph DIST["Distribution Models (REG-003)"]
+        direction TB
+        D3["<b>3-region model</b><br/>R_p ≠ R_c ≠ R_d<br/>e.g. US: WUS3 · CUS · CAC<br/>Full separation"]
+        D2["<b>2-region model</b><br/>R_p ≠ R_c = R_d<br/>e.g. Europe: CHN · SEC<br/>CVAL + DR co-located<br/>(ENV-003 · PLC-010a)"]
+        DX["<b>Cross-geo DR</b><br/>R_p, R_c in geo A<br/>R_d in geo B<br/>e.g. Middle East → Europe<br/>(DR-020 · PLC-010b)"]
+    end
+
+    ENV_MAP --> DIST
+
+    subgraph CONSTRAINTS["Placement Constraints"]
+        direction TB
+        C1["ENV-003 — Prod never shares<br/>capacity with anyone"]
+        C2["ENV-003 — DR may share<br/>with CVAL (same domain only)"]
+        C3["PLC-010a — 2-region: CVAL + DR<br/>co-locate, separate CRGs"]
+        C4["DOM-004 — sharing isolation =<br/>domain boundary"]
+        C5["PLC-015 — CRV gate: no DPB<br/>until CRV is resolved"]
+    end
+
+    DIST --> CONSTRAINTS
+
+    subgraph GLOSSARY["Acronyms & Variables"]
+        direction LR
+        G1["<b>C</b> — Customer"]
+        G2["<b>G</b> — Geography"]
+        G3["<b>D</b> — Domain Group"]
+        G4["<b>E</b> — Environment"]
+        G5["<b>R_p</b> — Prod region"]
+        G6["<b>R_c</b> — CVAL region"]
+        G7["<b>R_d</b> — DR region"]
+        G8["<b>mod</b> — Distribution model"]
+        G9["<b>ig</b> — Instance Group"]
+        G10["<b>CRG</b> — Capacity Reservation Group"]
+        G11["<b>CR</b> — Capacity Reservation"]
+        G12["<b>AEP</b> — Automation Entry Point"]
+    end
+
+    style AEP fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    style CRV_RES fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,color:#1b5e20
+    style SEL fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px,color:#4a148c
+    style ENV_MAP fill:#fff3e0,stroke:#e65100,stroke-width:1px,color:#bf360c
+    style DIST fill:#e8eaf6,stroke:#3f51b5,stroke-width:1px,color:#1a237e
+    style CONSTRAINTS fill:#fce4ec,stroke:#c62828,stroke-width:1px,color:#b71c1c
+    style GLOSSARY fill:#fafafa,stroke:#bdbdbd,color:#424242
+
+    style Q1 fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style REUSE fill:#c8e6c9,stroke:#2e7d32,color:#1b5e20
+    style EXACT fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style LOCK fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style WEIGHT fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style BIND fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style OUT fill:#c8e6c9,stroke:#2e7d32,color:#1b5e20
+    style NOTE fill:#fff3e0,stroke:#e65100,color:#bf360c
+    style E_P fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style E_C fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style E_D fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+    style D3 fill:#c8e6c9,stroke:#2e7d32,color:#1b5e20
+    style D2 fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style DX fill:#ffcdd2,stroke:#c62828,color:#b71c1c

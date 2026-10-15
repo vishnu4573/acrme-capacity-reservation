@@ -1,0 +1,143 @@
+flowchart TB
+    CRV["<b>CRV — Customer Region Vector</b><br/><i>Customer-scoped · one per C × G</i><br/>───────────────────<br/>R_p — Prod Region<br/>R_c — CVAL Region<br/>R_d — DR Region<br/>mod — Distribution Model<br/>G — Geography<br/>ver — Policy / Engine Version<br/>───────────────────<br/><b>PLC-013 · F.11</b>"]
+
+    CRV -->|"Required input<br/>(PLC-015 gate:<br/>CRV strictly precedes DPB)"| DPB
+
+    DPB["<b>DPB Engine</b><br/><i>Per Domain Group D × Environment E</i><br/>───────────────────<br/>Deterministic: same CRV + policy<br/>version = identical outcome<br/>No region weighting at domain scope<br/>───────────────────<br/><b>PLC-014 · F.12</b>"]
+
+    DPB --> DPB_BIND
+
+    DPB_BIND["<b>DPB(D,E) resolves:</b><br/>───────────────────<br/>① ig — Instance Group subscription<br/>(DOM-002 · C-12 · shard registry)<br/>② CRG set — per CAP-025<br/>(Prod-dedicated | CVDR-shared)<br/>③ CR sizing — allocated + buffer<br/>(F.1 · F.2 · F.3)<br/>④ Zone distribution — per-domain<br/>(PLC-016 · F.9)<br/>⑤ Quota draw — central group<br/>(QUA-015 · region × VM-family)<br/>───────────────────<br/><b>PLC-014</b>"]
+
+    DPB -->|"DPB(A,Prod)"| DGA
+    DPB -->|"DPB(A,CVAL)"| DGA
+    DPB -->|"DPB(A,DR)"| DGA
+    DPB -->|"DPB(B,Prod)"| DGB
+    DPB -->|"DPB(B,CVAL)"| DGB
+    DPB -->|"DPB(B,DR)"| DGB
+    DPB -->|"DPB(N,E)"| DGN
+
+    subgraph DGA["Domain Group A — e.g. wl-tms"]
+        direction TB
+        A_PS["<b>Prod Subscription</b><br/><code>sub-…-prod-wl-tms-…</code>"]
+        A_PC["🔒 Prod CRG Set<br/><code>crg-pr-R-*</code><br/><i>Dedicated · never shared</i><br/>ENV-003 · CAP-023"]
+        A_PS --- A_PC
+
+        A_NS["<b>CVAL Subscription</b><br/><code>sub-…-cval-wl-tms-…</code>"]
+        A_DS["<b>DR Subscription</b><br/><code>sub-…-dr-wl-tms-…</code>"]
+        A_CC["🔗 CVAL/DR Shared CRG Set<br/><code>crg-cvdr-R-*</code><br/><i>Shared within THIS domain only</i><br/>ENV-003 · DOM-004 · CAP-025"]
+        A_NS --- A_CC
+        A_DS --- A_CC
+    end
+
+    subgraph DGB["Domain Group B — e.g. wl-wms"]
+        direction TB
+        B_PS["<b>Prod Subscription</b><br/><code>sub-…-prod-wl-wms-…</code>"]
+        B_PC["🔒 Prod CRG Set<br/><i>Dedicated · never shared</i>"]
+        B_PS --- B_PC
+
+        B_NS["<b>CVAL Subscription</b>"]
+        B_DS["<b>DR Subscription</b>"]
+        B_CC["🔗 CVAL/DR Shared CRG Set<br/><i>Shared within THIS domain only</i>"]
+        B_NS --- B_CC
+        B_DS --- B_CC
+    end
+
+    subgraph DGN["Domain Group N"]
+        direction TB
+        N_PS["<b>Prod Subscription</b>"]
+        N_PC["🔒 Prod CRG Set"]
+        N_PS --- N_PC
+        N_NS["<b>CVAL Subscription</b>"]
+        N_DS["<b>DR Subscription</b>"]
+        N_CC["🔗 CVAL/DR Shared CRG Set"]
+        N_NS --- N_CC
+        N_DS --- N_CC
+    end
+
+    subgraph DGF["Domain Group: Foundation Services — wl-fnd"]
+        direction TB
+        F_PS["<b>Prod Subscription</b>"]
+        F_PC["🔒 Prod CRG Set"]
+        F_PS --- F_PC
+
+        F_CVAL_INFO["<b>Standing CVAL Capacity</b><br/>IAM · APIM · Kafka · Control Plane<br/><i>Always running in DR region R_d</i><br/><i>Ready before DR declaration</i>"]
+        F_CS["<b>Foundation CVAL Subscription</b>"]
+        F_CVAL_CRG["🛡️ CVAL Foundation CRG Set<br/><code>crg-cvalf-R-*</code><br/><i>Dedicated bootstrap ·</i><br/><i>pre-staged quota</i><br/><i>Never shared with DR</i><br/>ENV-005 · DR-007 · DR-021 · QUA-015"]
+        F_CVAL_INFO --- F_CS
+        F_CS --- F_CVAL_CRG
+
+        F_DR_INFO["<b>Standing DR Capacity</b><br/>IAM · APIM · Kafka · Control Plane<br/><i>Always running in DR region R_d</i><br/><i>Ready before DR declaration</i>"]
+        F_DS["<b>Foundation DR Subscription</b>"]
+        F_DC["🛡️ DR Foundation CRG Set<br/><code>crg-drf-R-*</code><br/><i>Dedicated bootstrap ·</i><br/><i>pre-staged quota</i><br/><i>Never shared with CVAL</i><br/>ENV-005 · DR-007 · DR-021 · QUA-015"]
+        F_DR_INFO --- F_DS
+        F_DS --- F_DC
+    end
+
+    DPB -->|"DPB(FND,E)"| DGF
+
+    SUB_GOV["<b>DOM-002 — Subscription Boundary</b><br/>Each D × E deploys in a<br/>distinct subscription"]
+    ISO["<b>ENV-003 + DOM-004 — Isolation</b><br/>CVAL/DR sharing is domain-bounded:<br/>a shared CRG never crosses<br/>domain group boundaries<br/>Prod never shares with anyone"]
+
+    SUB_GOV -.->|"governs"| DGA
+    SUB_GOV -.->|"governs"| DGB
+    SUB_GOV -.->|"governs"| DGN
+    SUB_GOV -.->|"governs"| DGF
+    ISO -.->|"enforces"| DGA
+    ISO -.->|"enforces"| DGB
+    ISO -.->|"enforces"| DGN
+    ISO -.->|"enforces"| DGF
+
+    subgraph LEGEND["Legend"]
+        direction LR
+        L1["🔒 Red — Prod CRG<br/>Dedicated · never shared"]
+        L2["🔗 Yellow — CVAL/DR Shared CRG<br/>Shared within one domain only"]
+        L3["🛡️ Purple — DR Foundation CRG<br/>Standing capacity · always present"]
+        L4["Blue box — Subscription<br/>One per domain × environment"]
+        L5["Dark container — Domain Group<br/>Workload-domain grouping"]
+        L6["Green box — Governance rule<br/>Cross-cutting constraint"]
+    end
+
+    style CRV fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    style DPB fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    style DPB_BIND fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    style SUB_GOV fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#bf360c
+    style ISO fill:#fce4ec,stroke:#c62828,stroke-width:2px,color:#b71c1c
+
+    style DGA fill:#37474f,color:#eceff1
+    style DGB fill:#37474f,color:#eceff1
+    style DGN fill:#37474f,color:#eceff1
+    style DGF fill:#1a237e,color:#e8eaf6
+
+    style A_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style A_NS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style A_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style B_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style B_NS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style B_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style N_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style N_NS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style N_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style F_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style F_CS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style F_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style F_CVAL_INFO fill:#e8eaf6,stroke:#3f51b5,color:#1a237e
+    style F_DR_INFO fill:#e8eaf6,stroke:#3f51b5,color:#1a237e
+    style F_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+
+    style A_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style B_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style N_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style A_CC fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style B_CC fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style N_CC fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style F_CVAL_CRG fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+    style F_DC fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+
+    style LEGEND fill:#fafafa,stroke:#bdbdbd,color:#424242
+    style L1 fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style L2 fill:#fff9c4,stroke:#f9a825,color:#e65100
+    style L3 fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+    style L4 fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    style L5 fill:#37474f,color:#eceff1
+    style L6 fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
