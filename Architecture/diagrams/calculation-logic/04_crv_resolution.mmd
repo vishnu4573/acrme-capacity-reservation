@@ -1,0 +1,65 @@
+---
+title: "CRV Resolution — Two Formula Sets (F.11)"
+---
+flowchart TB
+    subgraph INPUT["Placement Request"]
+        A["Customer C, Geography G\nRequested: E32ads_v5 × 20 = 640 vCPU"]
+    end
+
+    B{"Is Prod region\nsupplied?"}
+
+    subgraph SET1["Formula Set 1 — Exact-Region Path (PLC-001 default)"]
+        direction TB
+        S1A["R_p = supplied Prod region\n(e.g. West US 3)"]
+        S1B["VALIDATE R_p\nagainst HC Gate + PlacementPolicy\n(must pass HC-3 Prod)"]
+        S1C{"R_p\nvalid?"}
+        S1D["Score CVAL + DR candidates only\nPS = α·α_c + β·β_c + γ·γ_c + δ·δ_c + ε·ε_c\n(Prod is NOT scored — it is the input)"]
+        S1E["Alarm / Exception\nProd region fails HC\nbut still place CVAL/DR (PLC-008)"]
+    end
+
+    subgraph SET2["Formula Set 2 — Geography Path (PLC-002 exception)"]
+        direction TB
+        S2A["CANDIDATES(G) = all in-scope regions\nfiltered by HC Gate"]
+        S2B["Score ALL candidates\nPS = α·α_c + β·β_c + γ·γ_c + δ·δ_c + ε·ε_c\nat customer-aggregate scope"]
+        S2C["R_p = argmax PS among candidates\n(lowest-risk region for Prod)"]
+    end
+
+    subgraph DISTMODEL["Distribution Model (REG-003)"]
+        direction TB
+        DM{"Geography\nmodel?"}
+
+        DM3["3-region (US)\nR_c = highest CVAL PS\namong remaining regions\nR_d = highest DR PS\namong remaining regions\n(separation optional, PLC-010)"]
+
+        DM2["2-region (EU/AU/AP)\nR_c = R_d = single remaining\nregion after Prod\n(deterministic, PLC-010a)\nCo-location mandatory"]
+
+        DMX["Cross-geo (ME)\nR_c = R_p (same region,\nseparate CRGs)\nR_d = highest DR PS\namong Europe regions\n(PLC-010b)"]
+    end
+
+    subgraph OUTPUT["CRV Output (cached per C × G)"]
+        OUT["CRV(C,G) = (G, model, R_p, R_c, R_d)\n\nExample US 3-region:\n(US, 3-region, West US 3, Canada Central, Central US)\n\nExample EU 2-region:\n(EU, 2-region, Sweden Central, West Europe, West Europe)\n\nExample ME cross-geo:\n(ME, cross-geo, Saudi Arabia Central,\nSaudi Arabia Central, Switzerland North)"]
+    end
+
+    A --> B
+    B -->|"Yes (default)"| S1A
+    B -->|"No (exception-approved)"| S2A
+
+    S1A --> S1B --> S1C
+    S1C -->|Yes| S1D
+    S1C -->|No| S1E
+    S1D --> DM
+    S1E --> DM
+
+    S2A --> S2B --> S2C --> DM
+
+    DM -->|US| DM3
+    DM -->|EU/AU/AP| DM2
+    DM -->|ME| DMX
+
+    DM3 --> OUT
+    DM2 --> OUT
+    DMX --> OUT
+
+    style SET1 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style SET2 fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style DISTMODEL fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style OUTPUT fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
