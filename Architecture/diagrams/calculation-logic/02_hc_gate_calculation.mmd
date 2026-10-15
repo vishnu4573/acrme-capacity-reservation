@@ -1,0 +1,107 @@
+---
+title: "HC Gate — Hard Constraint Eligibility Calculation"
+---
+flowchart TB
+    subgraph INPUTS["Inputs from Capacity_Usage & Policy"]
+        direction LR
+        I1["Prod Q-Headroom\n= Prod Q-Limit − Prod Q-Used"]
+        I2["NP Eff-Free\n= NP Reserved − NP Alloc"]
+        I3["NP Q-Headroom\n= NP Q-Limit − NP Q-Used"]
+        I4["DR Free\n= DR Reserved − DR Alloc"]
+        I5["Requested vCPU\n(Setup: VM count × vCPU/VM)"]
+        I6["Policy Thresholds\nB13: DR bootstrap = 40\nB15: Min Prod headroom = 20\nB16: Min NP headroom = 20"]
+    end
+
+    subgraph HC3_PROD["HC-3 Production"]
+        P1{"Prod Q-Headroom\n≥ Requested vCPU?"}
+        P2{"Prod Q-Headroom\n− Requested vCPU\n≥ 20?"}
+        P3(["HC-3 Prod: PASS"])
+        P4(["HC-3 Prod: FAIL"])
+    end
+
+    subgraph HC3_NP["HC-3 NonProd"]
+        N1{"NP Eff-Free\n≥ Requested vCPU?"}
+        N2{"NP Q-Headroom\n− Requested vCPU\n≥ 20?"}
+        N3(["HC-3 NP: PASS"])
+        N4(["HC-3 NP: FAIL"])
+    end
+
+    subgraph HC3_DR["HC-3 DR"]
+        D1{"DR Free\n≥ DR bootstrap\n(40 vCPU)?"}
+        D2(["HC-3 DR: PASS"])
+        D3(["HC-3 DR: FAIL"])
+    end
+
+    subgraph HC6["HC-6 DR Coverage Floor"]
+        H1{"DR Free + NP Eff-Free\n≥ DR bootstrap\n(40 vCPU)?"}
+        H2(["HC-6: PASS"])
+        H3(["HC-6: FAIL"])
+    end
+
+    subgraph HC7["HC-7 DR Floor Integrity"]
+        H4{"NP Q-Used + Requested vCPU\n≤ NP Q-Limit − DR bootstrap?"}
+        H5(["HC-7: PASS"])
+        H6(["HC-7: FAIL"])
+    end
+
+    subgraph ELIGIBILITY["Eligibility Flags"]
+        E1{"HC-3 Prod\n= PASS?"}
+        E2(["Eligible Prod: YES"])
+        E3(["Eligible Prod: NO"])
+
+        E4{"HC-3 NP = PASS\nAND HC-7 = PASS?"}
+        E5(["Eligible NonProd: YES"])
+        E6(["Eligible NonProd: NO"])
+
+        E7{"HC-3 DR = PASS\nAND HC-6 = PASS?"}
+        E8(["Eligible DR: YES"])
+        E9(["Eligible DR: NO"])
+    end
+
+    I1 & I5 & I6 --> P1
+    P1 -->|Yes| P2
+    P1 -->|No| P4
+    P2 -->|Yes| P3
+    P2 -->|No| P4
+
+    I2 & I3 & I5 & I6 --> N1
+    N1 -->|Yes| N2
+    N1 -->|No| N4
+    N2 -->|Yes| N3
+    N2 -->|No| N4
+
+    I4 & I6 --> D1
+    D1 -->|Yes| D2
+    D1 -->|No| D3
+
+    I4 & I2 & I6 --> H1
+    H1 -->|Yes| H2
+    H1 -->|No| H3
+
+    I3 & I5 & I6 --> H4
+    H4 -->|Yes| H5
+    H4 -->|No| H6
+
+    P3 --> E1
+    P4 --> E1
+    E1 -->|Yes| E2
+    E1 -->|No| E3
+
+    N3 & H5 --> E4
+    N4 --> E4
+    H6 --> E4
+    E4 -->|Both PASS| E5
+    E4 -->|Either FAIL| E6
+
+    D2 & H2 --> E7
+    D3 --> E7
+    H3 --> E7
+    E7 -->|Both PASS| E8
+    E7 -->|Either FAIL| E9
+
+    style HC3_PROD fill:#e3f2fd,stroke:#1565c0,stroke-width:1px
+    style HC3_NP fill:#e3f2fd,stroke:#1565c0,stroke-width:1px
+    style HC3_DR fill:#e3f2fd,stroke:#1565c0,stroke-width:1px
+    style HC6 fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    style HC7 fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    style ELIGIBILITY fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
