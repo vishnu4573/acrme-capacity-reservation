@@ -1,0 +1,50 @@
+---
+title: "Capacity Sizing Formulas (F.1–F.3) — Per Domain × Environment"
+---
+flowchart LR
+    subgraph INPUTS["Inputs"]
+        direction TB
+        I1["Allocated VM Count(D,E)\nVMs currently running\nin the domain's ig"]
+        I2["Buffer Target(D,E)\nConfigurable per\nproduct/region/env/SKU\n(C-2, scope file)"]
+        I3["Reserved Quantity(D,E)\nCurrent reservation\nin the domain's CRG"]
+    end
+
+    subgraph F1["F.1 — Reservation Target"]
+        F1A["Target = Allocated + Buffer\n\nTMS Prod WUS3:\nTarget = 20 + 4 = 24 VMs\n\nTMS CVAL CAC:\nTarget = 8 + 2 = 10 VMs\n\nTMS DR CUS:\nTarget = 0 + 2 = 2 VMs\n(bootstrap only)"]
+    end
+
+    subgraph F2["F.2 — Reservation Headroom"]
+        F2A["Headroom = Reserved − Allocated\n\nTMS Prod WUS3:\nHeadroom = 18 − 20 = −2\n(behind demand!)\n\nTMS CVAL CAC:\nHeadroom = 10 − 8 = 2\n(healthy)\n\nTMS DR CUS:\nHeadroom = 0 − 0 = 0\n(no reservation yet)"]
+    end
+
+    subgraph F3["F.3 — Reservation Deficit"]
+        F3A["Deficit = max(0, Target − Reserved)\n\nTMS Prod WUS3:\nDeficit = max(0, 24 − 18) = 6\n→ Reconciliation: increase CRG by 6\n\nTMS CVAL CAC:\nDeficit = max(0, 10 − 10) = 0\n→ No action needed\n\nTMS DR CUS:\nDeficit = max(0, 2 − 0) = 2\n→ Create new reservation for 2 VMs"]
+    end
+
+    subgraph ACTION["Reconciliation (CAP-005)"]
+        direction TB
+        A1{"Deficit > 0?"}
+        A2["Raise / create reservation\nin domain's CRG set (CAP-025)\nReconciliation loop every 6 min"]
+        A3["No action\nReservation covers target"]
+        A4{"Deficit = 0 AND\nHeadroom > Buffer × 2?"}
+        A5["Flag for underutilisation\nreview (FIN-005)"]
+        A6["Healthy state"]
+    end
+
+    I1 --> F1A
+    I2 --> F1A
+    I1 --> F2A
+    I3 --> F2A
+    I3 --> F3A
+    F1A --> F3A
+
+    F3A --> A1
+    A1 -->|Yes| A2
+    A1 -->|No| A4
+    A4 -->|Yes| A5
+    A4 -->|No| A6
+
+    style F1 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style F2 fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    style F3 fill:#fce4ec,stroke:#c62828,stroke-width:2px
+    style ACTION fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
