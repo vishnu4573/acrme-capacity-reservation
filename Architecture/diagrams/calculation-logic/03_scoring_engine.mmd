@@ -1,0 +1,76 @@
+---
+title: "Scoring Engine — Component Calculation & Weighted Sum"
+---
+flowchart TB
+    subgraph RAW_DATA["Raw Data Inputs (per region R)"]
+        direction LR
+        R1["Prod Reserved\nNP Reserved\nDR Reserved"]
+        R2["NP Eff-Free\n= NP Reserved − NP Alloc"]
+        R3["DR Free\n= DR Reserved − DR Alloc"]
+        R4["Prod Q-Headroom\nProd Q-Limit"]
+        R5["NP Q-Headroom\nNP Q-Limit"]
+        R6["DR Coverage\nDR Coverage Target (0.80)"]
+        R7["Env Customers(r,env)\nTotal Customers(g)"]
+        R8["AZ Count"]
+    end
+
+    subgraph ALPHA["α — Capacity Headroom"]
+        direction TB
+        A1["Prod: α_raw = NP Eff-Free / Prod Reserved"]
+        A2["CVAL: α_raw = NP Eff-Free / NP Reserved"]
+        A3["DR: α_raw = DR Free / DR Reserved"]
+        A4["α_c = Clamp(α_raw, 0, 1)"]
+    end
+
+    subgraph BETA["β — Quota Headroom"]
+        direction TB
+        B1["Prod: β_raw = Prod Q-Headroom / Prod Q-Limit"]
+        B2["CVAL/DR: β_raw = NP Q-Headroom / NP Q-Limit"]
+        B3["β_c = Clamp(β_raw, 0, 1)"]
+    end
+
+    subgraph GAMMA["γ — Distribution Fairness (F.10)"]
+        direction TB
+        G1["Total Customers(g) = COUNT DISTINCT\ncustomers with ≥ 1 env in geography g"]
+        G2["γ_raw = 1 − Env Customers(r,env) / Total Customers(g)"]
+        G3["If Total Customers(g) = 0 → γ = 1"]
+        G4["γ_c = Clamp(γ_raw, 0, 1)"]
+    end
+
+    subgraph DELTA["δ — DR Readiness"]
+        direction TB
+        D1["Prod: δ_raw = DR Coverage (direct)"]
+        D2["CVAL: δ_raw = NP Eff-Free / NP Reserved\n⚠ Known gap: δ = α"]
+        D3["DR: δ_raw = DR Coverage / DR Target (0.80)"]
+        D4["δ_c = Clamp(δ_raw, 0, 1)"]
+    end
+
+    subgraph EPSILON["ε — Zone Diversity"]
+        direction TB
+        E1["ε_raw = AZ Count / 3"]
+        E2["ε_c = Clamp(ε_raw, 0, 1)"]
+    end
+
+    subgraph WEIGHTS["Policy Weights (must sum to 1.0)"]
+        W1["α = 0.30  β = 0.20  γ = 0.25  δ = 0.15  ε = 0.10"]
+    end
+
+    subgraph PS_CALC["Placement Score"]
+        PS["PS = α·α_c + β·β_c + γ·γ_c + δ·δ_c + ε·ε_c\n\nComputed per region per environment\nHighest PS wins that environment's region"]
+    end
+
+    R1 & R2 & R3 --> A1 & A2 & A3 --> A4
+    R4 & R5 --> B1 & B2 --> B3
+    R7 --> G1 --> G2 & G3 --> G4
+    R6 & R2 --> D1 & D2 & D3 --> D4
+    R8 --> E1 --> E2
+
+    A4 & B3 & G4 & D4 & E2 --> PS
+    W1 --> PS
+
+    style ALPHA fill:#e3f2fd,stroke:#1565c0,stroke-width:1px
+    style BETA fill:#e8eaf6,stroke:#283593,stroke-width:1px
+    style GAMMA fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style DELTA fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    style EPSILON fill:#fff8e1,stroke:#f57f17,stroke-width:1px
+    style PS_CALC fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px

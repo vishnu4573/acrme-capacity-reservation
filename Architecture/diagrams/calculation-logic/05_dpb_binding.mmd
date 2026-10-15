@@ -1,0 +1,76 @@
+---
+title: "Domain Placement Binding (DPB) — Calculation Chain (F.12)"
+---
+flowchart TB
+    subgraph GATE["PLC-015 Two-Phase Gate"]
+        G1["Consume CRV(C,G) = (G, model, R_p, R_c, R_d)\nNo region re-scoring at domain scope\nRegions are fixed from Phase 1"]
+    end
+
+    subgraph DOMAIN_LOOP["For each Domain D in Customer C"]
+        direction TB
+
+        subgraph IG["ig Subscription Resolution"]
+            IG1["Lookup ig(D,E,R) per DOM-002, C-12\nNaming: sub-{customer}-cld-cr-{env}-{domain}-{region}-{shard}\n\nExample (TMS Prod WUS3):\nsub-jda-cld-cr-prod-wl-tms-wus3-01"]
+        end
+
+        subgraph CRG["CRG Set Verification (CAP-025)"]
+            CRG1["Prod-Dedicated CRG\ncrg-{customer}-prod-{domain}-{region}-{sku}\nin R_p only"]
+            CRG2["CVDR-Shared CRG\ncrg-{customer}-cvdr-{domain}-{region}-{sku}\nin R_c and R_d"]
+            CRG3["DRF Foundation CRG\ncrg-{customer}-drf-fnd-{region}-{sku}\nin R_c and R_d\n(standing capacity, wl-fnd domain group)"]
+        end
+
+        subgraph RESERVATION["Reservation Sizing (per D,E,R)"]
+            direction TB
+            RS1["F.1 — Target Reserved Capacity\nTarget = Allocated VMs + Buffer Target\n\nExample TMS Prod WUS3:\nTarget = 20 + 4 = 24 VMs"]
+            RS2["F.2 — Reservation Headroom\nHeadroom = Reserved Qty − Allocated VMs\n\nExample: Headroom = 18 − 20 = −2\n(reservation behind demand)"]
+            RS3["F.3 — Reservation Deficit\nDeficit = max(0, Target − Reserved Qty)\n\nExample: Deficit = max(0, 24 − 18) = 6 VMs\n→ Reconciliation action (CAP-005)"]
+        end
+
+        subgraph ZONE["Zone Distribution (F.9, per D,E)"]
+            direction TB
+            Z1["Target VMs per Zone\n= round(VMs / ZoneCount)\n\nExample: 20 VMs / 3 zones\n= 7, 7, 6 (round-robin remainder)"]
+            Z2["Zone Skew\n= Actual(z) − Target(z) per zone\n\nExample: Actual 9/6/5\nSkew: +2, −1, −1"]
+            Z3{"Max Skew > Tolerance\n(C-13)?"}
+            Z4["Rebalance triggered\n(PLC-011)"]
+            Z5["Within tolerance\nNext VM targets argmin zone\n(zone with fewest VMs)"]
+        end
+
+        subgraph QUOTA["Quota Resolution (F.4–F.5)"]
+            direction TB
+            Q1["F.4 — Available Quota\n= Assigned Regional VM-Family Quota(ig)\n− Current VM-Family Usage(ig)\n\nExample: 800 − 640 = 160 vCPU available"]
+            Q2["F.5 — Quota Deficit\n= max(0, Requested − Available)\n\nExample: Deficit for 6 new VMs (192 vCPU):\nmax(0, 192 − 160) = 32 vCPU deficit"]
+            Q3["Draw from Central Quota Group\n(QUA-015) per region × VM-family\n\nExample: Pool 5,000 limit, 3,200 used\n→ 1,800 available, draw 32\n→ Post-draw: 3,232 / 5,000 = 64.6%"]
+            Q4{"Pool utilisation\n≥ 85% threshold?"}
+            Q5["Proactive Azure\nquota request"]
+            Q6["No action\n(pool healthy)"]
+        end
+    end
+
+    subgraph REGION_OBS["Region Observation (not action)"]
+        RO["RegionZoneLoad(R,E,z) = Σ_D VMs(D,E,R,z)\nCombined load across all domains\nOBS-001/002 alerting only\nNever triggers cross-domain reservation actions"]
+    end
+
+    subgraph DPB_RECORD["DPB Record Written"]
+        REC["DPB(D,E,R) = {\n  ig: sub-jda-cld-cr-prod-wl-tms-wus3-01\n  crg_set: prod-dedicated\n  target_reserved: 24\n  current_reserved: 18\n  deficit: 6 (reconciling)\n  zone_distribution: 9/6/5\n  max_skew: 2 (at tolerance)\n  quota_available: 160+32=192 vCPU\n  status: READY_WITH_RISK\n}"]
+    end
+
+    G1 --> IG1 --> CRG1 & CRG2 & CRG3
+    CRG1 & CRG2 & CRG3 --> RS1
+    RS1 --> RS2 --> RS3
+    RS3 --> Z1 --> Z2 --> Z3
+    Z3 -->|Yes| Z4
+    Z3 -->|No| Z5
+    Z4 --> Q1
+    Z5 --> Q1
+    Q1 --> Q2 --> Q3 --> Q4
+    Q4 -->|Yes| Q5
+    Q4 -->|No| Q6
+    Q5 --> REC
+    Q6 --> REC
+    Z1 -.-> RO
+
+    style GATE fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style RESERVATION fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style ZONE fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    style QUOTA fill:#fce4ec,stroke:#c62828,stroke-width:2px
+    style DPB_RECORD fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
