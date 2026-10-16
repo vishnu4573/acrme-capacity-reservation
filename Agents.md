@@ -109,6 +109,8 @@ Azure Capacity & Platform Architect   ◄── Requirements Baseline (single so
 
 For research, design, formula, and review work this agent runs as `.github/agents/acrme-research-designer.agent.md`, which executes skill SK-13 (`grounding-acrme-research-design`): resolve the current baseline version, map sources, tag evidence, gate against baseline/HC/WAF, and lint the output with `check_grounding.py` before delivery.
 
+Research and fact-checking use Microsoft Learn MCP search/fetch and relevant Azure MCP documentation/service guidance under SK-13 Step 3. Discover tools before use, cite official sources and version constraints, and disclose unavailable capabilities or fallbacks. Documentation retrieval is not a passing POC and grants no permission to query or mutate live environments; live validation remains the POC Validation Engineer's responsibility.
+
 ---
 
 ### Agent 2 — ACRME Implementation Engineer
