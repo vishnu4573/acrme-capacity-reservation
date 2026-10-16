@@ -1,5 +1,5 @@
 """
-Source→Destination DR Index — ACRME v2.3
+Source→Destination DR Index — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Tracks reciprocal multi-source DR hosting with max-not-sum sizing (TDD Section 6.2,
 DR-016/017/018, ADR-005).

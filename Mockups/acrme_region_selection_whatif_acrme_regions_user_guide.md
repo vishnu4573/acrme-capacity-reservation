@@ -1,5 +1,9 @@
 # ACRME Region Selection WHAT-IF Tool — User Guide
 
+> **Historical mockup — not reconciled to v4.0.** The catalogue and rules described here reflect
+> v2.4/v2.5-era inputs. Use the v4.0 baseline as normative authority; revalidate this guide and
+> its workbook before using its outputs for current placement decisions.
+
 **Workbook:** `acrme_region_selection_whatif_acrme_regions.xlsx`  
 **Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.4  
 **Status:** Mockup / Planning Tool — derived planning figures only; not connected to live Azure state  

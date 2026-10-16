@@ -15,6 +15,8 @@
 | **Cross-references** | ADR-001 (Region Selection), ADR-002 (Quota), ADR-003 (DR Capacity), |
 |  | ADR-005 (Distributed DR), ADR-006 (Quota/Reservation Enforcement) |
 
+> **Baseline status:** Baseline v4.0 is authoritative. This proposed draft was authored against v2.4 and has not been reviewed against v4.0. It remains proposed and must be revalidated before approval or implementation.
+
 ---
 
 > **Label conventions used in this document:**

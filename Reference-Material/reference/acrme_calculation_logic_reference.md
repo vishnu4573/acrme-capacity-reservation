@@ -1,5 +1,10 @@
 # ACRME Calculation Logic Reference — All Scenarios (v2.4)
 
+> **Historical calculation reference — not reconciled to v4.0.** Baseline
+> [`Requirements/acrme_requirements_baseline_v4_0.md`](../../Requirements/acrme_requirements_baseline_v4_0.md)
+> is normative for all formulas and calculation semantics. Do not use this document's older
+> formulas, scenario numbers, or references as current where they differ from v4.0.
+
 > **Revision v2.4 — 7 September 2026.**
 > This revision folds in the Baseline v2.4 reservation-model gaps. It adds **Scenario 21 — Even Per-Zone Distribution & Rebalancing** with the new **Appendix A.9** formulas (`zone_target_share = 1/zone_count`, greatest-deficit-first zone selection, drift-based rebalancing, config **C-13**) and a worked three-zone example, and records the naming-convention config (**C-12**, OPS-006) in the constant table. The reservation-eligibility (CAP-020/021), seed-matrix (CAP-022), reactive-discovery (CAP-024), per-AZ CRG structure (CAP-023), core-subscription classification (CAP-001a) and decommissioning-boundary (CAP-008/010) decisions are captured in ADR-002, the FDD, the TDD, and the requirements baseline; the arithmetic new in v2.4 is A.9. All other calculation logic is unchanged.
 >

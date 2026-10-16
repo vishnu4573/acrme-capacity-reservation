@@ -7,8 +7,9 @@ before it proceeds, while minimising idle cost through lean distributed DR and
 continuous reconciliation.
 
 Architecture:
-    - Requirements Baseline: v2.3 (5 geographies: US 3-region; Europe/Australia/
-      Asia Pacific/Middle East 2-region with ENV-003 CVAL/DR co-location)
+    - Current requirements baseline: v4.0
+    - This package remains a legacy implementation skeleton based on v2.3 concepts;
+      it has not been reconciled against the v4.0 requirements.
     - Technical Design: Design/acrme_technical_design_document.md
     - Functional Design: Design/acrme_functional_design_document.md
 
@@ -21,4 +22,5 @@ Phase 3 Scope (Placement & Customer Seed):
 """
 
 __version__ = "0.1.0-phase3-skeleton"
-__baseline_version__ = "2.3"
+__baseline_version__ = "4.0"
+__baseline_alignment__ = "not-reconciled"

@@ -12,14 +12,20 @@
 
 | Candidate | Path |
 |---|---|
-| Repo baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` |
+| Repo baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` — authoritative |
 | Legacy repo baseline (v2.5, filename historical) | `Requirements/acrme_requirements_baseline_v2_4.md` — superseded by v4.0 |
+| Historical baseline (v3.0) | `Requirements/acrme_requirements_baseline_v3_0.md` — superseded by v4.0 |
 | Optional external/uploaded copy | Supply its path with `check_grounding.py --uploaded-baseline <path>` or `ACRME_UPLOADED_BASELINE`; no host-specific path is assumed |
 | Expanded reference | `Requirements/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
 | Code glossary | `Reference-Material/reference/acrme_requirements_code_glossary.md` (one-line definitions + links) |
 | Consistency audit | `Requirements/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |
 
 Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the v4.0 baseline; re-check them if the version changed.
+
+The FDD, TDD, POC workbook/suite, glossary, calculation reference, and several mockups/reference
+documents still contain earlier-baseline material. Unless an artefact explicitly records a
+v4.0 reconciliation, treat it as historical or provisional; do not cite it as current normative
+authority over the v4.0 baseline.
 
 ## Topic → baseline section → codes → repo artefact
 

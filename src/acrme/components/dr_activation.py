@@ -1,5 +1,5 @@
 """
-DR Activation Engine — ACRME v2.3
+DR Activation Engine — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Implements the DR declaration workflow and standby activation
 (DR-009/010/013/019), driving the T6 engine state machine.

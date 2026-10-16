@@ -1,5 +1,9 @@
 # ACRME Placement Scoring Weights — Complete Reference
 
+> **Historical reference — not reconciled to v4.0.** Use the v4.0 baseline as normative authority
+> for placement scoring and formula semantics. The v2.4 notes below describe this document's
+> historical reconciliation only.
+
 **Project:** Azure Capacity Reservation Management Engine (ACRME)  
 **Classification:** Technical Reference  
 **Version:** 1.1  

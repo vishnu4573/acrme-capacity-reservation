@@ -1,5 +1,5 @@
 """
-Placement Scoring Algorithms — ACRME v2.3
+Placement Scoring Algorithms — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Weighted placement scoring (TDD Section 8.2, ADR-001, T15).
 

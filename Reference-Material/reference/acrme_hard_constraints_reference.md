@@ -1,5 +1,10 @@
 # ACRME Hard Constraints Reference
 
+> **Current baseline:** v4.0. The v4.0 baseline states that HC-1..HC-11 are unchanged from
+> v3.0. This reference retains earlier reconciliation notes and has not had every section,
+> code reference, and cross-link revalidated against v4.0. Use the v4.0 baseline as normative
+> authority if this reference conflicts with it.
+
 **Classification:** Principal Cloud Architect — Placement Engine Design  
 **Version:** 1.1  
 **Date:** 8 Oct 2026  
@@ -524,7 +529,7 @@ def get_prod_candidates(geography):
 
 *Europe Standard regions become eligible for the Middle East as **DR destinations only** (not for Prod) via the **HC-10 Cross-Geo Extension Path**, weighted-selected (DR-020, PLC-010b, DEC-001 RESOLVED).
 
-**Region lists above are examples of the current configured catalogue (Requirements Baseline v2.3 Section 6). The authoritative, versioned lists live in `PlacementPolicy` (REG-001); the engine must not hard-code them.**
+**Region lists above are historical examples, not the current configured catalogue. The v4.0 baseline (REG-001) is normative; the engine must not hard-code region lists.**
 
 #### Evidence Tag
 
@@ -1058,4 +1063,3 @@ All hard constraints carry one of four evidence tags:
 
 **Document Status:** Production Ready  
 **Next Review:** After POC-30 and POC-31 completion (Quota Groups GA validation) and POC-12/POC-13 (v3.0 two-scope + domain-scoped sharing validation)
-

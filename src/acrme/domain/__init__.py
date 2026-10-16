@@ -1,5 +1,5 @@
 """
-Domain Entities — ACRME v2.3
+Domain Entities — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Core domain model implementing the data architecture from TDD Section 6, 18.
 All entities support versioned, optimistic-concurrency state management (DAT-001..006).

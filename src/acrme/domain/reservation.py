@@ -1,5 +1,5 @@
 """
-Reservation State — ACRME v2.3
+Reservation State — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 CRG and reservation snapshot state (TDD Section 5.2, CAP-001/002).
 """

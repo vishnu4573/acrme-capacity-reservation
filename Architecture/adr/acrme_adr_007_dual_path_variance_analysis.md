@@ -1,5 +1,9 @@
 # ADR-007 Companion — Dual-Path ("2-Prong") Model: Variance & Impact Analysis
 
+> **Historical analysis — not reconciled to baseline v4.0.** The v2.4 references and
+> recommendations below describe an earlier baseline review. Baseline v4.0 is authoritative;
+> revalidate this analysis before using it as a current decision.
+
 **Companion analysis to ADR-007 (CRG/CR Deployment Model)**
 
 | Field               | Value                                                                 |
@@ -161,7 +165,7 @@ Sequenced so that breaking items and their gates land before dependent work. "Ga
 
 Two items warrant a memory update (offered, not auto-applied):
 
-1. **Stale baseline pointer (correctness fix).** The recorded ACRME standing instruction points to `Uploads/…Consolidated Requirements Baseline.md` mirrored at `docs/acrme_requirements_baseline_v2_2.md`. The **current authoritative source is `Requirements/acrme_requirements_baseline_v2_4.md`** (v2.4, 7 Sep 2026). The pointer should be updated so future work re-reads v2.4, not v2.2.
+1. **Stale baseline pointer (historical correctness fix).** At the time of this analysis, the recorded ACRME standing instruction pointed to `Uploads/…Consolidated Requirements Baseline.md` mirrored at `docs/acrme_requirements_baseline_v2_2.md`; v2.4 was then the current repository baseline. This is a historical observation, not a current pointer. Baseline v4.0 is now authoritative.
 2. **New reference fact (2-prong model canon).** Optionally record: *"ACRME CRG deployment = ONE unified structural model (CAP-023) with TWO access paths — shared (provider-subscription-owned CRGs, modern/remediated subs) and local (consumer-owned CRGs, un-remediated heritage). Region selection is path-agnostic (INV-R1). Shared prong is gated on POC-001 + DEP-001."* This prevents the recurring "two models" misframing.
 
 These are **proposed**; I will apply them only on your say-so.

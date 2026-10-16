@@ -5,14 +5,16 @@
 | **Title** | Azure Capacity Reservation Management Engine (ACRME) — Technical Design Document |
 | **Version** | 1.0 (net-new) |
 | **Date** | 2 September 2026 |
-| **Status** | Draft for review — supersedes the Production Readiness Review as the technical design of record |
-| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.4** (7 Sep 2026) |
+| **Status** | Historical draft — last reconciled to v2.4; pending reconciliation to v4.0 |
+| **Baseline** | Current governing baseline: **v4.0**; this document's last recorded basis: v2.4 (7 Sep 2026) |
 | **Owner** | Vishnuvardhan Reddy · Principal Cloud Architect |
 | **Audience** | Engineering, SRE/platform operations, security, POC leads |
 | **Companion** | Functional Design Document (`acrme_functional_design_document.md`) |
-| **Decision records** | ADR-001 (region selection), ADR-002 (quota & capacity, single-pool), ADR-003 (capacity during DR), ADR-004 (forecast & increase), ADR-005 (distributed DR reference model) — all reconciled to v2.4 |
+| **Decision records** | ADR-001 (region selection), ADR-002 (quota & capacity, single-pool), ADR-003 (capacity during DR), ADR-004 (forecast & increase), ADR-005 (distributed DR reference model) — last recorded reconciliation to v2.4 |
 
 > **Purpose.** This TDD describes **how** ACRME is built — components, runtime, topology, data, state, algorithms, interfaces, security, observability, NFRs, integration, and POC gating — traceable to Requirements Baseline v2.4 and to the companion FDD (which owns the *what*). This document is **self-contained**: all normative algorithms, formulas, schemas, enumerations, and constants are inlined, not referenced externally.
+
+> **Baseline status.** The inline v2.2–v2.4 notes below record historical design decisions; they do not establish current requirements. This TDD has not been reconciled to v4.0. The v4.0 baseline governs wherever this draft differs, and all requirement traceability claims require revalidation.
 
 > **Reconciliation note (v2.4 — reservation-model gaps).** This revision folds the reviewed architecture-diagram gaps into the technical design. **Reservation eligibility** is refined: Availability-Set VMs are ineligible for zonal capacity reservations (**CAP-020**), and onboarding requires a **deallocate/redeploy-to-AZ precondition** for any VM not already zone-pinned (**CAP-021**). The managed estate is initialised as a **seed matrix of count-0 (`seed`) reservations** across every eligible SKU×region×AZ combination, governed by per-product-team budget (**CAP-022**, extending CAP-009), reconciled with **reactive SKU/AZ discovery** which auto-creates a reservation and simultaneously raises a scope-file governance item (**CAP-024**, reconciling CAP-019). Reservations are organised into an explicit **regional + per-AZ CRG structure per environment** (**CAP-023**, extending CAP-011 and refining the three-CRG model in Section 5.2). VM placement targets an **even ≈1/zone_count per-zone distribution with a rebalancing action** (**PLC-011**, Section 8.5). A shared **core subscription is classified entirely production** (**CAP-001a**). The **decommissioning-workflow boundary** is made explicit (**CAP-008/CAP-010**): automatic reconciliation only right-sizes a reservation down to `Allocated + Buffer` (never to zero or delete on its own), while reducing to zero, retirement and deletion are **gated** workflow actions. A deterministic **RG/CRG/subscription naming convention + counter** is adopted (**OPS-006**, config **C-12**); the zone-distribution tolerance is config **C-13**. A "**seed reservation**" (count-0 reservation) is distinct from the placement "**seed record**" (`CustomerSeedRecord`, PLC-003).
 >

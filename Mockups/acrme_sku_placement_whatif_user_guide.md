@@ -1,5 +1,8 @@
 # ACRME SKU-Level Placement WHAT-IF — User Guide (Phase 2)
 
+> **Historical mockup — not reconciled to v4.0.** Use the v4.0 baseline as normative authority;
+> revalidate this workbook and guide before relying on its results.
+
 **Workbook:** `acrme_sku_placement_whatif.xlsx`
 **Builder:** `build_acrme_sku_scoring_whatif.py`
 **Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.4

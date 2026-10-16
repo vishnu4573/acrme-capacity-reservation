@@ -1,5 +1,5 @@
 """
-DR Destination Sizing — ACRME v2.3
+DR Destination Sizing — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Max-not-sum destination DR sizing (DR-017; Appendix A.6/A.7/A.8; Appendix D).
 

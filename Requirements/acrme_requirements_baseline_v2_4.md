@@ -1,5 +1,10 @@
 # Azure Capacity & Quota Management — Consolidated Requirements Baseline
 
+> **Historical baseline — superseded by v4.0.** This file is retained for version history and
+> is not the current source of truth. Use [`acrme_requirements_baseline_v4_0.md`](acrme_requirements_baseline_v4_0.md)
+> for current requirements. The filename reflects its original version lineage; its Document
+> Control row is authoritative for the version contained in this snapshot.
+
 > **Working document — coauthored baseline for the SaaS Design Services
 > capacity & DR programme.** This is a living requirements document. It
 > captures the agreed architectural direction while explicitly

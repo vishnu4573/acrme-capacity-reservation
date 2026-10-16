@@ -1,5 +1,5 @@
 """
-Customer Seed Record — ACRME v2.3
+Customer Seed Record — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 First placement decision becomes the authoritative seed; subsequent products/
 environments for the same customer+geography read the seed instead of re-selecting
@@ -19,7 +19,7 @@ class CustomerSeedRecord:
     Created on first placement; reused for all subsequent products/environments in that
     geography. "Their production is their production for all products in that geography."
     
-    Attributes aligned to Requirements Baseline v2.3:
+    Attributes aligned to the historical Requirements Baseline v2.3:
         - Five geographies: US (3-region), Europe/Australia/Asia Pacific/Middle East (2-region)
         - Two-region geos: CVAL+DR co-locate deterministically (PLC-010a)
         - Middle East: dr_region = "NOT_OFFERED" until DEC-001 clears (DR-014)

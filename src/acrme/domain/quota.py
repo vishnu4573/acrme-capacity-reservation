@@ -1,5 +1,5 @@
 """
-Quota Pool State — ACRME v2.3
+Quota Pool State — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Single governed quota pool per region/family (TDD Section 5.3, QUA-004, ADR-002).
 """

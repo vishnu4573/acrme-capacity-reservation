@@ -1,5 +1,9 @@
 # ACRME UML Class Diagrams — Design-First Summary
 
+> **Historical design analysis — not reconciled to v4.0.** Baseline v4.0 is normative. The
+> inline v2.2/v2.4 reconciliation notes and the FDD/TDD schema references below are historical;
+> verify all model coverage and schemas against v4.0 before treating this summary as current.
+
 **Author:** Vishnuvardhan Reddy  
 **Date:** August 22, 2026  
 **Status:** Design-first tool (70% complete) — identifies gaps for focused design sessions  

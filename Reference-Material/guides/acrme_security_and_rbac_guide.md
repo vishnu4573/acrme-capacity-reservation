@@ -1,8 +1,12 @@
 # ACRME Security and RBAC Guide
 
+> **Historical security guidance — not reconciled to v4.0.** This guide was last updated against
+> v2.4 and must be reviewed against v4.0 before use for implementation, access provisioning, or
+> security approval. The current baseline governs on any conflict.
+
 **Azure Capacity Reservation Management Engine (ACRME)**
 **Author:** Vishnuvardhan Reddy — August 2026 (reconciled to Requirements Baseline v2.4, 7 September 2026)
-**Status:** Prescriptive baseline for implementation and security review
+**Status:** Historical guide; not reconciled to v4.0 and not prescriptive for current implementation
 **Companion artifacts:** `Reference-Material/rbac/custom_roles/*.json`, `Reference-Material/rbac/deploy_custom_roles.sh`, `Reference-Material/rbac/deploy_role_assignments.sh`
 
 > **v2.4 reconciliation note (7 Sep 2026).** The authorization model — least-privilege UAMIs, isolated role-assignment authority, resource-group-scoped assignment, and the G-14 consent posture — is **unchanged** by Requirements Baseline v2.4. Two v2.4 items intersect this guide and are addressed inline: (a) **OPS-006/C-12 deterministic naming** — RBAC assignment scopes must bind to the deterministic RG/CRG/subscription names produced by OPS-006 (not ad-hoc names); see the new **Section 5.1**. (b) **CAP-023 regional + per-AZ CRG structure** — where a role is assigned at CRG scope, the target CRG set now includes the regional CRG (`crg-<env>-<region>-reg`) plus the per-AZ CRGs (`az1/az2/az3`); assignment stays at the narrowest resource-group/CRG scope as before. The seed-matrix governance (CAP-022) and reactive-discovery auto-create (CAP-024) are performed by the existing **ACRME Capacity Operator** identity within its approved provider resource groups — no new engine identity or broader scope is introduced.

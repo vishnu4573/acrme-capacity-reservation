@@ -1,5 +1,5 @@
 """
-Readiness State & Codes — ACRME v2.3
+Readiness State & Codes — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Combined capacity+quota+freshness verdict (TDD Section 11.3, RDY-001..004).
 Readiness = capacity ∧ quota ∧ freshness ∧ policy (TDD Section 2.1).

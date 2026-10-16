@@ -1,5 +1,5 @@
 """
-Readiness API — ACRME v2.3
+Readiness API — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Combined capacity+quota+freshness verdict API (TDD Section 11, RDY-001..004, INT-001..007).
 """

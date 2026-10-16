@@ -2,7 +2,7 @@
 ACRME Phase 4 Demo — Distributed DR Capacity Management
 
 Exercises the Phase 4 components against the reviewed worked example from
-Requirements Baseline v2.3 §12A.2 (Distributed DR Reference Model) and
+historical Requirements Baseline v2.3 §12A.2 (Distributed DR Reference Model) and
 Appendix D.3 (max-not-sum sizing):
 
     Region       Prod            DR standby hosted (source region)

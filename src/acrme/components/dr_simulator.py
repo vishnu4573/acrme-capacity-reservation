@@ -1,5 +1,5 @@
 """
-DR Simulator & Compliance Evidence — ACRME v2.3
+DR Simulator & Compliance Evidence — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Dry-run DR failover simulation and compliance-evidence generation
 (DR-012 annual mock drill; FIN-008/POC-011 overcommit exposure; SOC 2 DR assertions).

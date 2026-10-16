@@ -1,5 +1,9 @@
 # ACRME Aligned Placement What-If — User Guide
 
+> **Historical mockup — not reconciled to v4.0.** The workbook and guide use earlier baseline
+> assumptions. Use the v4.0 baseline as normative authority and revalidate before relying on
+> workbook results.
+
 **Workbook:** `acrme_aligned_placement_whatif.xlsx`  
 **Builder:** `build_acrme_aligned_placement.py`  
 **Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.5  

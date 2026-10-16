@@ -1,5 +1,11 @@
 # ACRME Complete Requirements Reference
 
+> **Legacy, non-normative compilation.** This document predates baseline v4.0 and has not been
+> reconciled to it. It may contain stale requirement coverage, classifications, and maturity
+> claims. Use [`acrme_requirements_baseline_v4_0.md`](acrme_requirements_baseline_v4_0.md) as
+> the sole source of current requirements; do not rely on this compilation for implementation
+> or acceptance decisions until it is reviewed and updated.
+
 This document consolidates **every requirement for the Azure Capacity Reservation Management Engine (ACRME)**, 
 spanning Functional Requirements (FR), Non-Functional Requirements (NFR), and Placement-Specific Requirements (R), 
 organized by category with evidence of coverage and design maturity.
@@ -10,8 +16,8 @@ organized by category with evidence of coverage and design maturity.
 - `acrme_requirements_traceability_review.md` (coverage matrix + blockers)
 - `multi_region_placement_design.md` (Placement Requirements R1..R8, NFR-R1..R3)
 
-> **Classification:** Principal Cloud Architect — System Design  
-> **Maturity:** Production Readiness Review Complete; POC-gated execution ready
+> **Historical classification:** Principal Cloud Architect — System Design
+> **Historical maturity assessment:** Production Readiness Review Complete; this assessment is not verified against v4.0.
 
 ---
 
@@ -398,4 +404,3 @@ Derived from multi_region_placement_design.md Section 27–28.
 ---
 
 **Overall Readiness:** ✅ **Ready for POC test planning** — Phase 1 Must items complete; Phase 2 Should items designed; Critical blockers B-1/B-2 have clear POC gates.
-

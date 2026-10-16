@@ -1,9 +1,12 @@
 # ACRME — Epic / Story / Task Backlog
 
+> **Historical backlog — not reconciled to v4.0.** Baseline v4.0 is authoritative. Revalidate
+> epic coverage, acceptance criteria, and story priorities before using this backlog for delivery.
+
 **Azure Capacity Reservation Management Engine (ACRME)**  
 _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture (PRR)._
 
-> Single source of truth: [`backlog_data.py`](./backlog_data.py). This Markdown and the [Jira import CSV](./acrme_backlog_jira_import.csv) are both generated from it, so they never drift.
+> Backlog content source: [`backlog_data.py`](./backlog_data.py). This Markdown and the [Jira import CSV](./acrme_backlog_jira_import.csv) are generated from it; that does not imply alignment with baseline v4.0.
 
 ## 1. Backlog Summary
 
@@ -1741,4 +1744,3 @@ _Generated 2026-09-07 from the Production-Readiness Review & Final Architecture 
 - [ ] `ACRME-T200601` Implement deterministic RG/CRG/subscription naming convention (OPS-006)
 - [ ] `ACRME-T200602` Implement + persist the naming counter (C-12)
 - [ ] `ACRME-T200603` Align RBAC scope assignment with deterministic names
-

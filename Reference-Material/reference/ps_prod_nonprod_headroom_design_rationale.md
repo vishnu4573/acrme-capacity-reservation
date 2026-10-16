@@ -1,9 +1,12 @@
 # PS_Prod α Component Design Rationale — Why NonProd Headroom Drives Prod Placement
 
+> **Historical design rationale — not reconciled to v4.0.** Baseline v4.0 is normative for
+> placement scoring; revalidate this proposal before treating it as an approved design.
+
 **Document Type:** Design Rationale / Technical Reference\
-**Baseline Version:** v2.4\
+**Historical baseline basis:** v2.4; not reconciled to v4.0\
 **Related Requirements:** PLC-001, PLC-002, CAP-013, QUA-004\
-**Status:** Design-of-Record
+**Status:** Historical design rationale; not verified against v4.0
 
 ---
 

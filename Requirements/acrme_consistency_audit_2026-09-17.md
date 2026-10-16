@@ -1,5 +1,9 @@
 # ACRME Repo Consistency Audit — 17 September 2026
 
+> **Historical audit snapshot.** This audit reflects the repository state and v2.4 baseline as
+> of 17 September 2026. It predates baseline v4.0; conclusions about current alignment are no
+> longer current.
+
 **Scope.** Full sweep of the ACRME documentation set (`Requirements/`, `Architecture/adr/`, `Design/`, `Reference-Material/`, `POC-Test-Scripts/`) checked against (a) the requirements baseline and (b) the canonical calculation formulas & constants. `Archive/` excluded (historical). Auto-generated `.docx`/`.pdf` twins excluded (they regenerate from their `.md`).
 
 **Authority sources used for the audit**

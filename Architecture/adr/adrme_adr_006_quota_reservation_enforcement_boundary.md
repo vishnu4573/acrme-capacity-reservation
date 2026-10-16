@@ -3,7 +3,7 @@
 **Version:** 1.0  
 **Date:** 9 September 2026  
 **Status:** Accepted  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
+**Part of:** ACRME Architecture Decision Records - last recorded alignment to Capacity & Quota Management Requirements Baseline v2.4.
 
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR clarifies the **enforcement boundary** between quota-as-governor and capacity reservation, correcting a common over-generalization about their relationship to deployment strategy. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
@@ -16,6 +16,8 @@
 **Deciders:** Principal Cloud Architect, Platform Engineering  
 **Related requirements:** QUA-001, QUA-002, QUA-005, QUA-006, QUA-007, QUA-013, CAP-003, CAP-016, CAP-017, ENV-002  
 **Related constraints:** Design Principle 2 (quota and capacity are separate resources)
+
+> **Baseline status:** Baseline v4.0 is authoritative. This ADR was authored against v2.4 and has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
 ## Context
 

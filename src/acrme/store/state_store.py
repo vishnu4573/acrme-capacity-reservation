@@ -1,5 +1,5 @@
 """
-State Store — ACRME v2.3
+State Store — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Versioned document store for entities, snapshots, operation records (TDD Section 6, 18).
 """

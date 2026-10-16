@@ -89,8 +89,8 @@ Check these before citing; fix through the owning doc, not in your output.
 | Where | Issue | Authoritative |
 |---|---|---|
 | Uploaded baseline vs repo baseline | Uploaded copy can lag the repo (seen 17 Sep and again at v2.5) | Highest Document Control version |
-| Older docs | May say "baseline v2.4" or "v2.5" for content now in v4.0 | Current baseline (v4.0) |
-| `Skills.md` / `Agents.md` | Aligned to v4.0 as of v2.0 of these files | Current baseline |
+| Older design/reference/POC artefacts | Some still identify v2.4/v2.5/v3.0 as their normative basis and have not been reconciled to v4.0; see the current repository index for affected artefact groups | Current baseline (v4.0) |
+| `Skills.md` / `Agents.md` | Programme instructions identify v4.0 as the current baseline | Current baseline |
 
 ## Escalation
 

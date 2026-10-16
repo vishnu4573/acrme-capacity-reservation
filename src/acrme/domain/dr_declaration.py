@@ -1,5 +1,5 @@
 """
-DR Declaration & Activation Records — ACRME v2.3
+DR Declaration & Activation Records — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Entities backing the DR declaration workflow and standby activation
 (TDD Section 12A; DR-009/010/013/019).

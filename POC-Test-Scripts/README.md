@@ -1,12 +1,17 @@
 # ACRME POC Test Suite
 
-Production-quality Python test-automation suite for the **Azure Capacity
+Runnable Python test-automation suite for the **Azure Capacity
 Reservation Management Engine (ACRME)** proof-of-concept programme. It implements
 **49 test cases across 12 groups** plus a **10-item pre-flight checklist**, driving
 the live Azure cases through the **Azure CLI (`az`) and `az rest`** — *no Azure SDK
 Python packages are required*. Groups **G9–G12** add the Baseline **v2.4**
 reservation-model coverage (CAP-020…024, PLC-010a, PLC-011, OPS-006, CAP-001a),
 whose deterministic rule logic is validated **offline**.
+
+> **Baseline status:** this suite and its v2.4 workbook have not been reconciled to
+> the authoritative [v4.0 baseline](../Requirements/acrme_requirements_baseline_v4_0.md).
+> The 49 cases and their expected outcomes are historical and are not a v4.0 acceptance
+> suite until reviewed and updated.
 
 ---
 

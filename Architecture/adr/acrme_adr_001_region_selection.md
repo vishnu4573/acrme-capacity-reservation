@@ -3,7 +3,9 @@
 **Version:** 2.4  
 **Date:** 7 September 2026  
 **Status:** Accepted - supersedes ADR-001 v2.2 region-selection content; reconciled to Baseline v2.4  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
+**Part of:** ACRME Architecture Decision Records - last recorded alignment to Capacity & Quota Management Requirements Baseline v2.4.
+
+> **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR states the accepted region-selection decision matching the consolidated requirements baseline — notably the five-geography region model with per-geography distribution models and mandatory two-region CVAL/DR co-location (PLC-010a). Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 >

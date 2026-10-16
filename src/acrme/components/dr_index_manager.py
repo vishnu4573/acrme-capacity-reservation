@@ -1,5 +1,5 @@
 """
-DR Index Manager — ACRME v2.3
+DR Index Manager — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Maintains and queries the authoritative source→destination DR index
 (DR-018) and the reciprocal, bidirectional multi-source hosting view (DR-016).

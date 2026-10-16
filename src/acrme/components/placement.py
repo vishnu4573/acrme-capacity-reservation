@@ -1,5 +1,5 @@
 """
-Placement & Scoring Engine — ACRME v2.3
+Placement & Scoring Engine — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Region selection via weighted placement scoring (TDD Section 3, 8; PLC-001..010, ADR-001).
 

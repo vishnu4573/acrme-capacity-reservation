@@ -1,19 +1,21 @@
-# ACRME POC Test Workbook — v2.4 (Canonical Spec of Record)
+# ACRME POC Test Workbook — v2.4 (Historical)
 
 **Azure Capacity Reservation Management Engine (ACRME) — POC Validation Runbook & Progress Tracker**
 
 | Field | Value |
 |---|---|
-| **Version** | 2.4 (canonical spec of record) |
-| **Status** | ACTIVE — aligned to Requirements Baseline v2.4 and the executable `POC-Test-Scripts/` |
+| **Version** | 2.4 |
+| **Status** | Historical — last aligned to Requirements Baseline v2.4; not reconciled to v4.0 |
 | **Supersedes** | `acrme_poc_workbook_v2.docx` / `.pdf` (v2.0, 21 Aug 2026 — archived, binary-only) |
-| **Authoritative source** | `Azure Capacity & Quota Management — Consolidated Requirements Baseline` (v2.4); mirrored at `Requirements/acrme_requirements_baseline_v2_4.md` |
+| **Current authoritative source** | [`Requirements/acrme_requirements_baseline_v4_0.md`](../Requirements/acrme_requirements_baseline_v4_0.md) |
 | **Executable implementation** | `POC-Test-Scripts/` (groups G1–G12; run `python runner.py` and `python test_v24_reservation_model.py`) |
 | **Classification** | Internal — Engineering Validation |
 | **Owner** | [Test Lead Name] |
 | **Environment** | [Subscription ID / Tenant ID — fill on start] |
 
-> **What this document is.** This is the single **POC workbook of record**. It consolidates the manual runbook/tracker content previously held only in the binary `acrme_poc_workbook_v2.docx`/`.pdf` (574 paragraphs, 140 tables) into a Markdown source that follows the repo's md-source convention, and it is kept in lock-step with the executable `POC-Test-Scripts/`. Expected results are hypotheses until executed with retained evidence. Preview features are not Microsoft contractual commitments; Tier 3 and VMSS emergency automation remain blocked in Phase 1.
+> **Baseline status.** This workbook and its executable suite have not been reconciled to baseline v4.0. The historical v2.4 cases and expected results are not a v4.0 acceptance specification; review them against the current baseline before relying on them. Expected results remain hypotheses until executed with retained evidence.
+>
+> **What this document is.** This is the v2.4 workbook, retained for historical reference and as context for the current executable tooling. It consolidates the manual runbook/tracker content previously held only in the binary `acrme_poc_workbook_v2.docx`/`.pdf` (574 paragraphs, 140 tables).
 >
 > **v2.4 reconciliation (what changed from v2.0).**
 > - **Region model — geography-aware (PLC-010a / PLC-010b).** The former "three distinct regions" hard rule (old §3.1, PF-09/PF-10) is now **geography-aware**: three distinct regions are required **only** for three-region geographies (US is the only one today); **two-region geographies co-locate CVAL + DR in the non-prod region** while the other region hosts Prod (ENV-003 / PLC-010a). **[Amended v2.4] Middle East now runs the `cross-geo` DR model (DR-020 / PLC-010b): Prod and CVAL co-locate in a weighted-selected Middle East region (separate CRGs, ENV-003) and DR is placed CROSS-GEO in a weighted-selected Europe Standard region.** This supersedes the earlier `DR_NOT_OFFERED` position for Middle East (DR-014 / DEC-001 **RESOLVED**). This mirrors the Phase 1 rework of `POC-Test-Scripts/acrme_suite/config.py` and `preflight.py` (which now carry a `cross-geo` `distribution_model`).

@@ -1,5 +1,9 @@
 # ACRME Region Selection — Interactive Mockup: Design Plan
 
+> **Historical mockup plan — not reconciled to v4.0.** The sources and formulas below reflect
+> earlier baseline versions. Baseline v4.0 is authoritative; revalidate before using this plan
+> to guide implementation or approve mockup behavior.
+
 **Status:** Draft — Awaiting Approval  
 **Date:** 2026-09-21  
 **Author:** ACRME Design Session  

@@ -1,5 +1,9 @@
 # ACRME — CR & CRG Deployment Layout Reference
 
+> **Historical reference — not reconciled to v4.0.** Baseline v4.0 is authoritative. This
+> layout was prepared against v2.4 and must be reviewed before use as current provisioning
+> guidance.
+
 ## Document Control
 
 | Field                   | Value                                                                                   |
@@ -7,16 +11,16 @@
 | **Title**               | ACRME — Capacity Reservation & CRG Deployment Layout Reference                          |
 | **Version**             | 1.0                                                                                     |
 | **Date**                | 9 Sep 2026                                                                              |
-| **Status**              | Active                                                                                  |
+| **Status**              | Historical; not verified against baseline v4.0                                           |
 | **Owner**               | Platform Engineering / Cloud Architecture                                               |
-| **Source baseline**     | `acrme_requirements_baseline_v2_4.md` (CAP-023, OPS-006, REG-003, PLC-010/PLC-010a)    |
+| **Historical source baseline** | `acrme_requirements_baseline_v2_4.md` (CAP-023, OPS-006, REG-003, PLC-010/PLC-010a); v4.0 is current |
 | **Purpose**             | Visual reference for CR & CRG deployment structure across all environments and geographies |
 
 ---
 
 ## 1. Purpose
 
-This document provides the **authoritative deployment layout** for Azure Capacity Reservations (CR) and Capacity Reservation Groups (CRG) across all ACRME-managed environments. It translates the normative requirements (CAP-023, OPS-006/C-12, REG-003, ENV-003, PLC-010/PLC-010a) into concrete deployment patterns with examples for each geography.
+This document records a historical deployment layout for Azure Capacity Reservations (CR) and Capacity Reservation Groups (CRG) across ACRME-managed environments. Its patterns are not normative until reconciled with baseline v4.0.
 
 **Use this document to:**
 - Understand the structural organization of CRGs per environment and region

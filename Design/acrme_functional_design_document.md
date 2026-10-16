@@ -5,13 +5,15 @@
 | **Title** | Azure Capacity Reservation Management Engine (ACRME) — Functional Design Document |
 | **Version** | 1.0 (net-new) |
 | **Date** | 2 September 2026 |
-| **Status** | Draft for review — supersedes the Executive Design Document as the functional design of record |
-| **Baseline** | Azure Capacity & Quota Management — Consolidated Requirements Baseline **v2.4** (7 Sep 2026) |
+| **Status** | Historical draft — last reconciled to v2.4; pending reconciliation to v4.0 |
+| **Baseline** | Current governing baseline: **v4.0**; this document's last recorded basis: v2.4 (7 Sep 2026) |
 | **Owner** | Vishnuvardhan Reddy · Principal Cloud Architect |
 | **Audience** | Business, architecture, operations, audit, onboarding, FinOps |
 | **Companion** | Technical Design Document (`acrme_technical_design_document.md`) |
 
 > **Purpose.** This FDD describes **what** ACRME does — its functional behaviour, flows, states, and rules — traceable to every requirement in Baseline v2.4. It is implementation-neutral; the **how** (components, data, algorithms, interfaces, security, NFRs) is in the companion TDD. This document is **self-contained**: all normative detail (readiness states, engine modes, formulas, classification tables, validation rules) is inlined, not referenced externally.
+
+> **Baseline status.** The inline v2.3/v2.4 notes below record the document's historical evolution; they do not establish current requirements. This FDD has not been reconciled to v4.0. The v4.0 baseline governs wherever this draft differs, and all requirement traceability claims require revalidation.
 
 > **Reconciliation note (v2.4 — reservation-model gaps).** This revision folds the reviewed architecture-diagram gaps into the functional design: **reservation eligibility** now explicitly excludes **Availability-Set VMs** (CAP-020) and requires a **deallocate/redeploy-to-AZ onboarding precondition** (CAP-021); the managed estate is initialised as a **seed matrix of count-0 reservations** per eligible SKU×region×AZ under **product-team budget governance** (CAP-022), reconciled with **reactive SKU/AZ discovery** that auto-creates a reservation and simultaneously raises a scope-file governance item (CAP-024, reconciling CAP-019); reservations are organised into an explicit **regional + per-AZ CRG structure per environment** (CAP-023); VMs are placed toward an **even ≈1/zone_count per-zone distribution with a rebalancing action** (PLC-011); a shared **core subscription is classified entirely production** (CAP-001a); the **decommissioning-workflow boundary** (automatic right-sizing to `allocated + buffer` vs gated retirement/deletion) is made explicit (CAP-008/CAP-010); and a deterministic **RG/CRG/subscription naming convention + counter** is adopted (OPS-006, C-12). "**Seed reservation**" (a count-0 reservation) is disambiguated from the placement "**seed record**" (PLC-003).
 

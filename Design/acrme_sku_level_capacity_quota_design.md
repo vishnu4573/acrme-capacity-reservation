@@ -6,9 +6,13 @@
 |-------|-------|
 | Author | ACRME design (Vishnuvardhan Reddy) |
 | Status | Design analysis / feasibility — *what-if, not a baseline change* |
-| Reconciled to | Requirements Baseline **v2.4** (11 Sep 2026 amendment) |
+| Historical baseline basis | Requirements Baseline **v2.4** (11 Sep 2026 amendment); not reconciled to v4.0 |
 | Scope | Region-selection mockup (`acrme_region_selection_whatif_acrme_regions.xlsx`) + engine data-model implications |
 | Grounding data | `SKU_USage (1).xlsx`, `sku_usage_prod_v1.xlsx` (40,039 source rows; 169 distinct SKUs; 14 regions) |
+
+> **Baseline status.** This is a historical feasibility analysis, not a v4.0 design decision.
+> Its references to v2.4/v2.5 record its original context. Baseline v4.0 is authoritative and
+> this analysis must be revalidated before its recommendations are used.
 
 ---
 

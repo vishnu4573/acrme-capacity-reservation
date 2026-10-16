@@ -1,5 +1,9 @@
 # ACRME — CRG & CR Foundation Provisioning Plan
 
+> **Historical planning document — not reconciled to v4.0.** The v4.0 baseline is normative.
+> Do not use the older baseline pointers or build sequence below as current implementation
+> instructions until this plan is reviewed against v4.0.
+
 ## Document Control
 
 | Field                   | Value                                                                                                |
@@ -9,7 +13,7 @@
 | **Date**                | 9 Sep 2026                                                                                           |
 | **Status**              | Draft — planning gate (pre-deployment)                                                               |
 | **Owner**               | Platform Engineering / Cloud Architecture                                                            |
-| **Source baseline**     | `acrme_requirements_baseline_v2_4.md` (authoritative: CAP-001..024, OPS-006, ENV-003, QUA-*, REG-003)|
+| **Historical source baseline** | `acrme_requirements_baseline_v2_4.md` (CAP-001..024, OPS-006, ENV-003, QUA-*, REG-003); current authority is v4.0 |
 | **Related**             | `acrme_cr_crg_deployment_layout.md`, `acrme_poc_workbook_v2_4.md`, ADR-002/003/006                   |
 | **Purpose**             | Plan the creation of CRGs and CRs (the foundation) **before** any deployment — cover all grounds     |
 
@@ -148,7 +152,7 @@ All tokens resolved deterministically; counter is zero-padded (`C-12` width conf
 | East Asia | ea | Southeast Asia | sea |
 | Saudi Arabia Central | sac | UAE North | uan |
 
-> **Reconciliation note.** The older POC workbook (`acrme_poc_workbook_v2_4.md`) shows a per-SKU CRG example (`crg-prod-<region>-<sku>`) that **predates CAP-023**. This plan follows the **authoritative v2.4 per-zone CRG structure** (one CRG per zone holding multiple SKUs), consistent with the deployment-layout reference. The engine validates managed resources against OPS-006 and flags non-conforming names as governance exceptions.
+> **Historical reconciliation note.** The older POC workbook (`acrme_poc_workbook_v2_4.md`) shows a per-SKU CRG example (`crg-prod-<region>-<sku>`) that **predates CAP-023**. This plan follows the v2.4 per-zone CRG structure (one CRG per zone holding multiple SKUs), consistent with the deployment-layout reference. Baseline v4.0 governs, and this plan requires revalidation before current use.
 
 ---
 

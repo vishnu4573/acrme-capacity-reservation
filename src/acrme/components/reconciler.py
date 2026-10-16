@@ -1,5 +1,5 @@
 """
-State Reconciler — ACRME v2.3
+State Reconciler — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Capacity reconciliation: enforces Allocated + Buffer floor, guarded scale-down,
 never deletes (TDD Section 3, CAP-003/004/009/010, OPS-002).

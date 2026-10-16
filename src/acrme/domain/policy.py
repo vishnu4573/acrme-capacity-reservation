@@ -1,5 +1,5 @@
 """
-Placement Policy & Region Catalogue — ACRME v2.3
+Placement Policy & Region Catalogue — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Configuration-driven policy and region model (TDD Section 3, 6.2; REG-001, ADR-001).
 All geographies, regions, distribution models, and scoring weights are versioned config.
@@ -68,7 +68,7 @@ class RegionEntry:
 @dataclass
 class RegionCatalogue:
     """
-    Five-geography region model (TDD Section 6.2, 18; Baseline v2.3 Section 6).
+    Five-geography region model (TDD Section 6.2, 18; historical baseline v2.3 Section 6).
     
     Region scope (v2.3):
         - US: 3-region (West US 3, Central US, Canada Central; Restricted: East US 2)

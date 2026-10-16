@@ -1,5 +1,5 @@
 """
-Inventory Collector — ACRME v2.3
+Inventory Collector — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Polls Azure APIs for CRG/reservation/quota snapshots with freshness timestamps
 (TDD Section 3, DAT-001..004, NFR-002).

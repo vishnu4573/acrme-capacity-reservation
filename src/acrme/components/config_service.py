@@ -1,5 +1,5 @@
 """
-Config / Scope-File Service — ACRME v2.3
+Config / Scope-File Service — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Versioned PlacementPolicy and region catalogue (TDD Section 3, REG-001, GOV-003, DAT-005).
 """
@@ -17,7 +17,7 @@ class ConfigService:
     Region catalogue is configuration-driven (REG-001): adding/removing/reclassifying
     regions or changing distribution models is a config change, not a code change.
     
-    Phase 3 skeleton: hardcoded v2.3 policy for bootstrap.
+    Phase 3 skeleton: hardcoded legacy v2.3 policy for bootstrap.
     """
     
     def __init__(self, config_path: str = None):
@@ -25,14 +25,14 @@ class ConfigService:
     
     def load_policy(self) -> PlacementPolicy:
         """
-        Load PlacementPolicy (Phase 3 hardcoded v2.3).
+        Load PlacementPolicy (Phase 3 hardcoded legacy v2.3).
         
         Real implementation:
             1. Read YAML/JSON config from config_path
             2. Validate schema
             3. Return PlacementPolicy
         """
-        # Hardcoded v2.3 policy for Phase 3 skeleton
+        # Hardcoded legacy v2.3 policy for Phase 3 skeleton
         catalogue = self._build_v2_3_catalogue()
         weights = ScoringWeights(
             alpha=0.30,
@@ -54,7 +54,7 @@ class ConfigService:
         )
     
     def _build_v2_3_catalogue(self) -> RegionCatalogue:
-        """Build v2.3 region catalogue (5 geographies, Baseline v2.3 Section 6)."""
+        """Build legacy v2.3 region catalogue (5 geographies; historical baseline Section 6)."""
         entries = [
             # US (3-region)
             RegionEntry("West US 3", "US", is_standard=True),

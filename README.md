@@ -1,9 +1,9 @@
 # ACRME — Azure Capacity Reservation & Management Enablement
 
-This repository is the consolidated, production-ready design unit for the **ACRME Capacity
-Reservation** initiative. It brings together the requirements baseline, the design and
-architecture documentation, the canonical POC test workbook, and a fully runnable test
-automation suite that implements every POC test case.
+This repository contains the requirements and design artefacts for the **ACRME Capacity
+Reservation** initiative, together with an implementation skeleton and POC tooling. The
+authoritative requirements baseline is **v4.0**. Several older design, reference, mockup,
+and POC artefacts have not yet been reconciled to v4.0; their status is called out below.
 
 ---
 
@@ -17,10 +17,10 @@ provided as `.md` (source), `.docx` (editable), and `.pdf` (print-ready) unless 
 acrme-capacity-reservation/
 ├── README.md                          # This file
 ├── docs/README.md                     # Navigation index → top-level areas
-├── Requirements/                      # WHAT the system must do (v2.4, current)
-│   ├── acrme_requirements_baseline_v2_4.*     # single source of truth (v2.4)
+├── Requirements/                      # WHAT the system must do (v4.0, current)
+│   ├── acrme_requirements_baseline_v4_0.md    # single source of truth (v4.0)
 │   └── acrme_complete_requirements_reference.*
-├── Design/                            # HOW it is designed (current design of record)
+├── Design/                            # Historical designs; v4.0 reconciliation pending
 │   ├── acrme_functional_design_document.*
 │   ├── acrme_technical_design_document.*
 │   ├── acrme_uml_class_diagrams_summary.*
@@ -29,7 +29,7 @@ acrme-capacity-reservation/
 │   ├── adr/                           # Standalone ADR-001..005 (+ diagrams/, README)
 │   ├── diagrams/                      # Core view PNG/SVG + fdd/ tdd/ + architecture deck
 │   └── tools/                         # ADR/doc-build helper scripts
-├── POC-Test-Scripts/                  # Executable suite + canonical spec workbook
+├── POC-Test-Scripts/                  # Executable legacy POC suite and workbook
 │   ├── README.md                      # Full suite usage guide
 │   ├── requirements.txt
 │   ├── config.yaml.template
@@ -37,7 +37,7 @@ acrme-capacity-reservation/
 │   ├── acrme_suite/                   # Engine, config, az client, reporter, preflight
 │   ├── test_region_model.py           # Offline region-model checks
 │   ├── test_v24_reservation_model.py  # Offline v2.4 logic checks
-│   └── acrme_poc_workbook_v2_4.*      # Canonical v2.4 POC workbook of record
+│   └── acrme_poc_workbook_v2_4.*      # Historical v2.4 POC workbook
 ├── Test-Results/                      # Generated execution evidence (reports land here)
 ├── Reference-Material/                # Supporting material
 │   ├── reference/                     # Calculation / rules quick-reference
@@ -56,6 +56,11 @@ acrme-capacity-reservation/
 └── examples/
 ```
 
+> **Baseline authority:** [`Requirements/acrme_requirements_baseline_v4_0.md`](Requirements/acrme_requirements_baseline_v4_0.md)
+> is the single source of truth. The v2.4 and v3.0 baseline files are retained as historical
+> snapshots. A v2.x/v3.0 reference in another artefact records its historical basis unless
+> that artefact explicitly states it has been reconciled to v4.0.
+
 > **Restructured (Phase 4).** Archived and current documents are no longer interleaved. All
 > moves used `git mv`, so `git log --follow <path>` shows full history across the restructure.
 
@@ -65,8 +70,8 @@ acrme-capacity-reservation/
 
 | Artifact | Description |
 |---|---|
-| **Requirements Baseline v2.4** ([`Requirements/acrme_requirements_baseline_v2_4.md`](Requirements/acrme_requirements_baseline_v2_4.md)) | The single source of truth (v2.4). Five geographies: US (three-region); Europe / Australia / Asia Pacific (two-region co-located, ENV-003 CVAL/DR co-location); **[Amended v2.4]** Middle East uses **cross-geo DR** — Prod+CVAL co-located in a weighted-selected ME region, DR in a weighted-selected Europe region (DR-020, PLC-010b, DEC-001 RESOLVED). |
-| **Complete Requirements Reference** | Consolidates all requirements (FR/NFR/R/Must/Should/Could) with evidence of design coverage, maturity ratings, critical POC blockers, and backlog cross-reference — the traceable source of record for ACRME requirements. |
+| **Requirements Baseline v4.0** ([`Requirements/acrme_requirements_baseline_v4_0.md`](Requirements/acrme_requirements_baseline_v4_0.md)) | Authoritative source of truth. v4.0 is the unified clean-slate baseline; older baseline files are historical only. |
+| **Complete Requirements Reference** ([`Requirements/acrme_complete_requirements_reference.md`](Requirements/acrme_complete_requirements_reference.md)) | Legacy explanatory compilation; not reconciled to v4.0 and not normative. Use the v4.0 baseline for requirements. |
 
 ---
 
@@ -74,8 +79,8 @@ acrme-capacity-reservation/
 
 | Artifact | Description |
 |---|---|
-| **Functional Design Document (FDD)** | Current functional design of record. |
-| **Technical Design Document (TDD)** | Current technical design of record. |
+| **Functional Design Document (FDD)** ([`Design/acrme_functional_design_document.md`](Design/acrme_functional_design_document.md)) | Draft last reconciled to v2.4; not yet reconciled to v4.0. The baseline governs on any conflict. |
+| **Technical Design Document (TDD)** ([`Design/acrme_technical_design_document.md`](Design/acrme_technical_design_document.md)) | Draft last reconciled to v2.4; not yet reconciled to v4.0. The baseline governs on any conflict. |
 | **UML Class Diagrams Summary** ([`Design/acrme_uml_class_diagrams_summary.md`](Design/acrme_uml_class_diagrams_summary.md)) | Design-first UML class diagrams (4 sets) for domain model, operation tracking, service layer, and state machines — with explicit gap analysis. UML sources are `Design/uml_01..04_*.md`. |
 
 #### UML Class Diagrams (`Design/uml_*.md`)
@@ -115,14 +120,16 @@ Full-resolution source images for each of the six core views, in raster (`.png`)
 
 ## POC test scripts & workbook (`POC-Test-Scripts/`)
 
-The single home for the executable suite **and** its spec of record.
+The home for the executable POC suite and its historical workbook. These artefacts were
+prepared against v2.4 and have not been reconciled to v4.0; do not treat them as the v4.0
+acceptance suite without review.
 
-- **Canonical v2.4 POC workbook** ([`POC-Test-Scripts/acrme_poc_workbook_v2_4.md`](POC-Test-Scripts/acrme_poc_workbook_v2_4.md)) — the **POC workbook of record**: 49 test cases across groups G1–G12 (G9–G12 are the v2.4 additions), kept in lock-step with the executable suite. The prior binary v2.0 workbook is archived at [`Archive/testing/`](Archive/testing/).
-- **Executable suite** — a fully runnable Python suite implementing every POC case.
+- **Historical v2.4 POC workbook** ([`POC-Test-Scripts/acrme_poc_workbook_v2_4.md`](POC-Test-Scripts/acrme_poc_workbook_v2_4.md)) — 49 cases across groups G1–G12. It is not established as aligned with baseline v4.0.
+- **Executable suite** — runnable POC tooling; its case coverage and expected results require reconciliation against v4.0.
 
 ### Key design decisions
 - **Azure CLI only** — all commands execute via `az` and `az rest`; no Azure Python SDK.
-- **Geography-aware region model (v2.4, PLC-010a)** — configuration validation is per-geography:
+- **Historical suite behavior (last described against v2.4, PLC-010a)** — configuration validation is per-geography:
   three distinct regions are required **only** for three-region geographies (US is the only one
   today); **two-region co-located geographies co-locate CVAL + DR** in the non-prod region while the other
   region hosts Production (ENV-003 / PLC-010a). **[Amended v2.4]** The **Middle East uses cross-geo DR** —
@@ -167,7 +174,7 @@ Generated execution evidence is collected under [`Test-Results/`](Test-Results/)
 
 #### Product backlog (`Reference-Material/backlog/`)
 
-The full Agile delivery backlog — **19 Epics → 66 Stories → 175 Tasks (426 story points)** — derived from the Production Readiness Review. Epics, Stories (with acceptance criteria), and Tasks are generated from a single Python data module so the Markdown and the Jira-import CSV never drift. See [`Reference-Material/backlog/`](Reference-Material/backlog/).
+The Agile backlog is a historical planning artefact derived from earlier design material; it has not been reconciled to v4.0. See [`Reference-Material/backlog/`](Reference-Material/backlog/).
 
 | Backlog file | Description |
 |---|---|
@@ -180,7 +187,6 @@ The full Agile delivery backlog — **19 Epics → 66 Stories → 175 Tasks (426
 ## Archive (`Archive/`)
 
 Superseded / historical documents, retained (not deleted) and isolated from current content.
-All carry explicit archive/supersede banners.
 
 | Location | Contents |
 |---|---|
@@ -188,12 +194,14 @@ All carry explicit archive/supersede banners.
 | [`Archive/adr/`](Archive/adr/) | Consolidated Architecture Decision Records (superseded by the split ADRs in `Architecture/adr/`). |
 | [`Archive/requirements/`](Archive/requirements/) | Requirements v2.1 (`capacity_and_quota_management_requirements_v2.*`) and the v2.1 deviation analysis. |
 | [`Archive/research/`](Archive/research/) | Pre-baseline research inputs — engine design v1.0, multi-region placement design v1.0, design-change summary, traceability review, and the exploratory research POC workbook. |
-| [`Archive/testing/`](Archive/testing/) | Binary v2.0 POC workbook (`.docx`/`.pdf`) — content consolidated into the canonical v2.4 workbook. |
+| [`Archive/testing/`](Archive/testing/) | Binary v2.0 POC workbook (`.docx`/`.pdf`) — historical predecessor to the v2.4 workbook. |
 | `Archive/README_PHASE3.md`, `Archive/README_PHASE4.md` | Point-in-time build notes. |
 
 ---
 
-## Hard constraints (carried across all artifacts)
+## Historical POC suite behavior (last described against v2.4)
+
+The following describes the legacy suite behavior, not a v4.0 validation result.
 
 1. **Geography-aware region placement (PLC-010a).** Production, the non-Production region, and DR
    must be placed per the geography's `distribution_model`: three distinct regions for

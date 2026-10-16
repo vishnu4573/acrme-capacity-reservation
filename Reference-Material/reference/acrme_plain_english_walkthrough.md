@@ -1,5 +1,9 @@
 # ACRME Calculation Logic — Plain English Walkthrough (v2.5)
 
+> **Historical explanatory reference — not reconciled to v4.0.** The v4.0 baseline is normative.
+> This walkthrough's versions, formulas, and section references reflect earlier baselines and
+> must be revalidated before use as current guidance.
+
 > **Document type:** Companion reference — plain-language explanation of every formula in the
 > Calculation Logic Reference. This document does **not** replace the Calculation Logic
 > Reference or the Technical Design Document. Read it alongside those documents to understand the
@@ -22,7 +26,7 @@
 |---|---|
 | **Title** | ACRME Calculation Logic — Plain English Walkthrough |
 | **Version** | 1.2 (reconciled to Requirements Baseline v2.5) |
-| **Status** | Baseline |
+| **Status** | Historical explanatory reference; not reconciled to v4.0 |
 | **Date** | 24 September 2026 (foundation); originally 2 September 2026 |
 | **Source** | ACRME Q&A design walkthrough session; Calculation Logic Reference; Requirements Baseline v2.5 |
 | **Companion documents** | `acrme_calculation_logic_reference.md` (formal notation); `acrme_technical_design_document.md` (component design) |

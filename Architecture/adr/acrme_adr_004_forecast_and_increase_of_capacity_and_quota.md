@@ -3,7 +3,9 @@
 **Version:** 2.4  
 **Date:** 7 September 2026  
 **Status:** Accepted - supersedes ADR-004 v1.2 forecast-only sizing content; reconciled to Baseline v2.4 (seed matrix + reactive discovery)  
-**Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
+**Part of:** ACRME Architecture Decision Records - last recorded alignment to Capacity & Quota Management Requirements Baseline v2.4.
+
+> **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR separates continuous reconciliation from longer-horizon forecasting and quota/capacity increase workflows. The **v2.4 revision** adds the seed-matrix initialisation model (**CAP-022**) and the reactive SKU/AZ discovery workflow (**CAP-024**) — see *Seed Matrix Initialisation and Reactive Discovery* below. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 

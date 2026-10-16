@@ -1,5 +1,5 @@
 """
-CVAL Earmark Record — ACRME v2.3
+CVAL Earmark Record — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Tracks CVAL capacity earmarked for DR activation (TDD Section 6.2, PLC-010, DR-005/006).
 CVAL-sacrifice bootstrap pattern: co-located CVAL is releasable toward DR.

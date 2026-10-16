@@ -5,6 +5,8 @@
 **Status:** Accepted - new ADR introduced with Requirements Baseline v2.2; reconciled to Baseline v2.4 (no DR-model change)  
 **Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
+> **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
+>
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR consolidates the distributed DR reference model (Section 12A of the requirements baseline) that was previously distributed across ADR-003 and the calculation logic reference. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 >
 > **v2.4 reconciliation note — reservation-model gaps.** The distributed, reciprocal DR reference model, max-not-sum destination sizing (DR-017), the `SourceDestinationDRIndex` (DR-018) and the reference topology are **unchanged** by the *reservation-model* gaps folded into Baseline v2.4 (seed matrix CAP-022, per-AZ CRG structure CAP-023, reactive discovery CAP-024, Availability-Set ineligibility CAP-020/021, even zone distribution PLC-011, naming OPS-006/C-12). Where DR sizing is applied **per zone**, the per-zone floors are held in the destination's per-AZ CRGs (CAP-023) and are kept balanced by the PLC-011 even-distribution target — see ADR-003 *DR Sizing Formula* for that cross-reference.

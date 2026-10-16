@@ -3,7 +3,7 @@
 ACRME Phase 3 Demo — Placement & Seed Record
 
 Demonstrates:
-    1. Policy loading (v2.3 five-geography model)
+    1. Policy loading (legacy v2.3 five-geography model)
     2. Exact-region seed creation (PLC-001)
     3. Seed reuse across products (PLC-004)
     4. Two-region co-location (PLC-010a)
@@ -105,7 +105,7 @@ def main():
     print(f"   Distribution model: {seed_me.distribution_model}")
     
     # 6. Region catalogue inspection
-    print("\n6. Region catalogue (v2.3)...")
+    print("\n6. Legacy region catalogue (v2.3)...")
     for geo, model in policy.region_catalogue.distribution_models.items():
         standard = policy.region_catalogue.get_standard_regions(geo)
         restricted = policy.region_catalogue.get_restricted_regions(geo)

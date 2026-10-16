@@ -5,12 +5,15 @@
 > `git log --follow <path>` shows full history across the restructure. This page is the
 > navigation index to the new locations.
 
-Every narrative document is provided in three synchronized formats — `.md` (authoritative
-source), `.docx` (editable), and `.pdf` (print-ready) — generated from the Markdown source,
-unless noted otherwise.
+Markdown is the source of truth for repository documentation. Some documents also have
+`.docx`/`.pdf` exports; those derived copies may lag the Markdown and must be regenerated after
+source changes.
 
-> **Single source of truth:** [`/Requirements/acrme_requirements_baseline_v2_4.md`](../Requirements/acrme_requirements_baseline_v2_4.md)
-> is the authoritative living requirements baseline (v2.4). All other documents reconcile to it.
+> **Single source of truth:** [`acrme_requirements_baseline_v4_0.md`](../Requirements/acrme_requirements_baseline_v4_0.md)
+> is the authoritative requirements baseline. The v2.4 and v3.0 baseline files are historical
+> snapshots. The FDD, TDD, POC workbook/suite, glossary, calculation reference, and several
+> mockups/reference documents still contain older-baseline content and are **not verified as
+> reconciled to v4.0**. On conflict, v4.0 wins.
 
 ---
 
@@ -20,22 +23,23 @@ unless noted otherwise.
 
 | Document | Purpose |
 |---|---|
-| [`acrme_requirements_baseline_v2_4`](../Requirements/acrme_requirements_baseline_v2_4.md) | **Authoritative** consolidated requirements baseline (v2.4). Single source of truth. |
-| [`acrme_complete_requirements_reference`](../Requirements/acrme_complete_requirements_reference.md) | All requirements (FR/NFR/R) with Must-Should-Could classification and design-coverage evidence. |
+| [`acrme_requirements_baseline_v4_0`](../Requirements/acrme_requirements_baseline_v4_0.md) | **Authoritative** consolidated requirements baseline (v4.0). Single source of truth. |
+| [`acrme_requirements_baseline_v2_4`](../Requirements/acrme_requirements_baseline_v2_4.md) and [`acrme_requirements_baseline_v3_0`](../Requirements/acrme_requirements_baseline_v3_0.md) | Superseded historical snapshots; not current sources. |
+| [`acrme_complete_requirements_reference`](../Requirements/acrme_complete_requirements_reference.md) | Legacy explanatory compilation; not reconciled to v4.0 and not normative. |
 
-### [`/Design`](../Design/) — HOW it is designed (current design of record)
+### [`/Design`](../Design/) — design artefacts (older baseline; reconciliation pending)
 
 | Document | Purpose |
 |---|---|
-| [`acrme_functional_design_document`](../Design/acrme_functional_design_document.md) | Functional design (FDD) — behaviour, flows, functional requirements. |
-| [`acrme_technical_design_document`](../Design/acrme_technical_design_document.md) | Technical design (TDD) — services, schemas, validation gates. |
-| [`acrme_uml_class_diagrams_summary`](../Design/acrme_uml_class_diagrams_summary.md) | UML class diagrams (4 sets) with explicit gap analysis. UML sources: `uml_01..04_*.md`. |
+| [`acrme_functional_design_document`](../Design/acrme_functional_design_document.md) | Draft FDD; last reconciled to v2.4, not yet reconciled to v4.0. |
+| [`acrme_technical_design_document`](../Design/acrme_technical_design_document.md) | Draft TDD; last reconciled to v2.4, not yet reconciled to v4.0. |
+| [`acrme_uml_class_diagrams_summary`](../Design/acrme_uml_class_diagrams_summary.md) | Legacy UML/gap-analysis material; verify against v4.0 before treating as current. |
 
 ### [`/Architecture`](../Architecture/) — ADRs + architecture diagrams
 
 | Item | Purpose |
 |---|---|
-| [`adr/`](../Architecture/adr/) | Individual standalone ADR-001..005 (`.md`/`.docx`/`.pdf`) plus rendered diagrams under `adr/diagrams/`. The consolidated ADR is archived (see below). |
+| [`adr/`](../Architecture/adr/) | Individual ADRs and rendered diagrams. Their v2.4 reconciliation notes are historical; see the ADR index for the v4.0 authority caveat. |
 | [`diagrams/`](../Architecture/diagrams/) | Source architecture diagrams (`.png`/`.svg`/`.mmd`), the `fdd/`+`tdd/` diagram sources, and the architecture diagrams deck (`.pptx`/`.pdf`). |
 | [`tools/`](../Architecture/tools/) | ADR/doc build-transform helper scripts. |
 
@@ -43,8 +47,8 @@ unless noted otherwise.
 
 | Item | Purpose |
 |---|---|
-| [`acrme_poc_workbook_v2_4`](../POC-Test-Scripts/acrme_poc_workbook_v2_4.md) | **Canonical v2.4 POC workbook of record** — 49 cases across G1–G12, in lock-step with the suite. |
-| [`README.md`](../POC-Test-Scripts/README.md) | Full test-suite usage guide. |
+| [`acrme_poc_workbook_v2_4`](../POC-Test-Scripts/acrme_poc_workbook_v2_4.md) | Historical v2.4 POC workbook; not yet reconciled to v4.0. |
+| [`README.md`](../POC-Test-Scripts/README.md) | Usage guide for the legacy suite; case coverage requires reconciliation to v4.0. |
 
 ### [`/Test-Results`](../Test-Results/) — execution evidence
 
@@ -70,7 +74,7 @@ Generated HTML / Markdown / JSON reports from suite runs land here.
 | [`adr/`](../Archive/adr/) | Consolidated Architecture Decision Records (superseded by the split ADRs in `/Architecture/adr/`). |
 | [`requirements/`](../Archive/requirements/) | Requirements v2.1 and the v2.1 deviation analysis. |
 | [`research/`](../Archive/research/) | Pre-baseline research inputs and the exploratory research POC workbook. |
-| [`testing/`](../Archive/testing/) | Binary v2.0 POC workbook (`.docx`/`.pdf`) — consolidated into the canonical v2.4 workbook. |
+| [`testing/`](../Archive/testing/) | Binary v2.0 POC workbook (`.docx`/`.pdf`) — historical predecessor to the v2.4 workbook. |
 
 ---
 

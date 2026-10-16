@@ -15,6 +15,8 @@
 | **Cross-references**| ADR-001 (Region Selection), ADR-002 (Quota), ADR-003 (DR Capacity),   |
 |                     | ADR-005 (Distributed DR), ADR-006 (Quota/Reservation Enforcement)      |
 
+> **Baseline status:** Baseline v4.0 is authoritative. This proposed ADR was authored against v2.4 and has not been reviewed against v4.0. It remains proposed and must be revalidated before approval or implementation.
+
 ---
 
 > **Label conventions used in this document:**
@@ -1146,4 +1148,3 @@ Both checks apply to the shared CVAL/DR CRG pool. HC-7 protects the DR floor; HC
 | POC-006 | Dedicated DR sub | Recommended (§11.3) | Shared sub with VM-level environment tagging |
 | POC-011 | Max-not-sum DR sizing | DR-017 design | Conservative sum-based sizing (C-11) |
 | DEP-001 | CRG Sharing GA | Required for production sharing path | Option B (local CRGs) |
-

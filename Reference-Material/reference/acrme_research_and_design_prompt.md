@@ -1,8 +1,16 @@
 # ACRME — Full Project Research & Design Prompt
 
+> **Historical prompt — not authoritative.** This prompt was written against baseline v2.5
+> and has not been reconciled to v4.0. Its remaining project context, decisions, and guidance
+> may be stale. The current source of truth is
+> [`../../Requirements/acrme_requirements_baseline_v4_0.md`](../../Requirements/acrme_requirements_baseline_v4_0.md);
+> follow the current research-and-design procedure in
+> [`../../.github/skills/grounding-acrme-research-design/SKILL.md`](../../.github/skills/grounding-acrme-research-design/SKILL.md).
+
 **Document Type:** Master Research & Design Prompt\
 **Intended For:** AI assistants, new architects, platform engineers, and technical researchers picking up this project cold\
-**Baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v2.5 (amended 7 Oct 2026)\
+**Current baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v4.0\
+**Historical context in this prompt:** v2.5 (amended 7 Oct 2026)\
 **Repo:** `vishnu4573/acrme-capacity-reservation` (branch: `master`)\
 **Last updated:** 6 October 2026
 

@@ -1,5 +1,8 @@
 # ACRME Calculation Logic — Plain English Walkthrough
 
+> **Historical worked-example reference — not reconciled to v4.0.** Use baseline v4.0 as
+> normative authority for formulas and semantics; revalidate examples before relying on them.
+
 **EU and US · E16ads\_v5 and E8ads\_v5 · 3 VMs per deployment**
 
 ---

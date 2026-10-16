@@ -1,5 +1,5 @@
 """
-Quota Pool Manager — ACRME v2.3
+Quota Pool Manager — ACRME legacy v2.3 implementation sketch (not reconciled to v4.0)
 
 Single governed quota pool with Prod floor + DR earmark (TDD Section 3, 5.3;
 QUA-004, ADR-002).

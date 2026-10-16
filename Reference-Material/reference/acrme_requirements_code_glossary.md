@@ -1,11 +1,15 @@
 # ACRME Requirements Code Glossary & Master Index
 
 **Azure Capacity Reservation Management Engine (ACRME)**
-**Version:** 1.0 — aligned to Requirements Baseline v2.4
+**Version:** 1.0 — legacy index; not reconciled to Requirements Baseline v4.0
 **Date:** 2026-09-08
 **Author:** Principal Cloud Architect
 
 ---
+
+> **Baseline status.** This glossary's code counts, section references, links, and definitions
+> reflect older baseline structure and may be stale. Baseline v4.0 is authoritative; use it
+> directly until this index has been reconciled and validated.
 
 ## Document Purpose
 

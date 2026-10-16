@@ -1,5 +1,8 @@
 # ACRME 4-Region DR Model — What-If Analysis Comparison
 
+> **Historical what-if — not reconciled to v4.0.** The v2.4 references below describe an earlier
+> comparison, not an approved baseline change. Use baseline v4.0 as normative authority.
+
 **Document Purpose:** Compare the baseline v2.4 region distribution models against a proposed 4-region upgrade for US and EU geographies.
 
 **Workbook:** `acrme_region_selection_whatif_4region.xlsx` (what-if variant; does NOT modify baseline requirements)
