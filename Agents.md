@@ -1,7 +1,8 @@
 # ACRME Programme — Agent Roster
 
-> **Version:** 1.0  
+> **Version:** 2.0  
 > **Scope:** Azure Capacity & Quota Management Engine (ACRME) — Core/Baseline only  
+> **Baseline alignment:** v4.0 (14 Oct 2026) — unified clean-slate rewrite  
 > **Authority:** This document governs the AI agent configuration and responsibility model for the ACRME programme. It is a companion to `Skills.md`.
 
 ---
@@ -80,7 +81,7 @@ Azure Capacity & Platform Architect   ◄── Requirements Baseline (single so
 #### Standing Constraints
 
 - **Always reads the living requirements baseline before any design or documentation action.**
-  File: `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md`
+  File: `Requirements/acrme_requirements_baseline_v4_0.md` (authoritative v4.0 baseline)
 - Never binds a region to a fixed environment (any Standard region can host Prod, CVAL, or DR).
 - Never treats Simplified Distribution Experiment content as core/baseline.
 - Never recommends Bicep for engine runtime logic — Bicep is Layer 1 (infrastructure) only.
@@ -96,7 +97,10 @@ Azure Capacity & Platform Architect   ◄── Requirements Baseline (single so
 | UML Class Diagrams | `Design/acrme_uml_class_diagrams_summary.md` |
 | Hard Constraints Reference | `Reference-Material/reference/acrme_hard_constraints_reference.md` |
 | Calculation Logic Reference | `Reference-Material/reference/acrme_calculation_logic_reference.md` |
-| Requirements Baseline | `Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` |
+| Region Selection Reference Docs | `Reference-Material/reference/region_selection_prerequisites.md`, `acrme_region_selection_executive_reference.md` |
+| Requirements Baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` |
+| Calculation Logic Diagrams | `Architecture/diagrams/calculation-logic/` (01–06.mmd) |
+| Capacity Partition Diagrams | `Architecture/diagrams/capacity-partition-model/` |
 | ADRs | `Architecture/adr/` |
 | Research & design agent profile | `.github/agents/acrme-research-designer.agent.md` |
 | Grounding skill (SK-13) | `.github/skills/grounding-acrme-research-design/` |
@@ -121,10 +125,13 @@ The primary software implementation agent for ACRME. Translates approved archite
 - Engine component implementation (`src/acrme/`)
 - Azure SDK integration (Compute, Quota, Resource Graph, Monitor)
 - Reconciliation loop implementation (CAP-005/006)
-- Placement engine implementation (PLC-001 through PLC-011)
-- DR capacity management implementation (DR-002 through DR-019)
-- Quota pool automation (QUA-001 through QUA-014)
+- Placement engine implementation (PLC-001..005, PLC-007..016; PLC-006 retired)
+- Domain group model implementation (DOM-001 through DOM-004)
+- Two-scope pipeline: CRV resolution (F.11) + DPB binding (F.12)
+- DR capacity management implementation (DR-001 through DR-021)
+- Quota pool automation (QUA-001 through QUA-015)
 - Readiness API implementation (RDY-001/002)
+- Unified formulas (F.1–F.13, §21) implementation
 - Unit and integration test authorship
 - CI/CD pipeline configuration (GitHub Actions)
 
@@ -133,23 +140,26 @@ The primary software implementation agent for ACRME. Translates approved archite
 | Component | Module | FR Coverage |
 |---|---|---|
 | Reconciler | `src/acrme/components/reconciler.py` | FR-2 (CAP-005/006/007/008/009) |
-| Inventory | `src/acrme/components/inventory.py` | FR-1 (CAP-001, CAP-022, CAP-024) |
-| Placement | `src/acrme/components/placement.py` | FR-5 (PLC-001 through PLC-011) |
-| Quota Manager | `src/acrme/components/quota_manager.py` | FR-3 (QUA-001 through QUA-014) |
-| DR Index Manager | `src/acrme/components/dr_index_manager.py` | FR-6 (DR-018) |
+| Inventory | `src/acrme/components/inventory.py` | FR-1 (CAP-001, CAP-022, CAP-024, CAP-025) |
+| Placement (CRV) | `src/acrme/components/placement.py` | FR-5 (PLC-001..005, PLC-007..013, F.10/F.11) |
+| Domain Manager (DPB) | `src/acrme/components/domain_manager.py` | FR-5a (DOM-001..004, PLC-014..016, F.12) |
+| Quota Manager | `src/acrme/components/quota_manager.py` | FR-3 (QUA-001 through QUA-015) |
+| DR Index Manager | `src/acrme/components/dr_index_manager.py` | FR-6 (DR-018, DR-021) |
 | DR Activation | `src/acrme/components/dr_activation.py` | FR-6 (DR-019, DR-006) |
 | DR Simulator | `src/acrme/components/dr_simulator.py` | FR-6 (DR-002, DR-017) |
-| Config Service | `src/acrme/components/config_service.py` | REG-001, CAP-001 |
-| DR Sizing | `src/acrme/algorithms/dr_sizing.py` | DR-017 (MAX-not-SUM) |
-| Scoring | `src/acrme/algorithms/scoring.py` | PLC-007 (live weighting) |
+| Config Service | `src/acrme/components/config_service.py` | REG-001, CAP-001, C-1..C-16 |
+| DR Sizing | `src/acrme/algorithms/dr_sizing.py` | DR-017, F.6–F.8 (MAX-not-SUM) |
+| Scoring | `src/acrme/algorithms/scoring.py` | PLC-007 (live weighting, F.10 γ fairness) |
 
 #### Capabilities
 
 - Reads approved architecture specs and backlog stories before writing any code
-- Implements the exact formulas from the requirements baseline — no approximations
-  - `Target = Allocated + Buffer` (CAP-003)
-  - `DR Destination Requirement = MAX over sources` (DR-017, Appendix D)
-  - `Even Zone Share = 1 / zone_count` ± configurable skew tolerance (CAP-023, PLC-011)
+- Implements the exact formulas from §21 (F.1–F.13) — no approximations
+  - `Target(D,E) = Allocated(D,E) + Buffer(D,E)` (F.1, CAP-003)
+  - `DR Destination Requirement(d) = MAX over non-concurrent sources` (F.6, DR-017)
+  - `Zone Target(D,E,z) = round(VMs(D,E) / Zone Count)` per domain (F.9, PLC-016)
+  - `γ(r,env) = Clamp(1 − Env_Customers / Total_Customers(g))` (F.10, PLC-012)
+  - CRV at customer scope (F.11), DPB at domain scope (F.12)
 - Validates implementation against hard constraints before PR
 - Uses Azure Managed Identity — no secrets in code or configuration files
 - Multi-subscription topology awareness (Prod sub, CVAL sub, DR sub)
@@ -298,7 +308,7 @@ Maintains the consistency, completeness, and normative accuracy of all ACRME pro
 > **Include ALL normative detail** — validation rules, state machines, formulas, classification tables.  
 > High-level summaries are insufficient. A document that covers the decision without the normative detail fails the completeness check.
 
-Specifically: ADRs covering reliability or DR must include the five-state engine state machine, VR-1..VR-11 validation framework, exact scoring formulas, and the 10-step capacity lifecycle where applicable (per §26–§32 of the baseline).
+Specifically: ADRs covering reliability or DR must include the five-state engine state machine, CRV/DPB two-scope pipeline validation, exact scoring formulas (F.1–F.13), domain group model (DOM-001..004), and the DR sizing/bootstrap model where applicable (per §11–§13, §21 of the baseline).
 
 #### Interaction Model
 
@@ -345,13 +355,14 @@ Performs cost modelling for ACRME capacity decisions. Quantifies the trade-offs 
 - CVAL sacrifice cost impact on DR declaration cost
 - Cost alerting thresholds and anomaly detection
 
-#### Key Cost Principles (from §2)
+#### Key Cost Principles (from §2, §14)
 
 - Large idle DR reservations (estimated millions/year) will not receive business approval
 - DR must start lean (bootstrap) and scale on demand — the cost justification for DR-017 MAX-not-SUM
-- Quota as a cost/consumption governor (QUA-005) — quota allocation caps deployable capacity
+- Quota as a cost/consumption governor (QUA-005, QUA-015) — quota allocation caps deployable capacity
 - Cost is measured, attributable, reviewed, and tunable (DP-9)
-- Idle reservation spend is a first-class metric
+- Idle reservation spend is a first-class metric (FIN-001..008)
+- Domain-group-scoped capacity means cost attribution is per (D,E) partition
 
 #### Interaction Model
 
@@ -414,12 +425,12 @@ ACRME FinOps Analyst
 
 ---
 
-## Programme State (as of v1.0)
+## Programme State (as of v2.0)
 
 | Agent | Status | Current Activity |
 |---|---|---|
-| Azure Capacity & Platform Architect | ✅ Active | Programme refresh complete; awaiting POC-001 validation |
-| ACRME Implementation Engineer | ⏸ Defined, not instantiated | Phase 1 backlog ready (59 stories, 371 pts); awaiting kickoff |
-| ACRME POC Validation Engineer | ⏸ Defined, not instantiated | POC workbook v2.4 ready; G9-G12 offline cases executable now |
-| ACRME Documentation Steward | ⏸ Defined, not instantiated | Reference material current; baseline at v2.4 |
+| Azure Capacity & Platform Architect | ✅ Active | v4.0 baseline authored; skills/agents aligned; awaiting member review |
+| ACRME Implementation Engineer | ⏸ Defined, not instantiated | Phase 1 backlog ready; awaiting kickoff after v4.0 approval |
+| ACRME POC Validation Engineer | ⏸ Defined, not instantiated | POC workbook ready; G9-G12 offline cases executable now |
+| ACRME Documentation Steward | ⏸ Defined, not instantiated | Reference material needs reconciliation to v4.0 baseline |
 | ACRME FinOps Analyst | ⏸ Defined, activate on demand | Activate when DR cost modelling or buffer trade-off analysis needed |

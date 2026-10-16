@@ -25,7 +25,7 @@ One tag per claim. The set unifies `Agents.md` (Documented/Tested/Derived/Assume
 ## Tagging rules
 
 1. Azure behaviour claims (limits, API semantics, quota consumption, zone mapping, sharing scope) are never untagged.
-2. `[Documented]` from the baseline is acceptable for programme rules; for platform behaviour prefer a Learn citation as well — the baseline itself cites Learn (v2.5).
+2. `[Documented]` from the baseline is acceptable for programme rules; for platform behaviour prefer a Learn citation as well — the baseline itself cites Learn (v4.0).
 3. A `[Derived]` claim built on any `[Assumed]` input is `[Assumed]`.
 4. Numbers (buffers, percentages, intervals, weights) are `Configurable` unless the baseline fixes them — cite the C-xx item or the calculation logic reference constant.
 5. Preview features: tag the feature state explicitly (`Preview`, API version) and never make it a production dependency.
@@ -33,7 +33,7 @@ One tag per claim. The set unifies `Agents.md` (Documented/Tested/Derived/Assume
 
 ## Azure facts locked by the baseline
 
-Current as of baseline v2.5 (24 Sep 2026; amended 7 Oct 2026). Re-read the baseline if its version moved.
+Current as of baseline v4.0 (14 Oct 2026). Re-read the baseline if its version moved.
 
 | Fact | Code | Tag |
 |---|---|---|
@@ -48,11 +48,14 @@ Current as of baseline v2.5 (24 Sep 2026; amended 7 Oct 2026). Re-read the basel
 | Two quota caps: VM-family vCPU and total regional vCPU — both must be free | QUA-002, QUA-007 | Documented |
 | A subscription belongs to one Quota Group; each transfer is one region × one family; deploy-time checks the subscription, not the group | QUA-003, QUA-004 | Documented |
 | Consumer subscription must hold its own quota; provider needs quota to create/grow | QUA-013 | Documented |
-| One region fails at a time; DR destination sized max-not-sum | DR-001, DR-017, App. D | Decided |
-| Middle East DR is cross-geo into a weighted-selected Europe Standard region | DEC-001, DR-020, PLC-010b, A-ME1 | Decided (residency clearance Assumed) |
+| One region fails at a time; DR destination sized max-not-sum | DR-001, DR-017, App. C | Decided |
+| Middle East DR is cross-geo into a weighted-selected Europe Standard region; dedicated DR capacity (not CVAL-sacrifice) | DEC-001, DR-020, PLC-010b, A-ME1 | Decided (residency clearance Assumed) |
 | Reconciliation reference interval 6 min, configurable | CAP-006 | Configurable |
-| No multi-cloud; all-of-Azure-down out of scope | §2, §24 | Decided |
-| γ denominator `total_customers(g)` = distinct customers with any env (Prod/CVAL/DR) provisioned or deploying in geography g; one live count shared by PS_Prod/PS_NonProd/PS_DR; γ = 1 when the count is 0 | PLC-012, A.10 | Decided (7 Oct 2026; decrement on decommission and cross-geo DR counting Assumed) |
+| No multi-cloud; all-of-Azure-down out of scope | §2, §26 | Decided |
+| γ denominator `total_customers(g)` = distinct customers with any env (Prod/CVAL/DR) provisioned or deploying in geography g; one live count shared by all scoring; γ = 1 when the count is 0 | PLC-012, F.10 | Decided (7 Oct 2026; decrement on decommission and cross-geo DR counting Assumed) |
+| Domain group model: capacity partitioned per (D,E) — domain group × environment | DOM-001..004 | Decided |
+| Two-scope pipeline: CRV customer-scoped, DPB domain-group-scoped; PLC-015 gate | PLC-015 | Decided |
+| Unified formulas F.1–F.13 replace former Appendix A / Appendix D | §21 | Decided |
 
 ## Open-items register
 
@@ -84,9 +87,8 @@ Check these before citing; fix through the owning doc, not in your output.
 | Where | Issue | Authoritative |
 |---|---|---|
 | Uploaded baseline vs repo baseline | Uploaded copy can lag the repo (seen 17 Sep and again at v2.5) | Highest Document Control version |
-| `Skills.md` SK-03 HC table | HC-1..HC-11 labels (CAP-003 … PLC-010b) do not match the hard-constraints reference names (REGION_SEPARATION … AVAILABILITY_SET_INELIGIBLE) | `acrme_hard_constraints_reference.md` Part 2 |
-| `Skills.md` SK-01 Step 2 | Cites baseline §26–§32, which the current baseline does not contain | Current baseline ToC |
-| Older docs | Say "baseline v2.4" for content now in v2.5 | Current baseline |
+| Older docs | May say "baseline v2.4" or "v2.5" for content now in v4.0 | Current baseline (v4.0) |
+| `Skills.md` / `Agents.md` | Aligned to v4.0 as of v2.0 of these files | Current baseline |
 
 ## Escalation
 
