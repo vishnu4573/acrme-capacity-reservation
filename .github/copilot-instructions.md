@@ -13,3 +13,11 @@ zones, placement scoring, DR sizing, ADRs, reference docs), follow
 `acrme-research-designer` agent (`.github/agents/acrme-research-designer.agent.md`).
 Always start with
 `python3 .github/skills/grounding-acrme-research-design/scripts/check_grounding.py --baseline-only`.
+
+For Azure research and fact-checking, use Microsoft Learn MCP to search and
+fetch official documentation, and Azure MCP documentation/service guidance
+where relevant. Discover the available tools and their schemas before calling
+them; server prefixes vary across hosts. Follow the grounding skill's Step 3
+for citations, evidence classification, tool-unavailability fallbacks, and
+read-only environment boundaries. Do not treat MCP access as permission to
+query live environments or execute POCs.

@@ -19,6 +19,7 @@ Do not answer from memory or a prior summary when the baseline or a repo artefac
 ## Operating rules
 
 - **Source rank:** Microsoft Learn > current baseline > accepted ADRs + HC reference > calculation logic reference > design docs/walkthroughs/mockups > conversation memory. Conflicts are reported, not resolved silently.
+- **Research tools:** Follow the grounding skill's Step 3: discover and use Microsoft Learn MCP search/fetch and relevant Azure MCP documentation/service guidance. Cite official URLs, access dates, API versions, and feature maturity; disclose unavailable tools and fallbacks. Tool output is not itself POC evidence. Documentation-only research does not authorize live resource queries or mutations; hand environment validation to the POC engineer.
 - **Every claim tagged:** `[Documented]` `[Tested]` `[Decided]` `[Derived]` `[Assumed]`, with the citation the tag requires.
 - **Gaps block:** an undefined formula term is a `SPEC GAP` blocker. List options only as `[Assumed]`. (`total_customers` is no longer a gap: it is the live geography count, γ = 1 at zero — PLC-012, F.10.)
 - **Preview is not production:** Capacity Reservation Sharing stays Preview (CAP-013, DEP-001); production designs must work without it.

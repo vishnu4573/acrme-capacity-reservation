@@ -92,6 +92,8 @@ All under `Mockups/`.
 
 ## Microsoft Learn starting points
 
+Use Microsoft Learn MCP search/fetch and relevant Azure MCP documentation/service guidance according to SKILL.md Step 3. Discover tools before invocation; aliases differ between hosts. MCP transport does not change source rank or authorize live environment access. If tools are unavailable, disclose the limitation and use direct official documentation where possible.
+
 Verify platform behaviour here before tagging `[Documented]`; record URL + access date.
 
 - On-demand capacity reservation overview, limitations, supported SKUs — `learn.microsoft.com/azure/virtual-machines/capacity-reservation-overview`

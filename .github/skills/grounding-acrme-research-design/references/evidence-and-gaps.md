@@ -30,6 +30,8 @@ One tag per claim. The set unifies `Agents.md` (Documented/Tested/Derived/Assume
 4. Numbers (buffers, percentages, intervals, weights) are `Configurable` unless the baseline fixes them — cite the C-xx item or the calculation logic reference constant.
 5. Preview features: tag the feature state explicitly (`Preview`, API version) and never make it a production dependency.
 6. Undefined formula terms: write `SPEC GAP:` + term + where it is used + what is missing (source, scope, data type). Do not propose a definition as if decided; options may be listed, each tagged `[Assumed]`.
+7. Microsoft Learn MCP and Azure MCP are retrieval/observation mechanisms, not evidence tiers. For documentation-backed claims retain the official URL, access date, applicable API version, scope restrictions, feature maturity, and capability used. Search snippets and generated best-practice advice do not prove platform behaviour or replace a fetched authoritative source.
+8. A live read-only MCP observation is limited to its authorized scope and timestamp; it does not establish general behaviour or count as `[Tested]` without a POC ID and reproducible results artefact. Record failed/unavailable capabilities and official-documentation fallbacks explicitly; missing evidence never implies PASS.
 
 ## Azure facts locked by the baseline
 

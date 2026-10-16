@@ -916,6 +916,8 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 **Trigger:** Any Azure capacity/quota/zone/sharing research question, or any new or revised design note, ADR, reference doc, or mockup logic. Also covers the v4.0 domain-group model (DOM-001–004), two-scope pipeline (CRV/DPB), and unified formula reference (F.1–F.13).
 
+**Research and fact-checking tools:** Use Microsoft Learn MCP to search and fetch official documentation, and relevant Azure MCP documentation/best-practice/service guidance to cross-check platform claims. Discover available tools and schemas first; follow Step 3 of the executable skill for the full procedure. Cite official URLs, access dates, API versions, and Preview/GA status; disclose missing MCP capabilities and any official-documentation fallback. MCP retrieval is not POC evidence and does not authorize live environment access or changes.
+
 **Implementation (executable — the procedure lives there, not here):**
 
 | Item | Path |
