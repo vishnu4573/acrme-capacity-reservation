@@ -1,7 +1,8 @@
 # ACRME Programme — Skills Inventory
 
-> **Version:** 1.0  
+> **Version:** 2.0  
 > **Scope:** Azure Capacity & Quota Management Engine (ACRME) — Core/Baseline only  
+> **Baseline alignment:** v4.0 (14 Oct 2026) — unified clean-slate rewrite  
 > **Authority:** This document defines the reusable skill patterns for the ACRME programme. Each skill is a structured, repeatable procedure that any ACRME agent applies when the trigger condition is met. Skills are companion artefacts to `Agents.md`.
 
 ---
@@ -61,8 +62,8 @@ This document defines the **skill inventory** — the reusable, structured proce
 | Input | Description |
 |---|---|
 | Proposed change | The design decision, recommendation, or document update being proposed |
-| Baseline file | `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` |
-| Relevant FR codes | The functional requirement codes relevant to the proposed change (e.g., CAP-003, DR-017) |
+| Baseline file | `Requirements/acrme_requirements_baseline_v4_0.md` (authoritative v4.0 baseline) |
+| Relevant FR codes | The functional requirement codes relevant to the proposed change (e.g., CAP-003, DR-017, PLC-013, DOM-001) |
 
 **Process**
 
@@ -74,14 +75,15 @@ Step 1 — Read the baseline
 Step 2 — Identify relevant sections
   Map the proposed change to the relevant baseline sections:
   - §7  Environment Policy (ENV-001 through ENV-007)
-  - §8  Capacity Reservation Management (CAP-001 through CAP-024)
-  - §9  Quota Management (QUA-001 through QUA-014)
-  - §10 Readiness (RDY-001 through RDY-004)
-  - §11 Region Selection & Placement (PLC-001 through PLC-011)
-  - §12 Disaster Recovery (DR-001 through DR-019)
-  - §26–§32 Production Readiness (state machine, VR-1..VR-11, scoring, lifecycle)
-  - Appendix A — Core Formulas
-  - Appendix D — DR Sizing (MAX-not-SUM)
+  - §8  Capacity Reservation Management (CAP-001 through CAP-025)
+  - §9  Quota Management (QUA-001 through QUA-015)
+  - §10 Combined Capacity & Quota Readiness (RDY-001 through RDY-004)
+  - §11 Region Selection & Customer Placement (PLC-001..005, PLC-007..016; PLC-006 retired)
+  - §12 Domain Group Model (DOM-001 through DOM-004)
+  - §13 Disaster Recovery (DR-001 through DR-021)
+  - §21 Formulas & Calculation Reference (F.1–F.13; unified — replaces legacy Appendix A/D)
+  - §24 Configurable Items Register (C-1..C-16)
+  - Appendix C — DR Sizing Formula Correction (Max vs Sum)
 
 Step 3 — Cross-check the proposed change
   For each relevant baseline section:
@@ -215,19 +217,19 @@ Step 6 — Produce WAF assessment table
 
 **Hard Constraints (HC-1 through HC-11)**
 
-| HC | Constraint | Source |
-|---|---|---|
-| HC-1 | Reservation target = Allocated + Buffer. Never associated-only. | CAP-003 |
-| HC-2 | Zero capacity = set quantity to 0, never delete the reservation object. | CAP-009 |
-| HC-3 | Decommission requires approved workflow. Reconciliation never deletes. | CAP-010 |
-| HC-4 | Quota and capacity must both be validated before any placement decision. | QUA-007, RDY-001 |
-| HC-5 | Placement reads exact production region from the customer seed record. Not derived from geography. | PLC-001, PLC-003 |
-| HC-6 | DR destination uses MAX-not-SUM sizing across non-concurrent sources. | DR-017, Appendix D |
-| HC-7 | CVAL capacity is released (sacrificed) before requesting new DR capacity from Azure. | DR-006, DR-004 |
-| HC-8 | DR bootstrap is the capacity floor — not a full production copy (no fixed % of prod). | ENV-005, DR-001 |
-| HC-9 | Reconciliation always uses current state — stale state is rejected. | CAP-005, RDY-004 |
-| HC-10 | Every managed SKU/AZ combination is seeded at quantity 0 in the seed matrix. | CAP-022 |
-| HC-11 | Middle East DR is cross-geo into EU weighted region (DEC-001 RESOLVED, v2.4). | PLC-010b, DR-020 |
+| HC | Name | Constraint | Source |
+|---|---|---|---|
+| HC-1 | REGION_SEPARATION | Prod, CVAL, DR never in the same AZ; each occupies a distinct region or a distinct CRG set. | ENV-003 |
+| HC-2 | CAPACITY_FLOOR | Reservation target = Allocated + Buffer (F.1). Never associated-only. | CAP-003 |
+| HC-3 | QUOTA_FLOOR | Both VM-family and total regional vCPU quota must be free before any placement. | QUA-002, QUA-007, RDY-001 |
+| HC-4 | DR_SEPARATION_CLASS | DR CRG set is separate from Prod CRG set; no DR reservation in a Prod CRG. | ENV-003, CAP-025 |
+| HC-5 | ZONE_AVAILABILITY | The target region must offer ≥ 1 availability zone for the requested SKU. | CAP-023 |
+| HC-6 | DR_COVERAGE_FLOOR | DR destination sized MAX-not-SUM across non-concurrent sources (F.6). | DR-001, DR-017, §21.3 |
+| HC-7 | DR_FLOOR_INTEGRITY | CVAL sacrifice releases CVAL capacity before requesting new DR capacity from Azure. | DR-004, DR-006 |
+| HC-8 | GEOGRAPHY_CONTAINMENT | All customer environments stay within the customer’s geography unless cross-geo path approved. | PLC-010, REG-003 |
+| HC-9 | STANDARD_REGION_ONLY | Placement reads exact production region from the seed record. Restricted regions require exception. | PLC-001, PLC-003, REG-001 |
+| HC-10 | CROSS_GEO_EXTENSION_PATH_APPROVED | Middle East DR is cross-geo into EU weighted region (DEC-001 RESOLVED). | PLC-010b, DR-020 |
+| HC-11 | AVAILABILITY_SET_INELIGIBLE | Availability-Set VMs cannot use capacity reservations. | CAP-020 |
 
 **Process**
 
@@ -435,62 +437,84 @@ P3 (offline-executable now, no Azure environment needed):
 - Reviewing an existing calculation for correctness
 - Responding to a question about how capacity or DR is sized
 
-**Core Formulas (from Appendix A and D)**
+**Core Formulas (from §21 Formulas & Calculation Reference, F.1–F.13)**
 
-#### Formula 1 — Reservation Target (CAP-003)
+#### Formula F.1 — Reservation Target (CAP-003, §21.1)
 
 ```
-Target Reserved Capacity = Allocated VM Count + Configured Buffer
+Target Reserved Capacity(D,E) = Allocated VM Count(D,E) + Buffer Target(D,E)
 ```
 
+- **(D,E)** = domain group × environment operand (per-domain ig, DOM-002)
 - **Allocated VM Count:** VMs currently running and consuming capacity (not associated-but-deallocated)
-- **Configured Buffer:** Policy input per SKU/AZ/region/environment — not a hardcoded constant
+- **Buffer Target:** Policy input per product/region/environment/SKU (C-2) — not a hardcoded constant
 - **Never:** `Target = Associated VM Count` (associated-only is explicitly rejected)
 
-#### Formula 2 — DR Destination Sizing (DR-017, Appendix D — MAX-not-SUM)
+#### Formula F.6 — DR Destination Sizing (DR-017, §21.3 — MAX-not-SUM)
 
 ```
-Destination DR Requirement(d) = MAX over all source regions s { portion(s → d) }
+Destination DR Requirement(d) = MAX over each non-concurrent source region s protected by d (
+      Workload Portion of s assigned to destination d
+  )
 ```
 
 Where:
 - `d` = destination region
 - `s` = each source production region that has DR mapped to `d`
-- `portion(s → d)` = the DR portion of source `s` routed to destination `d`
+- Workload portions are domain-attributed
 - This uses MAX, not SUM — destination is sized for the largest single source, not the aggregate of all sources
 - Rationale: sources are non-concurrent (DR-001); only one source fails at a time
+- A conservative SUM override is available (C-11) only where a customer/contract explicitly requires concurrent-failure protection
 
 ```
-Overcommit Ratio = SUM(portions routed to d) / MAX(portion routed to d)  [informational]
+Overcommit Ratio(d) = SUM(source portions on d) / MAX(source portions on d)  [informational, F.8]
 ```
 
-#### Formula 3 — Zone Distribution Target (PLC-011, CAP-023)
+#### Formula F.9 — Zone Distribution Target (PLC-011, PLC-016, CAP-023, §21.4)
 
 ```
-Even Zone Share = 1 / zone_count   (e.g., 33.3% per zone in a 3-zone region)
+Even Zone Share            = 1 / Zone Count
+Target VMs per Zone(D,E,z) = round( VMs(D,E) / Zone Count )
+Zone Skew(D,E,z)           = VMs(D,E,z) − Target VMs per Zone(D,E,z)
+Max Skew(D,E)              = MAX over zones z of | Zone Skew(D,E,z) |
+Rebalance Trigger           = Max Skew(D,E) > Configured Skew Tolerance  (C-13)
 ```
 
-Skew tolerance is configurable per `PlacementPolicy` (C-13).
+Zone distribution is per-domain (PLC-016). Region maintains a combined-load observation across domains (OBS-001/002) but it never triggers cross-domain reservation actions.
 
-Rebalance trigger: actual zone share deviates from even share by more than configured tolerance.
-
-#### Formula 4 — Production Growth Buffer (QUA-006)
+#### Formula F.10 — γ Fairness Term (PLC-012, §21.5)
 
 ```
-Quota Top-Up Trigger: usage / allocated_quota > (1 - buffer_threshold)
-Required Quota = current_usage + quota_buffer_headroom
+γ(r,env) = 1                                             if Total_Customers(g) = 0
+           = Clamp(1 − Env_Customers(r,env) / Total_Customers(g), 0, 1)  otherwise
 ```
+
+- `Total_Customers(g)` = distinct customers with ≥ 1 environment provisioned or deploying in geography g
+- `Env_Customers(r,env)` = customers with the specific environment in region r
+- One geography-level denominator shared by all three scores; numerator is environment-specific
+
+#### Formula F.4 — Available Subscription Quota (QUA-002, §21.2)
+
+```
+Available Quota(D,E) = Assigned Regional VM-Family Quota(D,E)
+                       − Current Regional VM-Family Usage(D,E)
+```
+
+Computed per ig subscription (DOM-002); both VM-family cap and total regional vCPU cap checked (QUA-002).
 
 **Process**
 
 ```
 Step 1 — Identify the formula being used in the implementation or calculation
-Step 2 — Match it against the canonical formulas above
+Step 2 — Match it against the canonical formulas above (F.1–F.13)
 Step 3 — Verify:
   a. Variable mapping: are "allocated", "associated", "buffer", "portion" used correctly?
-  b. Operator: SUM vs MAX for DR destination (MAX-not-SUM is the hard constraint HC-6)
-  c. Buffer: is it a configurable policy input, not a hardcoded value?
-  d. Zone: is it `1/zone_count` with configurable tolerance?
+  b. Domain scope: is the (D,E) operand correctly scoped per domain group (DOM-002)?
+  c. Operator: SUM vs MAX for DR destination (MAX-not-SUM is the hard constraint HC-6)
+  d. Buffer: is it a configurable policy input, not a hardcoded value?
+  e. Zone: is it `1/zone_count` per domain (PLC-016) with configurable tolerance?
+  f. γ fairness: is the denominator Total_Customers(g) geography-scoped (PLC-012)?
+  g. CRV/DPB: is region selection at customer scope (F.11) and capacity binding at domain scope (F.12)?
 Step 4 — Classify: CORRECT | DEVIATION | ERROR
 Step 5 — If DEVIATION or ERROR: state the exact difference and the correct formula
 ```
@@ -519,14 +543,15 @@ Step 5 — If DEVIATION or ERROR: state the exact difference and the correct for
 
 | FR Domain | Requirement Codes | Design Component | Source Module | Test |
 |---|---|---|---|---|
-| FR-1 Capacity Inventory | CAP-001 to CAP-024 | `acrme_technical_design_document.md` §Inventory | `src/acrme/components/inventory.py` | `tests/` |
+| FR-1 Capacity Inventory | CAP-001 to CAP-025 | `acrme_technical_design_document.md` §Inventory | `src/acrme/components/inventory.py` | `tests/` |
 | FR-2 Reconciliation | CAP-005, CAP-006, CAP-007, CAP-008, CAP-009 | §Reconciler | `src/acrme/components/reconciler.py` | `tests/` |
-| FR-3 Quota Management | QUA-001 to QUA-014 | §QuotaManager | `src/acrme/components/quota_manager.py` | `tests/` |
+| FR-3 Quota Management | QUA-001 to QUA-015 | §QuotaManager | `src/acrme/components/quota_manager.py` | `tests/` |
 | FR-4 Readiness | RDY-001 to RDY-004 | §ReadinessGate | `src/acrme/domain/readiness.py` | `tests/` |
-| FR-5 Placement | PLC-001 to PLC-011 | §PlacementEngine | `src/acrme/components/placement.py` | `tests/` |
-| FR-6 DR Capacity | DR-001 to DR-019 | §DRManager | `src/acrme/components/dr_index_manager.py` `src/acrme/components/dr_activation.py` `src/acrme/algorithms/dr_sizing.py` | `tests/` |
-| FR-7 Observability | OPS-001 to OPS-00x | §Observability | `src/acrme/observability/` | `tests/` |
-| FR-8 Governance | CAP-010, CAP-019, PLC-005 | §Governance | TBD | TBD |
+| FR-5 Placement | PLC-001..005, PLC-007..016 (PLC-006 retired) | §PlacementEngine | `src/acrme/components/placement.py` | `tests/` |
+| FR-5a Domain Model | DOM-001 to DOM-004 | §DomainGroupManager | `src/acrme/components/domain_manager.py` | `tests/` |
+| FR-6 DR Capacity | DR-001 to DR-021 | §DRManager | `src/acrme/components/dr_index_manager.py` `src/acrme/components/dr_activation.py` `src/acrme/algorithms/dr_sizing.py` | `tests/` |
+| FR-7 Observability | OBS-001 to OBS-005 | §Observability | `src/acrme/observability/` | `tests/` |
+| FR-8 Governance | CAP-010, CAP-019, PLC-005, GOV-001..009 | §Governance | TBD | TBD |
 
 **Process**
 
@@ -569,7 +594,7 @@ Step 6 — Classify coverage:
 **Epic:** E<NN> — <Epic Title>
 **Phase:** P<N>
 **Points:** <Fibonacci: 1 2 3 5 8 13 21>
-**Domain:** <FR-1 through FR-8 | CAP | QUA | PLC | DR | RDY | OPS>
+**Domain:** <FR-1 through FR-8 | CAP | QUA | PLC | DOM | DR | RDY | OBS | OPS | GOV>
 **Requirements:** <Requirement codes: e.g., CAP-003, DR-017>
 **Status:** `[ ]`
 
@@ -640,8 +665,9 @@ Step 6 — Add to backlog file
 | Input | Description |
 |---|---|
 | DR Index | Source→destination mapping from `src/acrme/domain/dr_index.py` |
-| Source portions | The DR portion of each source region assigned to the destination |
+| Source portions | The DR portion of each source region assigned to the destination (domain-attributed) |
 | Destination region | The region whose DR requirement is being sized |
+| Baseline formulas | F.6 (MAX-not-SUM), F.7 (DR capacity gap), F.8 (overcommit ratio) from §21.3 |
 
 **Process**
 
@@ -649,14 +675,16 @@ Step 6 — Add to backlog file
 Step 1 — List all source regions routed to the destination
   Extract from DR index: { source_region → portion_size }
 
-Step 2 — Apply MAX-not-SUM (HC-6)
-  Destination DR Requirement = MAX({ portion(s → d) for all s })
+Step 2 — Apply MAX-not-SUM (HC-6, F.6)
+  Destination DR Requirement(d) = MAX over each non-concurrent source region s
+      { Workload Portion of s assigned to d }
   NOT: SUM({ portion(s → d) for all s })
 
 Step 3 — Compute overcommit ratio (informational)
   Overcommit Ratio = SUM(all portions to d) / MAX(portion to d)
-  Example: SUM=1200, MAX=600 → Overcommit Ratio = 2.0
+  Example: SUM=1200, MAX=600 → Overcommit Ratio = 2.0 (F.8)
   This means the destination is sized for 1 source failing at a time (non-concurrent assumption DR-001).
+  A conservative SUM override is available (C-11) only for explicit concurrent-failure contracts.
 
 Step 4 — Validate against HC-6
   If the sizing uses SUM instead of MAX: FAIL — HC-6 violation.
@@ -764,21 +792,27 @@ Step 3 — Return machine-readable state
 **Region Model Rules**
 
 ```
-Rule 1 — US (3-region model):
+Rule 1 — US (3-region model, REG-003 item 1):
   Three Standard regions: West US 3, Central US, Canada Central.
   Each can host Prod, CVAL, or DR independently.
   No co-location required — three regions, three environments separate.
+  Region selection uses weighted scoring (F.10/F.11) among all three for CVAL and DR.
 
-Rule 2 — All other geos (2-region model, ENV-003 / PLC-010a):
+Rule 2 — All other geos (2-region co-located model, REG-003 item 2, PLC-010a):
   Prod anchors in one Standard region.
   CVAL + DR co-locate in the other Standard region (deterministic, not optional).
   Co-location must be recorded in seed record: cval_region == dr_region.
   Co-located CVAL must not be double-counted as both live CVAL and DR headroom (PLC-010).
+  Applies to: Europe, Australia, Asia Pacific.
 
-Rule 3 — Middle East (cross-geo DR, DEC-001 RESOLVED, v2.4):
-  Prod + CVAL: ME-weighted Standard region (Saudi Arabia Central or UAE North).
-  DR: cross-geo into EU-weighted Standard region (Switzerland North or Sweden Central).
-  NOT a ME region for DR — this is a legal override, not a general 2-region property.
+Rule 3 — Middle East (cross-geo DR model, REG-003 item 3, PLC-010b, DEC-001 RESOLVED):
+  Prod + CVAL: single ME Standard region, co-located but in **separate CRGs** (ENV-003).
+  CVAL co-locates with Prod (prod_region == cval_region), NOT with DR.
+  DR: EU Standard region selected independently via the weighted placement model (DR-020).
+  DR is NOT bootstrapped by CVAL-sacrifice (DR-005/DR-006 do not apply) —
+  Middle East DR uses dedicated reserved DR capacity in Europe.
+  Record: prod_region == cval_region (ME), dr_region ∈ Europe, dr_geography == "Europe".
+  Per-country DR_NOT_OFFERED (DR-014) carve-out: no DR region assigned if set.
 
 Rule 4 — Region-environment non-binding:
   ANY Standard region can host Prod, CVAL, or DR.
@@ -788,6 +822,11 @@ Rule 4 — Region-environment non-binding:
 Rule 5 — EUS2 exception:
   East US 2 is a restricted deployment region (exception, not Standard auto-select).
   North Europe, West Europe (EU), Japan East (APAC) are similarly exception/pending regions.
+
+Rule 6 — Two-scope pipeline (CRV + DPB):
+  Region selection (CRV, PLC-013, F.11) is customer-scoped; resolved once per customer × geography.
+  Capacity binding (DPB, PLC-014, F.12) is domain-scoped; each domain group resolves independently.
+  CRV strictly precedes DPB (PLC-015 gate).
 ```
 
 **Process**
@@ -828,18 +867,19 @@ For any document derived from the requirements baseline, verify that the followi
 
 | Check | Required content | Applies to |
 |---|---|---|
-| C-01 | Exact requirement codes (CAP-xxx, QUA-xxx, DR-xxx, etc.) — not paraphrased descriptions | All documents |
-| C-02 | Core formulas verbatim (CAP-003 target, DR-017 MAX-not-SUM, zone distribution) | Capacity / DR docs |
+| C-01 | Exact requirement codes (CAP-xxx, QUA-xxx, PLC-xxx, DOM-xxx, DR-xxx, etc.) — not paraphrased descriptions | All documents |
+| C-02 | Core formulas verbatim from §21 (F.1–F.13: capacity sizing F.1–F.3, quota F.4–F.5, DR sizing F.6–F.8, zone distribution F.9, γ fairness F.10, CRV F.11, DPB F.12) | Capacity / DR / placement docs |
 | C-03 | The five-state engine state machine: `STEADY_STATE → DR_DECLARATION_PENDING → DR_EVENT_ACTIVE → FAILBACK_PENDING → INCIDENT_HOLD` | Reliability / DR ADRs |
-| C-04 | VR-1 through VR-11 validation framework | Production readiness docs (§26–§32) |
+| C-04 | Two-scope pipeline: CRV customer-scoped (PLC-013, F.11) + DPB domain-scoped (PLC-014, F.12) with PLC-015 ordering gate | Placement / region-selection docs |
 | C-05 | 8 machine-readable readiness states (RDY-002) | Readiness / readiness API docs |
 | C-06 | 9 readiness conditions (RDY-001) | Readiness docs |
-| C-07 | Region classification table (Standard vs Restricted, per geography) | Region / placement docs |
-| C-08 | HC-1 through HC-11 in full | Hard constraints reference / any doc with constraints |
-| C-09 | Scoring formula components (PLC-007 live weighting: capacity, quota, buffers, zones, DR contribution) | Placement docs |
-| C-10 | 10-step capacity lifecycle | Reliability / operational docs (§26–§32) |
+| C-07 | Region classification table (Standard vs Restricted, per geography) and distribution models (3-region US, 2-region co-located, cross-geo ME) | Region / placement docs |
+| C-08 | HC-1 through HC-11 in full, with Part 2 authoritative names (REGION_SEPARATION … AVAILABILITY_SET_INELIGIBLE) | Hard constraints reference / any doc with constraints |
+| C-09 | Scoring formula components (PLC-007/008 live weighting at customer-aggregate scope: α capacity headroom, β quota, γ fairness (PLC-012, F.10), δ DR readiness, ε zone diversity) | Placement docs |
+| C-10 | Domain group model (DOM-001–004): domain taxonomy, ig binding, cross-domain independence, domain-bounded sharing | Multi-domain / domain-scoped docs |
 | C-11 | Exact POC-gated assumptions labelled (e.g., QUA-013 POC-gated) | Any doc referencing sharing or quota |
 | C-12 | Confidence classification per finding (Documented / Tested / Derived / Assumed) | All ADRs |
+| C-13 | PLC-006 is RETIRED (subsumed by PLC-013); no doc should reference PLC-006 as active | All placement docs |
 
 **Process**
 
@@ -856,7 +896,7 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 **Completeness Rule Origin**
 
-> This skill exists because: "Agent delivered ADRs covering the four requested areas but omitted substantial normative detail present in Production Readiness Review §26–§32: the region classification model table, VR-1..VR-11 validation framework, the full five-state engine state machine, exact scoring formulas, and the 10-step capacity lifecycle. User: ADRs don't cover details in Production Readiness design, review and update the details accordingly." — Recorded lesson, 2026-08-27.
+> This skill exists because: "Agent delivered ADRs covering the four requested areas but omitted substantial normative detail: the region classification model table, the two-scope pipeline (CRV + DPB), the full five-state engine state machine, exact scoring formulas (F.1–F.13), and the domain group model (DOM-001–004). User: ADRs don't cover details in Production Readiness design, review and update the details accordingly." — Recorded lesson, 2026-08-27 (updated for v4.0 alignment).
 
 **Outputs**
 
@@ -874,7 +914,7 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 **Purpose:** Wrapper procedure that keeps every ACRME research finding and design output traceable to the current baseline and Microsoft Learn. It sequences SK-01, SK-02, SK-03, SK-06 and SK-09 and adds baseline-version resolution, evidence tagging, an open-items register, output templates, and an automated lint.
 
-**Trigger:** Any Azure capacity/quota/zone/sharing research question, or any new or revised design note, ADR, reference doc, or mockup logic.
+**Trigger:** Any Azure capacity/quota/zone/sharing research question, or any new or revised design note, ADR, reference doc, or mockup logic. Also covers the v4.0 domain-group model (DOM-001–004), two-scope pipeline (CRV/DPB), and unified formula reference (F.1–F.13).
 
 **Implementation (executable — the procedure lives there, not here):**
 
@@ -893,7 +933,7 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 **Platform Skill Registration:** ✅ Built — `grounding-acrme-research-design`
 
-> **Note on HC numbering:** the HC table in SK-03 above uses older labels. The authoritative HC-1..HC-11 names are in `Reference-Material/reference/acrme_hard_constraints_reference.md` Part 2 (REGION_SEPARATION … AVAILABILITY_SET_INELIGIBLE); SK-13 uses those.
+> **Note on HC numbering:** The SK-03 HC table now uses the authoritative HC-1..HC-11 names from `Reference-Material/reference/acrme_hard_constraints_reference.md` Part 2 (REGION_SEPARATION … AVAILABILITY_SET_INELIGIBLE), aligned with SK-13.
 
 ---
 
@@ -935,12 +975,12 @@ The following skills are recommended for Abacus AI platform skill registration �
 
 | SK ID | Recommended Platform Skill Name | Priority |
 |---|---|---|
-| SK-01 | `acrme-baseline-check` | **P0 — Register first** |
-| SK-03 | `acrme-hc-check` | P0 |
-| SK-06 | `acrme-formula-check` | P1 |
+| SK-01 | `acrme-baseline-check` | **P0 — Register first** (aligned to v4.0 § numbering) |
+| SK-03 | `acrme-hc-check` | P0 (aligned to HC reference Part 2 names) |
+| SK-06 | `acrme-formula-check` | P1 (covers F.1–F.13 unified formulas) |
 | SK-09 | `acrme-dr-sizing-check` | P1 |
 | SK-02 | `acrme-waf-assessment` | P2 |
-| SK-12 | `acrme-doc-completeness` | P2 |
+| SK-12 | `acrme-doc-completeness` | P2 (checklist updated for v4.0 two-scope pipeline + DOM) |
 
 > **Note:** SK-01 (`acrme-baseline-check`) should be the first skill registered. It underpins all other skills and is already a standing instruction — registering it as a platform skill makes it invocable by name in any ACRME conversation without re-stating the procedure.
 

@@ -12,13 +12,14 @@
 
 | Candidate | Path |
 |---|---|
-| Repo baseline | `Requirements/acrme_requirements_baseline_v2_4.md` (filename is historical — read the Document Control `Version` row) |
+| Repo baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` |
+| Legacy repo baseline (v2.5, filename historical) | `Requirements/acrme_requirements_baseline_v2_4.md` — superseded by v4.0 |
 | Uploaded copy | `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` |
 | Expanded reference | `Requirements/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
 | Code glossary | `Reference-Material/reference/acrme_requirements_code_glossary.md` (one-line definitions + links) |
 | Consistency audit | `Requirements/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |
 
-Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the baseline; re-check them if the version changed.
+Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the v4.0 baseline; re-check them if the version changed.
 
 ## Topic → baseline section → codes → repo artefact
 
@@ -30,24 +31,28 @@ Rule: the highest Document Control version wins. `scripts/check_grounding.py --b
 | Scope in/out | §5 | — | — |
 | Region strategy, catalogue, geography models | §6 | REG-001..003, PLC-010/010a/010b, DR-020 | `Mockups/build_acrme_whatif_acrme_regions.py` (catalogue), `Mockups/acrme_4region_model_comparison.md` |
 | Environment policy (Prod / CVAL / DR isolation, core sub) | §7 | ENV-001..007 | ADR-001, ADR-007 |
-| Capacity reservation mgmt (target, reconcile, zero-not-delete, sharing, zonal CRG, seed matrix) | §8 | CAP-001..024, CAP-001a | ADR-002, ADR-007, `Reference-Material/reference/acrme_cr_crg_deployment_layout.md`, `acrme_crg_cr_foundation_provisioning_plan.md` |
-| Quota (two caps, Quota Groups, earmarks, consumer quota) | §9 | QUA-001..014 | ADR-002, ADR-006 (`adrme_adr_006_quota_reservation_enforcement_boundary.md`) |
+| Capacity reservation mgmt (target, reconcile, zero-not-delete, sharing, zonal CRG, seed matrix) | §8 | CAP-001..025, CAP-001a | ADR-002, ADR-007, `Reference-Material/reference/acrme_cr_crg_deployment_layout.md`, `acrme_crg_cr_foundation_provisioning_plan.md` |
+| Quota (two caps, Quota Groups, earmarks, consumer quota) | §9 | QUA-001..015 | ADR-002, ADR-006 (`adrme_adr_006_quota_reservation_enforcement_boundary.md`) |
 | Combined readiness | §10 | RDY-001..004 | `Mockups/acrme_sku_placement_whatif_user_guide.md` (6-state readiness) |
-| Region selection & customer placement (seed record) | §11 | PLC-001..011 | ADR-001, `Design/acrme_region_selection_mockup_plan.md` |
-| DR capacity (bootstrap, CVAL sacrifice, max-not-sum, reciprocal hosting) | §12, §12A, App. D | DR-001..020 | ADR-003, ADR-005 |
-| FinOps | §13 | FIN-001..008 | `Reference-Material/reference/ps_prod_nonprod_headroom_design_rationale.md` (α headroom) |
-| AEP / provisioning integration | §14 | INT-001..007 | TDD |
-| State & data | §15 | DAT-001..006 | `Design/uml_01_core_domain_model.md`, `uml_02_operation_tracking_model.md` |
-| Observability | §16 | OBS-001..005 | TDD |
-| Governance, security, RBAC | §17 | GOV-001..009 | `Reference-Material/guides/acrme_security_and_rbac_guide.md`, `Reference-Material/rbac/` |
-| NFRs | §18 | NFR-001..010 | TDD |
-| Operations (runbooks, drills) | §19 | OPS-001..006 | — |
-| Acceptance criteria | §20 | — | POC workbook |
-| Delivery phases | §21 | — | `Reference-Material/backlog/acrme_epics_stories_tasks.md` |
-| Configurable items | §22 | C-xx | calculation logic reference (constants) |
-| Pending decisions & POCs | §23 | POC-001..011, DEC-001..003, DEP-001 | `POC-Test-Scripts/acrme_poc_workbook_v2_4.md` |
-| Assumptions, constraints, risks | §24 | A-ME1 | — |
-| Core formulas | App. A | A.1..A.6 | calculation logic reference |
+| Region selection & customer placement (CRV customer-scoped) | §11 | PLC-001..005, PLC-007..016 (PLC-006 retired) | ADR-001, `Design/acrme_region_selection_mockup_plan.md` |
+| Domain group model (domain-scoped partitioning, DPB) | §12 | DOM-001..004 | — |
+| DR capacity (bootstrap, CVAL sacrifice, max-not-sum, reciprocal hosting) | §13 | DR-001..021 | ADR-003, ADR-005 |
+| Cost economics & FinOps | §14 | FIN-001..008 | `Reference-Material/reference/ps_prod_nonprod_headroom_design_rationale.md` (α headroom) |
+| AEP / provisioning integration | §15 | INT-001..007 | TDD |
+| State & data | §16 | DAT-001..006 | `Design/uml_01_core_domain_model.md`, `uml_02_operation_tracking_model.md` |
+| Observability | §17 | OBS-001..008 | TDD |
+| Governance, security, RBAC | §18 | GOV-001..009 | `Reference-Material/guides/acrme_security_and_rbac_guide.md`, `Reference-Material/rbac/` |
+| NFRs | §19 | NFR-001..010 | TDD |
+| Operations (runbooks, drills) | §20 | OPS-001..006 | — |
+| Unified formulas & calculation reference | §21 | F.1..F.13 | calculation logic reference |
+| Acceptance criteria | §22 | — | POC workbook |
+| Delivery phases | §23 | — | `Reference-Material/backlog/acrme_epics_stories_tasks.md` |
+| Configurable items | §24 | C-xx (C-01..C-16) | calculation logic reference (constants) |
+| Pending decisions & POCs | §25 | POC-001..011, DEC-001..003, DEP-001 | `POC-Test-Scripts/acrme_poc_workbook_v2_4.md` |
+| Assumptions, constraints, risks | §26 | A-ME1 | — |
+| Requirement summary | §27 | — | — |
+| Forward-items impact evaluation | §28 | — | — |
+| DR sizing formula correction | App. C | — | — |
 
 Design-level docs that cut across topics: `Design/acrme_functional_design_document.md` (FDD), `Design/acrme_technical_design_document.md` (TDD), `Design/acrme_sku_level_capacity_quota_design.md`, `Design/uml_03_service_layer_model.md`, `Design/uml_04_state_machines.md`.
 
@@ -55,12 +60,12 @@ Design-level docs that cut across topics: `Design/acrme_functional_design_docume
 
 | Need | Source (rank order) |
 |---|---|
-| Reservation target, headroom, deficit, quota deficit, DR destination | Baseline App. A (A.1–A.6), App. D |
-| PS_Prod / PS_NonProd / PS_DR scoring, α/β/γ terms, constants, scenarios | `Reference-Material/reference/acrme_calculation_logic_reference.md` |
+| Reservation target, headroom, deficit, quota deficit, DR destination, γ fairness, CRV, DPB, lineage | Baseline §21 (F.1–F.13), App. C (max-vs-sum correction) |
+| Score_Pool(C,R) scoring, α/β/γ/δ/ε terms, constants, scenarios | `Reference-Material/reference/acrme_calculation_logic_reference.md` |
 | Worked numbers | `acrme_calculation_logic_comprehensive_walkthrough.md`, `acrme_plain_english_walkthrough.md`, `ACRME_Scoring_Weights_Explained.md` |
 | α headroom design rationale | `ps_prod_nonprod_headroom_design_rationale.md` |
 
-If a walkthrough disagrees with the calculation logic reference, the reference wins; if the reference disagrees with App. A, the baseline wins.
+If a walkthrough disagrees with the calculation logic reference, the reference wins; if the reference disagrees with §21, the baseline wins.
 
 ## Mockups and their builders
 
