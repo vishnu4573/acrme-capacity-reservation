@@ -14,7 +14,7 @@
 |---|---|
 | Repo baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` |
 | Legacy repo baseline (v2.5, filename historical) | `Requirements/acrme_requirements_baseline_v2_4.md` — superseded by v4.0 |
-| Uploaded copy | `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` |
+| Optional external/uploaded copy | Supply its path with `check_grounding.py --uploaded-baseline <path>` or `ACRME_UPLOADED_BASELINE`; no host-specific path is assumed |
 | Expanded reference | `Requirements/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
 | Code glossary | `Reference-Material/reference/acrme_requirements_code_glossary.md` (one-line definitions + links) |
 | Consistency audit | `Requirements/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |

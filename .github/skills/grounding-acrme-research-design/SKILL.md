@@ -7,7 +7,7 @@ description: Grounds any ACRME (Azure Capacity & Quota Management / capacity-res
 
 Procedure that keeps every ACRME research finding and design output traceable to an authoritative source. It does not restate requirements — it tells you where they live, how to rank them, and what must be checked before anything is delivered.
 
-Repo: `vishnu4573/acrme-capacity-reservation` (branch `master`), local clone `/home/ubuntu/acrme-capacity-reservation`. All paths below are repo-relative.
+Repo: `vishnu4573/acrme-capacity-reservation` (branch `master`). All paths below are repo-relative. The grounding checker derives the repository root from its own location, so it can run from any checkout path.
 
 ## Workflow
 
@@ -17,7 +17,7 @@ Run the steps in order. Do not draft any output before Step 3 is complete.
 ```bash
 python3 .github/skills/grounding-acrme-research-design/scripts/check_grounding.py --baseline-only
 ```
-The script reads the Document Control `Version` row of every baseline candidate (repo `Requirements/acrme_requirements_baseline_v*.md` and the uploaded copy under `/home/ubuntu/Uploads/`) and reports the highest. **The filename is not the version** — `acrme_requirements_baseline_v2_4.md` currently carries v2.5. If the candidates disagree, use the highest version, state the drift in your output, and do not cite the stale copy.
+The script reads the Document Control `Version` row of every repository baseline candidate (`Requirements/acrme_requirements_baseline_v*.md`) and reports the highest. To include an external/uploaded copy, pass `--uploaded-baseline <path>` or set `ACRME_UPLOADED_BASELINE`; the checker has no host-specific upload path. **The filename is not the version.** If candidates disagree, use the highest version, state the drift in your output, and do not cite the stale copy.
 
 Then read, from the current baseline: Version History (top rows since the last version you knew), §2 Strategic Drivers, §3 Design Principles, §23 Pending Decisions & POCs, and every section mapped to your topic in `references/source-map.md`.
 

@@ -15,12 +15,9 @@ import glob
 import os
 import re
 import sys
+from pathlib import Path
 
-DEFAULT_REPO = "/home/ubuntu/acrme-capacity-reservation"
-UPLOADED_BASELINE = (
-    "/home/ubuntu/Uploads/Azure Capacity & Quota Management- "
-    "Consolidated Requirements Baseline.md"
-)
+DEFAULT_REPO = Path(__file__).resolve().parents[4]
 CODE_RE = re.compile(
     r"\b(?:REG|DEC|ENV|CAP|QUA|RDY|PLC|DR|FIN|INT|DAT|OBS|GOV|NFR|OPS|POC|DEP)"
     r"-\d{3}[a-z]?\b"
@@ -31,7 +28,9 @@ TAG_RE = re.compile(
     r"|SPEC GAP|Configurable",
     re.I,
 )
-VERSION_ROW_RE = re.compile(r"\|\s*\*\*Version\*\*\s*\|\s*([0-9]+(?:\.[0-9]+)*)")
+VERSION_ROW_RE = re.compile(
+    r"\|\s*\*\*Version\*\*\s*\|\s*(?:\*\*)?([0-9]+(?:\.[0-9]+)*)(?:\*\*)?"
+)
 BASELINE_CITE_RE = re.compile(r"[Bb]aseline[\s*:]*v?(\d+\.\d+)")
 AZURE_CLAIM_RE = re.compile(
     r"\b(Azure|ARM|CRG|capacity reservation|quota group|Quota Group|sharing|"
@@ -78,10 +77,12 @@ def vkey(v):
     return tuple(int(p) for p in v.split(".")) if v else (0,)
 
 
-def resolve_baseline(repo):
+def resolve_baseline(repo, uploaded_baseline=None):
     candidates = sorted(glob.glob(os.path.join(repo, "Requirements", "acrme_requirements_baseline_v*.md")))
-    if os.path.exists(UPLOADED_BASELINE):
-        candidates.append(UPLOADED_BASELINE)
+    if uploaded_baseline:
+        if not os.path.isfile(uploaded_baseline):
+            raise FileNotFoundError(f"uploaded baseline not found: {uploaded_baseline}")
+        candidates.append(uploaded_baseline)
     found = []
     for path in candidates:
         with open(path, encoding="utf-8") as fh:
@@ -178,13 +179,22 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("files", nargs="*", help="markdown outputs to lint")
     ap.add_argument("--repo", default=os.environ.get("ACRME_REPO", DEFAULT_REPO))
+    ap.add_argument(
+        "--uploaded-baseline",
+        default=os.environ.get("ACRME_UPLOADED_BASELINE"),
+        help="optional external baseline copy to compare (or set ACRME_UPLOADED_BASELINE)",
+    )
     ap.add_argument("--baseline-only", action="store_true", help="only resolve the current baseline")
     ap.add_argument("--max-warn", type=int, default=25, help="max warnings printed per file")
     args = ap.parse_args()
 
-    current, found = resolve_baseline(args.repo)
+    try:
+        current, found = resolve_baseline(args.repo, args.uploaded_baseline)
+    except FileNotFoundError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     if not current:
-        print(f"ERROR: no baseline found under {args.repo}/Requirements or Uploads", file=sys.stderr)
+        print(f"ERROR: no baseline found under {args.repo}/Requirements", file=sys.stderr)
         return 2
     cur_version, cur_path, cur_text = current
     print(f"Current baseline: v{cur_version}  ->  {cur_path}")
