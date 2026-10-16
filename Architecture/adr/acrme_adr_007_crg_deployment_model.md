@@ -17,6 +17,23 @@
 
 > **Baseline status:** Baseline v4.0 is authoritative. This proposed ADR was authored against v2.4 and has not been reviewed against v4.0. It remains proposed and must be revalidated before approval or implementation.
 
+## Scoped v4.0 reconciliation - proposal boundary
+
+[Documented] CAP-023 defaults to one zonal group with exact-size/zone
+reservation children; mandatory regional-plus-per-AZ layout below is
+historical. CAP-025 adds per-domain `prod`, `cvdr` and `drf` sets;
+DOM-004 forbids cross-domain sharing. CAP-013 requires Prod reservations
+in the deploying subscription until approved GA conditions; enterprise
+Preview approval alone does not rewrite that production requirement.
+DR-021 Foundation is always present and independent of sharing.
+
+[Derived] This ADR remains **PROPOSED**. Its "authoritative" language,
+option recommendation, formatted-draft and variance copies must not be
+treated as ratified v4.0 decisions. The current reconciliation target is
+[TDD section 5](../../Design/acrme_technical_design_document.md), with
+POC-006/012 and other unresolved gates retained. This bounded note does not
+approve a physical DR subscription/cluster topology.
+
 ---
 
 > **Label conventions used in this document:**

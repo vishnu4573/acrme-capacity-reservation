@@ -1,0 +1,26 @@
+flowchart TB
+    C["Customer CRV - regions reused by all domains"] --> T["TMS DPBs"]
+    C --> W["WMS DPBs"]
+    Q["One customer Quota Group - multiple region/family cells"] --> QT["Confirmed draws to TMS ig subscriptions"]
+    Q --> QW["Confirmed draws to WMS ig subscriptions"]
+    T --> TP["TMS Prod ig: local pr set"]
+    T --> TC["TMS CVAL/DR: cvdr extension set"]
+    T --> TD["TMS DR ig: always-present drf Foundation"]
+    W --> WP["WMS Prod ig: local pr set"]
+    W --> WC["WMS CVAL/DR: cvdr extension set"]
+    W --> WD["WMS DR ig: always-present drf Foundation"]
+    QT -.-> TP
+    QT -.-> TC
+    QT -.-> TD
+    QW -.-> WP
+    QW -.-> WC
+    QW -.-> WD
+    TD --> B["Bootstrap from confirmed reservation and subscription quota - no sharing dependency"]
+    WD --> B
+    TC --> E["Extension only after approved declaration, release and Preview validation"]
+    WC --> E
+    R["Default group: zonal; exact VM size per zone children. Optional per-zone/no-zone exceptions."]
+    P["No cross-domain capacity sharing. Prod never shares with CVAL or DR."]
+    R -.-> T
+    R -.-> W
+    P -.-> E

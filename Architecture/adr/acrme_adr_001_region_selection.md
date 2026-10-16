@@ -7,6 +7,24 @@
 
 > **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
+## Scoped v4.0 reconciliation - placement boundary (draft)
+
+[Documented] PLC-013/014/015 supersede the single-scope pipeline below:
+resolve/reuse one CRV per customer/geography, then deterministic DPBs per
+domain/environment/CRV region, then readiness and deployment. A new domain
+does not rerun customer region scoring. DOM-001 through DOM-004 require
+separate ig/subscriptions and domain-bounded sharing; INT-008 adds the domain,
+CRV and DPB contract. PLC-006 is retired. PLC-016/F.9 apply count-skew zone
+actions per domain; combined region load is observation only.
+
+The [FDD sections 2/4.4](../../Design/acrme_functional_design_document.md) and
+[TDD sections 4/6/8/11](../../Design/acrme_technical_design_document.md) carry
+the reconciled draft. Their exact-region path validates the supplied Prod
+constant; only the approved geography path derives Prod. Legacy schemas and
+diagrams below omit DPB and are historical illustrations, not the full current
+pipeline. Detailed normalization, tie rules and API transition remain pending
+approval; this note does not change this ADR's historical acceptance record.
+
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR states the accepted region-selection decision matching the consolidated requirements baseline — notably the five-geography region model with per-geography distribution models and mandatory two-region CVAL/DR co-location (PLC-010a). Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 >
 > **v2.4 reconciliation note — reservation-model gaps.** Baseline v2.4 folds in the *reservation-model* gaps (seed-at-0 matrix CAP-022, per-AZ CRG structure CAP-023, reactive discovery CAP-024, Availability-Set ineligibility CAP-020/021, even zone-distribution PLC-011, naming convention OPS-006/C-12). **None of these change the region-selection or DR-placement decision recorded here** — the five-geography model, per-geography distribution models, exact-production-region-first placement, `CustomerSeedRecord` and two-region CVAL/DR co-location (PLC-010a) are all unchanged by the reservation-model work. The new per-AZ CRG structure (CAP-023) operates **within** a selected region and is specified in ADR-002/ADR-004, not here.

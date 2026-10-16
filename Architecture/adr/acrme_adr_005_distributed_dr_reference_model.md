@@ -6,6 +6,26 @@
 **Part of:** ACRME Architecture Decision Records - aligned to Capacity & Quota Management Requirements Baseline v2.4.
 
 > **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
+
+## Scoped v4.0 reconciliation - isolated destination scenarios (draft)
+
+[Documented] DR-002/018/019/021 and DOM-004 require domain-attributed source
+assignments, separate Foundation/extension and isolated destination capacity.
+Within one compatible domain/ig/exact-SKU/physical-zone partition, aggregate
+all demand from one failed source, then MAX across approved non-concurrent
+sources (F.6). Do not apply a pooled MAX to independently isolated domains.
+Count live CVAL only as conditional potential until approved release is
+confirmed; conditional expansion/sharing is not immediately usable supply.
+
+[Derived] Equal positive source portions yield F.8 ratio n for n sources,
+not 1; zero-demand ratio reporting remains pending. DR-001's "within a
+geography" wording and DR-020's cross-geo contribution require an explicit
+Architect/business scenario decision before claiming concurrent ME/Europe
+coverage. The older global MAX diagram below is not proof of that guarantee.
+
+See [TDD section 9/17](../../Design/acrme_technical_design_document.md) for
+partition examples, the scenario blocker, and POC-011/012/013 gates. This is
+a scoped draft reconciliation, not a new approval of the historical body.
 >
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR consolidates the distributed DR reference model (Section 12A of the requirements baseline) that was previously distributed across ADR-003 and the calculation logic reference. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 >

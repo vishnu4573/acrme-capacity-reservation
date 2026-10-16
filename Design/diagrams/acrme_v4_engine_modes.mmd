@@ -1,0 +1,20 @@
+stateDiagram-v2
+    [*] --> STEADY_STATE
+    STEADY_STATE --> DR_DECLARATION_PENDING: authorized declaration
+    DR_DECLARATION_PENDING --> DR_EVENT_ACTIVE: activation approved
+    DR_DECLARATION_PENDING --> STEADY_STATE: authorized withdrawal, no active incident
+    DR_EVENT_ACTIVE --> FAILBACK_PENDING: failback authorized
+    FAILBACK_PENDING --> STEADY_STATE: failback verified and incident closed
+    STEADY_STATE --> INCIDENT_HOLD: safety trip, retain interrupted mode
+    DR_DECLARATION_PENDING --> INCIDENT_HOLD: safety trip, retain pending declaration
+    DR_EVENT_ACTIVE --> INCIDENT_HOLD: safety trip, retain active incident
+    FAILBACK_PENDING --> INCIDENT_HOLD: safety trip, retain reversal progress
+    INCIDENT_HOLD --> STEADY_STATE: approved resume of steady mode, no unresolved incident
+    INCIDENT_HOLD --> DR_DECLARATION_PENDING: approved resume of pending declaration
+    INCIDENT_HOLD --> DR_EVENT_ACTIVE: approved resume of same active incident
+    INCIDENT_HOLD --> FAILBACK_PENDING: approved resume of same failback
+    note right of INCIDENT_HOLD
+        Proposed resumption guards - Architect approval pending.
+        Freshness alone never clears an incident or completes failback.
+        Reconcile in-flight operations before authorized resumption.
+    end note

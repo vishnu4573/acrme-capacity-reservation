@@ -4,6 +4,39 @@
 > Do not use the older baseline pointers or build sequence below as current implementation
 > instructions until this plan is reviewed against v4.0.
 
+## Scoped v4.0 creation prerequisites (reconciliation draft)
+
+[Documented] CAP-025/DR-021 distinguish structural count-0 seed
+reservations from the **non-implicitly-zero DR Foundation bootstrap**.
+Creating only zero seeds does not demonstrate DR readiness. Foundation
+must be domain-specific, always present and have confirmed pre-staged
+subscription quota sized by approved C-16 policy; extension is separate
+same-domain cvdr capacity, declaration/Preview-gated.
+
+Reconciled creation order, for subsequent approved implementation:
+
+1. Resolve/reuse customer CRV, validate domain taxonomy/owner/budget, then
+   resolve domain ig/subscription/shard and DPB (PLC-013/014/015).
+2. Validate subscription eligibility/access, quota membership and both
+   family/regional caps; confirm any required transfers before sizing.
+3. Create domain prod/cvdr/drf sets according to CAP-023/025: default zonal
+   groups and exact-size/zone children; optional per-zone/no-zone exceptions
+   are explicit policy variants, not mandatory regional-plus-AZ duplication.
+4. Initialize budgeted eligible seed matrix, then fulfill approved
+   Foundation bootstrap and verify actual quantity/quota separately.
+5. Validate resource identity, physical zones, isolation, naming and
+   permissions; activate config only after Azure resources validate
+   (CAP-002). Production reservations remain in deploying subscription
+   while sharing is Preview (CAP-013).
+6. Record lineage and readiness evidence. Leave POC-006/007/012/013 and
+   policy gaps open; never mark a live step complete from document review.
+
+[Derived] [TDD sections 5/9/10](../../Design/acrme_technical_design_document.md)
+are the current reconciliation target. The older phase/build sequence
+below is retained as historical planning only, including its local phase
+numbers; use baseline section 23 for P1-P5 delivery phases. No provisioning
+is authorized or performed by this note.
+
 ## Document Control
 
 | Field                   | Value                                                                                                |

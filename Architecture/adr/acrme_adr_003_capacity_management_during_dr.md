@@ -7,6 +7,29 @@
 
 > **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
+## Scoped v4.0 reconciliation - recovery safety (draft)
+
+[Documented] DR-021/CAP-025 require always-present per-domain `drf`
+Foundation with pre-staged quota, independent of Preview sharing; `cvdr`
+extension is separately released only on authorized declaration and supported
+same-domain sharing. Use actual confirmed destination capacity and subscription
+quota, not a pool earmark, for immediate waves (DR-006/QUA-013). CAP-009
+normal target-zero is distinct from CAP-010 intentional retirement.
+
+[Assumed] The [TDD section 7](../../Design/acrme_technical_design_document.md)
+proposes corrected hold resumption: persist interrupted mode, incident and
+in-flight operations; require guarded approved resumption to that mode.
+Fresh inputs alone cannot switch active DR to steady state or complete
+failback. This correction is not a newly accepted state-machine decision;
+the old unconditional hold exit/sequence below must not be implemented as
+current behavior.
+
+[Documented] DR-018/019 index and activation records include domain/ig,
+exact SKU/physical-zone assignment and incident lineage. POC-006/007/011/012
+remain open; cross-geography concurrency is an explicit unresolved guarantee
+in [TDD section 9](../../Design/acrme_technical_design_document.md), not a
+silent global-single-failure assumption.
+
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR updates disaster-recovery capacity management to the lean bootstrap and distributed DR model. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 >
 > **v2.4 reconciliation note.** The DR capacity model (max-not-sum sizing, `SourceDestinationDRIndex`, standby activation waves, CVAL earmark / no-double-count) is **unchanged** by Baseline v2.4. v2.4 adds the **even per-zone distribution target and rebalancing action (PLC-011, Appendix A.9)** and the **regional + per-AZ CRG structure (CAP-023)**; because DR sizing here is computed **per zone**, this ADR now cross-references PLC-011/A.9 at the sizing formula so per-zone DR floors and per-AZ CRG sizing stay balanced (see *DR Sizing Formula* below).

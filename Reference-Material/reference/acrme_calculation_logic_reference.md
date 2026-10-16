@@ -5,6 +5,38 @@
 > is normative for all formulas and calculation semantics. Do not use this document's older
 > formulas, scenario numbers, or references as current where they differ from v4.0.
 
+## Scoped v4.0 formula reconciliation
+
+This section is the bounded companion to the [TDD sections 8-11](../../Design/acrme_technical_design_document.md);
+it does not ratify all historical scenarios below.
+
+| Historical block | Current rule / replacement operand |
+|---|---|
+| Scenarios 1-6, 20 | [Documented] F.10/F.11 scoring is customer aggregate for CRV only; F.12 DPB is deterministic per domain, never a second region selection. PLC-006 retired. Historical PS weight/normalization proposals remain unapproved. |
+| Scenarios 8-10 | [Documented] QUA-004/015: one customer group object, multiple region/family cells; confirmed subscription family AND regional quota, not group balance. CRG-derived Pool_Limit is desired procurement, not observed entitlement. |
+| Scenario 14 | [Derived] Count actual `(subscription,region,set,group shard)` groups; exact VM sizes add reservation children. Requests include pages/polls/retries divided by configured seconds (360 for the six-minute reference). ARM/Compute limits are separate; old 250/5min is not current generic ARM guidance. |
+| Scenario 16 | [Documented] F.1 target is per-domain allocated+buffer; preserve CAP-004 association guard as executable constraint. CAP-009 normal target-zero retains object; CAP-010 intentional retirement is separate. |
+| Scenarios 17-18 | [Documented] Aggregate assignments within each failed-source scenario and isolated domain/SKU/physical-zone destination, then MAX non-concurrent sources (F.6). Foundation is independent DR-021 capacity; conditional CVAL/sharing is not immediate supply. Cross-geo concurrency remains a decision blocker. |
+| Scenario 19 | [Derived] Incremental reservation availability is `max(0,reserved-allocated-distinct_holds-other_protection)`. Quota is lesser remaining family/regional caps after distinct uncharged commitments. Same-subscription precharged reservation use must not be charged twice. |
+| Scenario 21 | [Documented] F.9/PLC-016 use per-domain integer VM-count skew against `round(VMs/ZoneCount)`, not a fixed 0.10 percentage drift. Combined region load is observation only. |
+
+```text
+AvailableQuota = min(FamilyLimit-FamilyUsage, RegionalLimit-RegionalUsage)   # QUA-007
+QuotaDeficit = max(0, IncrementalUnchargedRequest - usable residual quota) # F.5; holds distinct
+Overcommit = sum(source portions)/max(source portions)                    # positive demand
+```
+
+[Derived] Reserved 10/allocated 9/request 2 has deficit 1. Family free 40,
+regional free 4/request 8 vCPU has deficit 4. Equal positive portions 100/100
+give ratio 2, not 1. Separately isolated domains 120/80 and 20/60 need
+120+60=180, not pooled MAX 140. B1-B4 baseline wording is proposed only;
+empty ratio, score normalization, zone ties/rounding, threshold utilization
+and charge semantics remain explicit policy/evidence gaps in the TDD.
+
+The remainder is the historical scenario corpus, including old labels such
+as "Current"/"Decided"; those labels do not override this scoped correction
+or baseline v4.0. No binary workbook or runtime calculation was regenerated.
+
 > **Revision v2.4 — 7 September 2026.**
 > This revision folds in the Baseline v2.4 reservation-model gaps. It adds **Scenario 21 — Even Per-Zone Distribution & Rebalancing** with the new **Appendix A.9** formulas (`zone_target_share = 1/zone_count`, greatest-deficit-first zone selection, drift-based rebalancing, config **C-13**) and a worked three-zone example, and records the naming-convention config (**C-12**, OPS-006) in the constant table. The reservation-eligibility (CAP-020/021), seed-matrix (CAP-022), reactive-discovery (CAP-024), per-AZ CRG structure (CAP-023), core-subscription classification (CAP-001a) and decommissioning-boundary (CAP-008/010) decisions are captured in ADR-002, the FDD, the TDD, and the requirements baseline; the arithmetic new in v2.4 is A.9. All other calculation logic is unchanged.
 >

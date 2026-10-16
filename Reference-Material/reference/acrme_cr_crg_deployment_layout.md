@@ -4,6 +4,36 @@
 > layout was prepared against v2.4 and must be reviewed before use as current provisioning
 > guidance.
 
+## Scoped v4.0 target layout (reconciliation draft)
+
+[Documented] CAP-023/025 and DOM-001 through DOM-004 replace the mandatory
+regional-plus-per-AZ pattern below. The default is one zonal group for
+each applicable domain/set/subscription/region, with one reservation per
+exact VM size per declared zone. Optional per-zone groups and the no-zone
+SKU exception are not mandatory additional groups. A no-zone group is
+pinned to one Azure-selected zone, not a region-wide pool.
+
+| Domain set | Target ownership |
+|---|---|
+| prod / `crg-pr-*` | Domain Prod ig; reservation local to deploying subscription; no CVAL/DR sharing |
+| cvdr / `crg-cvdr-*` | [Documented] Same-domain CVAL/DR extension, released only after approved declaration and supported sharing validation (DR-021) |
+| drf / `crg-drf-*` | Always-present per-domain Foundation with pre-staged quota, independent of sharing |
+
+[Documented] CRV binds customer regions once; domain DPBs bind separate
+igs/sets within them (PLC-013/014/015). Names carry domain through
+subscription/registry identity, not a cross-domain CRG name. Quota group
+membership is customer-central across domain subscriptions; region/family
+cells are accounting units (QUA-004/015). CAP-013's production path is
+same-subscription while sharing is Preview, regardless of the historical
+Prod-sharing example below.
+
+[Derived] Use [TDD section 5](../../Design/acrme_technical_design_document.md) and the
+[current topology source](../../Design/diagrams/acrme_v4_topology.mmd) for
+the reconciliation target. The geographical ASCII/legacy examples, group
+counts and examples in the remainder are historical only,
+not current provisioning instructions. POC-006 physical topology,
+POC-007 bootstrap and POC-012 sharing remain open.
+
 ## Document Control
 
 | Field                   | Value                                                                                   |

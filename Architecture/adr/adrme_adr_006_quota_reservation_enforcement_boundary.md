@@ -19,6 +19,25 @@
 
 > **Baseline status:** Baseline v4.0 is authoritative. This ADR was authored against v2.4 and has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
+## Scoped v4.0 reconciliation - fail-fast readiness (draft)
+
+[Documented] RDY-001/QUA-007 require ACRME to fail readiness safely if either
+required family or total-regional deploying-subscription quota is insufficient.
+The warning-only phrasing below does not mean AEP may proceed on a deficit:
+this is fail-fast validation of the native limit, not a second independent
+quota allocation throttle. Group transferable balance/provider quota does
+not prove consumer deployability (QUA-003/013).
+
+[Derived] Compare incremental uncharged demand and commitments, avoiding a
+duplicate debit for capacity already charged to a same-subscription
+reservation. Capacity readiness uses residual allocated/held/protected
+exact-SKU/physical-zone capacity, not total reserved quantity. Domain DPB
+readiness follows customer CRV resolution (INT-008/PLC-015).
+
+See [TDD sections 2/8.3/11](../../Design/acrme_technical_design_document.md)
+for the reconciled contract and unresolved API-version charge semantics.
+No risk/break-glass result silently overrides an actual quota deficit.
+
 ## Context
 
 A fundamental question arose during deployment-architecture review: **Should the quota-as-governor principle restrict deployment strategy (subscription topology), or should it operate only at the capacity definition/allocation layer?**

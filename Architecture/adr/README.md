@@ -2,6 +2,31 @@
 
 Individual, standalone Architecture Decision Records for the Azure Capacity Reservation Management Engine (ACRME). Each ADR is **self-contained and reference-free** — it can be read without any companion document (`.md` source + `.pdf` print-ready + `.docx` editable), and includes its own context, decision, consequences, alternatives considered, the relevant normative detail, and rendered architecture diagrams.
 
+## v4.0 reconciliation boundary
+
+[Derived] The [FDD](../../Design/acrme_functional_design_document.md) and
+[TDD](../../Design/acrme_technical_design_document.md) are now v4.0 reconciliation
+drafts, not accepted replacement ADRs. Scoped reconciliation notes in ADR-001
+through ADR-007 identify current baseline requirements and displaced historical
+details. They do not retroactively approve new design choices or the whole ADR body.
+
+| Historical ADR | Current binding requirement / design location |
+|---|---|
+| ADR-001 | PLC-013/014/015 customer CRV then domain DPB; TDD sections 4/8/11 |
+| ADR-002 | QUA-004/015 one customer group with cells and confirmed subscription quota; TDD section 8.3 |
+| ADR-003 | DR-021 Foundation, guarded incident resumption proposal; TDD sections 7/9 |
+| ADR-004 | CAP-009 normal target-zero versus CAP-010 intentional retirement; TDD section 10 |
+| ADR-005 | Domain-partitioned MAX and explicit cross-geo scenario blocker; TDD section 9 |
+| ADR-006 | Both-cap residual readiness is fail-fast, not warning-only; TDD section 11 |
+| ADR-007 (proposed) | CAP-023/025 domain zonal sets, CAP-013 production local-subscription route; TDD section 5 |
+
+Canonical current diagram drafts are in [Design/diagrams](../../Design/diagrams/).
+Legacy PNGs/inline diagrams remain historical, not current runtime specifications.
+The splitter below is a historical generation utility: its source path does not
+identify the archived consolidated document as a current editable authority.
+Do not run it to overwrite scoped reconciliation notes or claim it regenerates the
+new design. Source/generator modernization is outside this documentation change.
+
 A legacy combined document, [`/Archive/adr/acrme_architecture_decision_records.md`](../../Archive/adr/acrme_architecture_decision_records.md), contains an earlier consolidated form of records 001–004 (pre-v2.2 two-group / Belgium Central) and is **superseded** by these standalone v2.2 ADRs plus ADR-005; it is retained for history only.
 
 The v2.2 reconciliation aligned these ADRs to Requirements Baseline v2.2: **single governed quota pool** (ADR-002, QUA-004), Belgium Central → **Switzerland North** cross-geo DR, max-not-sum sizing, seed record, `SourceDestinationDRIndex`, standby activation, and the distributed DR reference model (new ADR-005).

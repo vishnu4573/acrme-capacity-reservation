@@ -7,6 +7,26 @@
 
 > **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
+## Scoped v4.0 reconciliation - retained reservation lifecycle (draft)
+
+[Documented] F.1/CAP-003 targets allocated plus buffer per domain/ig/exact
+SKU/zone. CAP-004's association guard constrains executable shrink without
+redefining the desired target; surface constrained quantity, retained quota
+and remediation. Its acceptance wording is pending Architect clarification.
+CAP-009 allows legitimate reconciliation to zero when approved target and
+all guards permit, retaining the resource; CAP-010 separately approves
+intentional retirement/deletion/scope removal. Any blanket "never zero"
+statement below is historical, not the current rule. DR bootstrap cannot
+implicitly become zero (ENV-006).
+
+[Documented] CAP-023/025 use default zonal per-domain sets, not mandatory
+regional-plus-per-AZ groups. Forecast remains advisory/independently governed;
+FWD-001/007 require customer-aggregate trends and per-domain ig sizing, never
+cross-domain sum-reserving. Legacy forecast thresholds/horizons are
+Configurable proposals, not approved v4.0 policy.
+See [TDD sections 8.4/10/14](../../Design/acrme_technical_design_document.md)
+for the scoped draft and confirmed-outcome/failure handling.
+
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR separates continuous reconciliation from longer-horizon forecasting and quota/capacity increase workflows. The **v2.4 revision** adds the seed-matrix initialisation model (**CAP-022**) and the reactive SKU/AZ discovery workflow (**CAP-024**) — see *Seed Matrix Initialisation and Reactive Discovery* below. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 ---

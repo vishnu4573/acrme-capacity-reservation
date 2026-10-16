@@ -1,0 +1,18 @@
+flowchart TD
+    A["AEP customer and domain intent"] --> B{"Fresh customer CRV exists?"}
+    B -->|Yes| C["Reuse CRV - no region re-selection"]
+    B -->|No| D{"Input path"}
+    D -->|Exact Prod default| E["Validate supplied Prod against catalogue and HC"]
+    D -->|Geography exception| F["Require approval and acknowledgement; score customer aggregate"]
+    E --> G["Derive CVAL and DR per distribution model; persist CRV with concurrency guard"]
+    F --> G
+    C --> H["Resolve domain DPB in bound CRV regions"]
+    G --> H
+    H --> I["Bind ig, subscription, prod/cvdr/drf sets, exact SKU and zone plan, quota route"]
+    I --> J{"Fresh readiness and all required HC/policy gates pass?"}
+    J -->|No| K["Return blocking reasons or tracked remediation; no deployment approval"]
+    J -->|Yes| L["Commit capacity, family and shared regional quota intents without double-spend"]
+    L --> M{"Versions and all claims committed?"}
+    M -->|Conflict| I
+    M -->|Yes| N["AEP associates and deploys validated resources"]
+    N --> O["Confirm actual outcome; settle claims once or reconcile partial failure"]

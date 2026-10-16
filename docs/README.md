@@ -11,7 +11,8 @@ source changes.
 
 > **Single source of truth:** [`acrme_requirements_baseline_v4_0.md`](../Requirements/acrme_requirements_baseline_v4_0.md)
 > is the authoritative requirements baseline. The v2.4 and v3.0 baseline files are historical
-> snapshots. The FDD, TDD, POC workbook/suite, glossary, calculation reference, and several
+> snapshots. The FDD/TDD are v4.0 reconciliation drafts, pending decisions and POC evidence.
+> The POC workbook/suite, glossary, calculation reference, and several
 > mockups/reference documents still contain older-baseline content and are **not verified as
 > reconciled to v4.0**. On conflict, v4.0 wins.
 
@@ -31,8 +32,8 @@ source changes.
 
 | Document | Purpose |
 |---|---|
-| [`acrme_functional_design_document`](../Design/acrme_functional_design_document.md) | Draft FDD; last reconciled to v2.4, not yet reconciled to v4.0. |
-| [`acrme_technical_design_document`](../Design/acrme_technical_design_document.md) | Draft TDD; last reconciled to v2.4, not yet reconciled to v4.0. |
+| [`acrme_functional_design_document`](../Design/acrme_functional_design_document.md) | v4.0 reconciliation draft v2.0; customer CRV/domain DPB, Foundation and acceptance mapping; not ratified. |
+| [`acrme_technical_design_document`](../Design/acrme_technical_design_document.md) | v4.0 reconciliation draft v2.0; schemas/contracts/algorithms, canonical Mermaid sources and explicit remaining gates. |
 | [`acrme_uml_class_diagrams_summary`](../Design/acrme_uml_class_diagrams_summary.md) | Legacy UML/gap-analysis material; verify against v4.0 before treating as current. |
 
 ### [`/Architecture`](../Architecture/) — ADRs + architecture diagrams

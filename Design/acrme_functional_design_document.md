@@ -1,392 +1,257 @@
-# ACRME — Functional Design Document (FDD)
+# ACRME - Functional Design Document (FDD)
 
-| | |
+| Field | Value |
 |---|---|
-| **Title** | Azure Capacity Reservation Management Engine (ACRME) — Functional Design Document |
-| **Version** | 1.0 (net-new) |
-| **Date** | 2 September 2026 |
-| **Status** | Historical draft — last reconciled to v2.4; pending reconciliation to v4.0 |
-| **Baseline** | Current governing baseline: **v4.0**; this document's last recorded basis: v2.4 (7 Sep 2026) |
-| **Owner** | Vishnuvardhan Reddy · Principal Cloud Architect |
-| **Audience** | Business, architecture, operations, audit, onboarding, FinOps |
-| **Companion** | Technical Design Document (`acrme_technical_design_document.md`) |
+| Version | 2.0 reconciliation draft |
+| Date | 16 October 2026 |
+| Status | v4.0 reconciliation draft - pending Architect decisions and POC validation; not ratified |
+| Baseline | [Requirements baseline v4.0](../Requirements/acrme_requirements_baseline_v4_0.md) |
+| Owner | Principal Cloud Architect |
+| Audience | Business, architecture, product platforms, AEP, operations, audit, FinOps |
+| Companion | [Technical Design Document](acrme_technical_design_document.md) |
+| Change history | 1.0: historical v2.4 design. 2.0: two scopes, domains, Foundation, readiness and quota corrections; current traceability. Historical versions remain in Git. |
 
-> **Purpose.** This FDD describes **what** ACRME does — its functional behaviour, flows, states, and rules — traceable to every requirement in Baseline v2.4. It is implementation-neutral; the **how** (components, data, algorithms, interfaces, security, NFRs) is in the companion TDD. This document is **self-contained**: all normative detail (readiness states, engine modes, formulas, classification tables, validation rules) is inlined, not referenced externally.
+**Type:** Design Note. **Phases touched:** P1 visibility/protection, P2 quota, P3 placement, P4 DR, P5 multi-domain binding.
 
-> **Baseline status.** The inline v2.3/v2.4 notes below record the document's historical evolution; they do not establish current requirements. This FDD has not been reconciled to v4.0. The v4.0 baseline governs wherever this draft differs, and all requirement traceability claims require revalidation.
+This document states **what** ACRME must do. The TDD owns components, detailed contracts, algorithms and implementation choices. Requirements govern over this draft. Historical ADRs are contextual, not current authority where they conflict with baseline v4.0.
 
-> **Reconciliation note (v2.4 — reservation-model gaps).** This revision folds the reviewed architecture-diagram gaps into the functional design: **reservation eligibility** now explicitly excludes **Availability-Set VMs** (CAP-020) and requires a **deallocate/redeploy-to-AZ onboarding precondition** (CAP-021); the managed estate is initialised as a **seed matrix of count-0 reservations** per eligible SKU×region×AZ under **product-team budget governance** (CAP-022), reconciled with **reactive SKU/AZ discovery** that auto-creates a reservation and simultaneously raises a scope-file governance item (CAP-024, reconciling CAP-019); reservations are organised into an explicit **regional + per-AZ CRG structure per environment** (CAP-023); VMs are placed toward an **even ≈1/zone_count per-zone distribution with a rebalancing action** (PLC-011); a shared **core subscription is classified entirely production** (CAP-001a); the **decommissioning-workflow boundary** (automatic right-sizing to `allocated + buffer` vs gated retirement/deletion) is made explicit (CAP-008/CAP-010); and a deterministic **RG/CRG/subscription naming convention + counter** is adopted (OPS-006, C-12). "**Seed reservation**" (a count-0 reservation) is disambiguated from the placement "**seed record**" (PLC-003).
+**Evidence:** `[Documented]` identifies baseline requirements or official platform behavior; `[Decided]` identifies a baseline programme decision; `[Derived]` identifies design consequences; `[Assumed]` identifies a proposal requiring approval. No live POC completion is implied by this reconciliation.
 
-> **Reconciliation note (v2.3).** This document reflects the confirmed v2.3 design decisions: **single governed quota pool** as the primary model (QUA-004); **max-not-sum** DR destination sizing (DR-017); **exact-production-region-first** onboarding with a governed **seed record** (PLC-001..005); distributed, reciprocal DR with a **source→destination DR index** (DR-016/018) and **standby activation waves** (DR-019). *(The Middle East DR position is superseded by the v2.4-amended note below.)*
->
-> **⚠️ [Amended v2.4 — 11 Sep 2026] Middle East DR now offered (cross-geo to Europe).** The former Middle East `DR_NOT_OFFERED` position (DR-014/DEC-001) is **superseded**. Middle East DR **is now offered** as a **cross-geo DR** model: **Prod and CVAL co-locate in a selected Middle East Standard region** (separate CRGs — co-location in a region is not capacity sharing, ENV-003) and **DR is placed cross-geo in a weighted-selected Europe Standard region**. Both selections run the **weighted capacity placement model** (REG-002/REG-003). New codes: **DR-020** (cross-geo DR ME→Europe), **PLC-010b** (cross-geo DR override to PLC-010a), **A-ME1** (data-residency assumption: Europe is the approved destination). The CVAL-sacrifice DR bootstrap (DR-005/006) does **not** apply to the Middle East (CVAL co-locates with Prod locally). This is a **third distribution model** — *cross-geo DR* — alongside the US three-region and the standard two-region co-located models. Affected passages below carry inline **[Amended v2.4]** markers.
->
-> **Region model update (baseline Section 6, [Amended v2.4]).** The supported footprint is **five geographies** with an explicit per-geography **distribution model**, of which there are now **three**: the **US is the only three-region geography** (West US 3, Central US, Canada Central; East US 2 Restricted); **EU, Australia and Asia Pacific are two-region co-located geographies** where **CVAL and DR co-locate** in the non-production region (mandatory rule **PLC-010a**); and the **Middle East is a cross-geo DR geography [Amended v2.4]** — Prod and CVAL co-locate in a selected Middle East region and DR is placed cross-geo in a **weighted-selected Europe region** (DR-020, PLC-010b). The region catalogue remains versioned and configuration-driven (REG-001); Japan East is a **pending** Asia Pacific addition awaiting confirmation.
+## 1. Purpose, scope and vocabulary
 
----
+[Decided] ACRME protects production first, maintains allocated-plus-buffer reservations, governs quota separately and supplies explainable, fresh readiness to AEP. Policy is configurable; idle cost and lean DR matter. Actual workload deployment belongs to AEP. No live environment change is authorized by this document.
 
-## 1. Introduction
-
-### 1.1 Purpose and scope
-ACRME governs Azure capacity reservations and VM-family quota across a managed fleet so that every managed deployment has **both** reserved physical capacity and deployable quota, in the right region/zone/SKU, before it is allowed to proceed — while keeping idle cost low through lean DR and dynamic reconciliation.
-
-**In scope (baseline Section 5):** capacity reservation lifecycle (CAP), quota governance and pooling (QUA), combined deployment readiness (RDY), region selection and customer placement (PLC/REG), disaster recovery (DR), cost/FinOps signals (FIN), AEP/provisioning integration (INT), data/state (DAT), observability (OBS), governance (GOV), operations (OPS), and non-functional behaviour (NFR).
-
-**Out of scope:** the actual provisioning of customer workloads (owned by AEP), Azure control-plane implementation, and any automation not gated by policy in Phase 1 (destructive VM-association changes remain blocked — see Section 4.5).
-
-### 1.2 Definitions
-| Term | Meaning |
+| Term | Functional meaning |
 |---|---|
-| **CRG** | Capacity Reservation Group — Azure construct holding reserved capacity per region/zone/SKU. |
-| **CVAL** | Customer validation environment; its capacity may contribute to DR readiness under earmark. |
-| **AEP** | Azure/Application Enablement Platform — the provisioning consumer of ACRME readiness. |
-| **Seed record** | Authoritative customer record holding production, CVAL, and DR regional placement (PLC-003). |
-| **Single governed quota pool** | One governed quota group per region/quota family covering Prod + NonProd/CVAL + DR (QUA-004). |
-| **DR bootstrap capacity** | Minimum reserved standby capacity to initiate recovery, not a fixed % of production (DR-007). |
-| **max-not-sum** | Destination DR sizing = largest single non-concurrent protected source portion (DR-017). |
-| **Source→destination DR index** | Reverse-of-seed mapping driving source-specific standby activation (DR-018). |
-| **Readiness state** | Machine-readable deployment-readiness verdict returned to AEP (RDY-002). |
+| Customer Region Vector (CRV) | One customer/geography binding of distribution model, Prod, CVAL and DR regions; reused by every domain (PLC-013). |
+| Domain group | Customer-owned workload grouping such as TMS/WMS, with separate capacity ownership (DOM-001). Taxonomy is configurable C-14; DEC-004 remains open. |
+| Instance group (ig) | Domain/environment/region subscription-bound capacity set; no ig spans domains (DOM-002). |
+| Domain Placement Binding (DPB) | Deterministic lookup/binding of ig, subscription, CRG sets, sizing, zones and quota inside an already bound CRV region (PLC-014). |
+| CRG / reservation | Regional group with reservations for exact VM sizes and zones. Family identity alone cannot select a reservation (CAP-016/023). |
+| Seed record / seed reservation | Seed record persists customer placement/CRV and DPB references. A seed reservation is a retained count-0 resource, not a placement decision (PLC-003/CAP-022). |
+| Customer quota group | Governed membership of the customer's domain ig subscriptions; regional/family cells are accounting and operation scopes, not separate memberships (QUA-004/015). |
+| DR Foundation | Always-present, domain-specific bootstrap set with pre-staged quota; independent of sharing (DR-021). |
 
-### 1.3 Traceability approach
-Every functional capability in Section 4 cites the requirement IDs it satisfies. Section 9 is a full matrix mapping **every** Baseline v2.3 ID (REG/ENV/CAP/QUA/RDY/PLC/DR/FIN/INT/DAT/OBS/GOV/NFR/OPS + POC/DEC/DEP dependencies) to an FDD section.
+**In scope:** REG, ENV, CAP, QUA, RDY, PLC, DOM, DR, FIN, INT, DAT, OBS, GOV, NFR and OPS requirements. Forward forecasting/optimization remains phased, not an implicit commitment to runtime automation (baseline section 28).
 
----
+**Out of scope:** workload deployment, automatic live migration, simultaneous failures beyond an approved guarantee, multi-cloud DR, and relaxed hard constraints. Infrastructure provisioning is separate from engine runtime logic.
 
-## 2. Solution Overview
+## 2. Functional architecture and actors
 
-ACRME is a policy-driven control engine sitting between the customer/onboarding intent and Azure's capacity and quota control planes. It continuously reconciles desired vs actual state and answers a single question for every managed deployment: *is this deployment ready, and if not, exactly why?*
+The ordered control path is:
 
-**Capability map → requirement groups:**
+1. AEP submits customer/domain intent.
+2. Resolve or reuse **customer CRV**; select regions only if the seed is absent or an approved migration changes it.
+3. Resolve **domain DPB** deterministically within those regions.
+4. Evaluate exact deployment readiness and acquire a concurrency-safe intent.
+5. AEP associates/deploys against validated references; ACRME confirms or compensates the outcome.
 
-| Capability | Requirement group | FDD section |
-|---|---|---|
-| Capacity reservation management | CAP | Section 4.1 |
-| Quota governance & single-pool management | QUA | Section 4.2 |
-| Combined deployment readiness | RDY | Section 4.3 |
-| Region selection & customer placement (seed) | PLC, REG | Section 4.4 |
-| Disaster recovery (distributed, max-not-sum) | DR, ENV | Section 4.5 |
-| Cost & FinOps | FIN | Section 4.6 |
-| Provisioning & AEP integration | INT | Section 4.7 |
-| Observability & governance & operations | OBS, GOV, OPS | Section 4.8 |
-| Data & state (functional view) | DAT | Section 6 |
-| Non-functional behaviour | NFR | Section 4 (each), Section 6 |
+[Decided] PLC-015 ordering is mandatory. Adding WMS to an existing TMS customer reuses the CRV but creates a separate DPB/ig, never another region-selection run.
 
-### F1 — System context
-
-```mermaid
-flowchart TB
-    Onboard[Onboarding / Product teams] -->|exact prod region, customer intent| ACRME
-    AEP[AEP / Provisioning] -->|readiness query| ACRME
-    ACRME -->|DeploymentReadinessResult| AEP
-    Ops[Platform operators / DR coordinator] -->|approvals, overrides, DR declaration| ACRME
-    FinOps[FinOps] -->|cost policy, buffer policy| ACRME
-    Audit[Auditors] -->|read audit trail| ACRME
-    ACRME -->|reservations, CRGs| AzCap[Azure Capacity Control Plane]
-    ACRME -->|quota pool ops| AzQuota[Azure Quota / groupQuotas]
-    ACRME -->|metrics, alerts| Obs[Observability platform]
-    AzCap --> ACRME
-    AzQuota --> ACRME
-```
-
-### F2 — Capability map
-
-```mermaid
-flowchart LR
-    ACRME((ACRME Engine))
-    ACRME --> C1[Capacity mgmt<br/>CAP]
-    ACRME --> C2[Quota single pool<br/>QUA]
-    ACRME --> C3[Readiness<br/>RDY]
-    ACRME --> C4[Placement + Seed<br/>PLC / REG]
-    ACRME --> C5[Disaster recovery<br/>DR / ENV]
-    ACRME --> C6[Cost / FinOps<br/>FIN]
-    ACRME --> C7[AEP integration<br/>INT]
-    ACRME --> C8[Observability / Governance / Ops<br/>OBS / GOV / OPS]
-```
-
----
-
-## 3. Actors and Stakeholders
-
-| Actor | Role in ACRME | Key requirements |
-|---|---|---|
-| Onboarding / product team | Supplies exact production region and customer intent; requests placement. | PLC-001, PLC-002, REG-001 |
-| AEP / provisioning | Queries readiness before deploying; consumes readiness contract. | INT-001..007, RDY-001..004 |
-| Platform operator | Approves increases/overrides, runs reconciliation, manages scope files. | GOV-001..009, OPS-001..005, CAP-006 |
-| DR coordinator | Declares DR events, orders priority waves, authorises CVAL release, drives failback. | DR-004..013, DR-019 |
-| FinOps | Sets cost/buffer policy; monitors idle cost and overcommit. | FIN-001..008 |
-| Auditor | Reads immutable audit trail of all decisions and mutations. | GOV-004..009, DAT-005 |
-| Microsoft/Azure | Capacity & quota provider and feature-maturity dependency. | DEP-001, POC-001..011 |
-
-### F3 — Actor / use-case overview
-
-```mermaid
-flowchart TB
-    subgraph Actors
-        O[Onboarding]
-        A[AEP]
-        Op[Operator]
-        DR[DR coordinator]
-        F[FinOps]
-        Au[Auditor]
-    end
-    O --> UC1((Onboard + place customer))
-    A --> UC2((Query deployment readiness))
-    Op --> UC3((Reconcile capacity/quota))
-    Op --> UC4((Approve increase / override))
-    DR --> UC5((Declare DR + activate standby))
-    DR --> UC6((Run DR drill / failback))
-    F --> UC7((Set cost/buffer policy))
-    Au --> UC8((Audit decisions))
-```
-
----
-
-## 4. Functional Capabilities
-
-### 4.1 Capacity reservation management (CAP-001..024)
-- ACRME maintains reservation state per subscription/region/zone/SKU-family/environment/product and correlates it with quota state (CAP-001, CAP-002). VMs in a shared **core subscription are classified production** for buffer/coverage purposes (CAP-001a). `[Decided]`
-- **Steady-state reservation floor** is normative: `Target Reserved Capacity = Allocated VM Count + Configured Buffer` (CAP-003). Associated-but-deallocated VMs are reported separately and do not automatically preserve paid reservation (CAP-004, CAP-013). `[Decided]`
-- Azure resource creation precedes config activation: create/validate the CRG/reservation first, then activate the deployment config that references it (CAP-007, CAP-008). `[Decided]`
-- **Zero-capacity, not deletion:** an unused managed reservation is reduced to zero where Azure permits; deletion is a separate approved decommissioning workflow (CAP-009, CAP-010). `[Decided]`
-- Over-allocation (reserved < associated demand) is explicit and policy-approved, never silent (CAP-011, CAP-012). Capacity sharing across subscriptions is validated for SKU/region/zone/authorisation (CAP-014..019). `[Decided]`
-
-**Reservation eligibility & onboarding (CAP-020/CAP-021).**
-- **Availability-Set VMs are ineligible** for Capacity Reservations — the constructs are mutually exclusive. ACRME excludes them from eligibility and from the `allocated`/`associated` counts that drive CAP-003 targets, and surfaces any managed-scope Availability-Set VM as a non-eligible exception with a remediation action (CAP-020). `[Decided]`
-- **Onboarding precondition:** a VM must occupy a reservation-eligible placement — an availability zone (preferred), or regional placement only where the SKU has no zonal support. An ineligible VM must first be **deallocated and redeployed into an AZ** (or migrated per runbook); ACRME records the required action and never auto-migrates running workloads (CAP-021). `[Decided]`
-
-**Seed matrix, reactive discovery & CRG structure (CAP-022/CAP-023/CAP-024).**
-- The managed estate is initialised as a **seed matrix of count-0 reservations** ("seed reservations") for every eligible SKU×region×AZ, created in the correct CRG at reserved quantity 0 so reconciliation can scale up the instant demand appears. Entry into the matrix requires an owning **product team + approved budget line** (CAP-022). This "seed reservation" is distinct from the placement "seed record" (PLC-003). `[Decided]`
-- Reservations are organised into an explicit **regional + per-AZ CRG structure per environment** — one regional (non-zonal) CRG plus one CRG per AZ (e.g. `crg-pr-eus2-reg`, `crg-pr-eus2-az1..az3`); environments are never mixed in a CRG (CAP-023, ENV-003). `[Decided]`
-- On **reactive discovery** of an allocated SKU/AZ not yet in the matrix, ACRME **auto-creates** the CRG (if absent) + reservation at `allocated + buffer` to protect production immediately, **and simultaneously raises a scope-file governance item** to ratify the SKU/AZ with owner + budget — reconciling the reactive path with CAP-019/CAP-002 within the governance SLA (CAP-024). `[Decided]`
-
-**Decommissioning-workflow boundary (CAP-008/CAP-010).** Automatic reconciliation may **right-size a retained reservation down to `allocated + buffer`** after a decommission, but reducing a reservation **to 0 as an intentional retirement**, deleting a CRG/reservation object, or removing a SKU/AZ from the scope file requires the **separate approved decommissioning workflow** (approval + impact analysis + audit). ACRME never infers teardown intent from a transient drop in allocated VMs. `[Decided]`
-
-### 4.2 Quota management — single governed pool (QUA-001..014)
-- **Primary model (QUA-004): one governed quota pool per region and quota family**, covering Prod, NonProd/CVAL, and DR together. All eligible default per-region quota is hoarded into the pool (QUA-003) and allocated on demand to whichever environment needs it — maximising flexibility, improving utilisation, and **cutting quota-increase requests to Microsoft**. `[Decided]`
-- **Prod protection inside the shared pool** is by logical earmark, not physical separation: `Prod_Reserved_Floor` and `DR_Earmark_vCPU` are never allocatable to NonProd; NonProd allocation fail-safes at `Allocatable_NonProd = 0` (QUA-006..009). `[Decided]`
-- **Quota-as-governor (QUA-005):** quota caps deployable capacity per product/env/subscription/region/family; every increase is justified and recorded — unallocated pooled quota is not auto-distributed. `[Decided]`
-- **Exception topology (QUA-004 clause):** a two-group/multi-group model is used only when Azure Quota Group limits or a mandatory Prod-isolation governance boundary make one pool impossible; each such case is recorded in the Decision Log and reverts to one pool when the constraint lifts. `[Decided]`
-- Reclamation never drops a subscription below current usage, committed demand, Prod buffer, or approved DR need (QUA-010..014). `[Decided]`
-
-### 4.3 Combined readiness (RDY-001..004)
-ACRME returns a single machine-readable **deployment readiness state** to AEP (RDY-001, RDY-002). The enumerated states are normative:
-
-```text
-READY | READY_WITH_RISK | QUOTA_DEFICIT | RESERVATION_DEFICIT |
-CAPACITY_UNAVAILABLE | STALE_STATE | POLICY_BLOCKED | VALIDATION_REQUIRED
-```
-
-Readiness combines capacity **and** quota **and** freshness: a reservation without deployable quota is `READY_WITH_RISK`/`QUOTA_DEFICIT`, never "ready" (RDY-003). State older than the configured maximum, when synchronous refresh fails, is `STALE_STATE` and fails safe (RDY-004, NFR-002). `[Decided]`
-
-### F8 — Deployment readiness state model (RDY-002)
-
-```mermaid
-stateDiagram-v2
-    [*] --> Evaluating
-    Evaluating --> READY: capacity+quota ok & fresh
-    Evaluating --> READY_WITH_RISK: reserved>deployable quota (policy)
-    Evaluating --> QUOTA_DEFICIT: consumer quota short
-    Evaluating --> RESERVATION_DEFICIT: reserved < required
-    Evaluating --> CAPACITY_UNAVAILABLE: Azure cannot supply
-    Evaluating --> STALE_STATE: snapshot too old & refresh failed
-    Evaluating --> POLICY_BLOCKED: policy/exception required
-    Evaluating --> VALIDATION_REQUIRED: unknown/preview behaviour
-    READY --> [*]
-    READY_WITH_RISK --> [*]
-    QUOTA_DEFICIT --> Evaluating: quota allocated
-    RESERVATION_DEFICIT --> Evaluating: capacity added
-    STALE_STATE --> Evaluating: refresh succeeds
-```
-
-### 4.4 Region selection & customer placement (PLC-001..010, REG-001..003)
-- **Exact production region is the default validated input (PLC-001).** ACRME validates the supplied region against the versioned catalogue rather than deriving it from a broad geography. `[Decided]`
-- **Geography-only selection is an exception path (PLC-002):** it requires explicit exception approval and customer acknowledgement that the derived production region becomes **fixed** (the seed) until a governed migration changes it. `[Decided]`
-- **Seed-once, reuse-across-products (PLC-003..005):** the first valid decision writes `CustomerSeedRecord`; later products/environments for the same customer/geography reuse it. Seed changes require an approved migration workflow. `[Decided]`
-- CVAL and DR are selected after production is fixed, using current readiness, environment separation (ENV-003), restriction flags, workload distribution, quota/capacity, and freshness (PLC-006..009). `[Derived]`
-- **CVAL/DR co-location double-count guard (PLC-010):** earmarked CVAL capacity counts toward DR headroom, never as both live CVAL and available DR. `[Decided]`
-- **Two-region CVAL/DR co-location is mandatory (PLC-010a):** in every two-region **co-located** geography (EU, Australia, Asia Pacific), production is in one region and **CVAL and DR are co-located in the other region**. The three-region US geography places production, CVAL and DR across distinct regions. `[Decided]`
-- **Cross-geo DR for the Middle East (PLC-010b, DR-020) [Amended v2.4]:** the Middle East is **not** a two-region co-located geography. **Prod and CVAL co-locate in a selected Middle East Standard region** (separate CRGs — co-location in a region is not capacity sharing, ENV-003) and **DR is placed cross-geo in a weighted-selected Europe Standard region**. This **overrides** PLC-010a co-location for the Middle East (CVAL co-locates with Prod locally, not with DR). Both selections run the weighted capacity placement model; the DR copy's residency is governed by A-ME1. `[Decided]`
-- **Region catalogue (REG-001..003) [Amended v2.4]:** versioned, configuration-driven; the catalogue defines **five geographies** each with an explicit **distribution model** — now **three models**: the US **three-region** geography; the EU/Australia/Asia Pacific **two-region co-located** geographies; and the Middle East **cross-geo DR** geography (Prod+CVAL in a Middle East region, DR weighted-selected in Europe). There is no universal three-region minimum. Region examples come from authoritative config (REG-002 — the Europe DR region is weighted-selected among Europe Standard regions, Switzerland North as a default example, not a fixed region); Japan East is a **pending** Asia Pacific addition awaiting confirmation. `[Decided]`
-- **Even per-zone distribution target + rebalancing (PLC-011):** within a placement region, ACRME distributes VMs across the availability zones toward an **even target of ≈1/zone_count per zone** (≈33% for a three-zone region). Each placement selects the eligible zone with the greatest deficit from target subject to capacity/quota/restriction constraints; when the observed distribution drifts beyond the configurable tolerance band (**C-13**, default ±10 percentage points), a **rebalancing action** is raised so future placements (and, where policy allows, redeploys) restore balance. The target and tolerance are configuration-driven and the algorithm is defined in Baseline Appendix A.9. `[Decided]`
-
-**Region classification (functional view) [Amended v2.4]:** Standard (auto-selectable/scored), Restricted (production-only by exception, never CVAL/DR — e.g. East US 2, North Europe, West Europe), **Cross-Geo DR Destination** (a geography approved to host another geography's DR — **Europe is the approved cross-geo DR destination for the Middle East**, with the specific Europe region **weighted-selected** among Europe Standard regions per DR-020/PLC-010b, A-ME1), and `DR_NOT_OFFERED` (no cross-border substitution — **no longer set for the Middle East**; retained for any future geography/country Legal declares no-DR). Where `DR_NOT_OFFERED` is set it is evaluated **before** any cross-geo path. `[Decided]`
-
-### F4 — Onboarding + placement flow
-
-```mermaid
-flowchart TD
-    Start[Placement request] --> Seed{Seed exists?}
-    Seed -- Yes --> Reuse[Reuse CustomerSeedRecord]
-    Seed -- No --> Mode{Input mode}
-    Mode -- Exact prod region default --> ValP[Validate production region vs catalogue]
-    Mode -- Geography exception --> Appr{Exception approved + acknowledged?}
-    Appr -- No --> PB[POLICY_BLOCKED]
-    Appr -- Yes --> DerP[Derive prod from Standard regions - becomes fixed seed]
-    ValP --> Ok{Valid, supported, fresh?}
-    DerP --> Ok
-    Ok -- No --> Reason[Readiness reason state]
-    Ok -- Yes --> CVAL[Select/validate CVAL - env separation]
-    CVAL --> DR[Select DR: in-geo, cross-geo Europe for Middle East, or DR_NOT_OFFERED]
-    DR --> Idx[Contribute to SourceDestinationDRIndex]
-    Idx --> Hold[Atomic placement hold]
-    Hold --> Write[Write CustomerSeedRecord]
-    Reuse --> Out[Return DeploymentReadinessResult]
-    Write --> Out
-```
-
-### 4.5 Disaster recovery (DR-001..019)
-- **Distributed, reciprocal DR (DR-016):** each region concurrently hosts Prod, CVAL, and DR standby for multiple *different* source regions. No dedicated DR-only regions. `[Decided]`
-- **Lean bootstrap (DR-007):** DR holds a configurable bootstrap target by workload/product/region/zone/SKU — never a fixed 30-40% clone; zero bootstrap only by explicit approved policy. `[Decided]`
-- **max-not-sum sizing (DR-017):** each destination sizes to the largest single non-concurrent protected source portion; a SUM override covers contractual simultaneous-failure needs. `[Decided]`
-- **Source→destination index (DR-018)** drives **source-specific standby activation in business-priority waves (DR-009, DR-019)** via staged acquisition (DR-006), reversible on failback (DR-013). `[Decided]`
-- **Staged capacity acquisition order (DR-006):** bootstrap → destination quota/capacity → approved CVAL release → approved sharing → pooled quota → Azure request with exposed deficit. Because all environments share one governed quota pool, the emergency DR draw needs **no cross-group transfer**. `[Decided]`
-- **Cross-geo DR for the Middle East (DR-020, PLC-010b) [Amended v2.4]:** Middle East regions are **DR sources** whose destinations are **weighted-selected Europe Standard regions**. ME customers produce `dr_region = <Europe region>` seeds, add cross-geo `source → destination` rows to the `SourceDestinationDRIndex`, and the DR standby is **sized max-not-sum and earmarked as dedicated reserved capacity in the Europe destination** (no CVAL sacrifice — DR-005/006 do not apply to ME). Subject to sovereignty/zone-alignment (HC-10) and residency assumption A-ME1. This supersedes the former ME `DR_NOT_OFFERED` position (DR-014/DEC-001). `[Decided]`
-- **`DR_NOT_OFFERED` (DR-014):** where sovereignty/contract forbids cross-border DR, the seed records no DR and ACRME never silently substitutes. **No longer set for the Middle East [Amended v2.4]**; retained for any future geography/country Legal declares no-DR (and, by config, for specific ME countries with per-country carve-outs, A-ME1). `[Decided]`
-- **DR drills and role flip (DR-010..012):** annual drill/rotation validate the model without a real incident; destructive VM-association changes remain **blocked in Phase 1**. `[Decided]`
-
-### F6 — Distributed DR reference model (Section 12A)
-See the rendered reference diagram (reused): `adr/diagrams/acrme_three_region_capacity_model.png` — each region hosts Prod + CVAL + DR standby tagged with its `src Rn` source region; each destination sizes by max-not-sum.
-
-### F7 — DR event → standby activation waves
-
-```mermaid
-sequenceDiagram
-    participant DRC as DR coordinator
-    participant ENG as ACRME engine
-    participant IDX as SourceDestinationDRIndex
-    participant POOL as Single governed quota pool
-    participant AZ as Azure
-    DRC->>ENG: Declare source-region failure (authorised)
-    ENG->>ENG: engine_mode = DR_EVENT_ACTIVE
-    ENG->>IDX: Read standby sets for failed source
-    IDX-->>ENG: Customers + priority waves
-    loop each priority wave
-        ENG->>POOL: Draw pool headroom then reclaimable NonProd
-        POOL-->>ENG: Capacity earmark released
-        ENG->>AZ: Acquire deficit if any (exposed)
-        ENG->>ENG: standby -> allocated/active
-        ENG->>DRC: Wave complete + audit checkpoint
-    end
-    DRC->>ENG: Failback authorised
-    ENG->>ENG: FAILBACK_PENDING -> STEADY_STATE (reversible)
-```
-
-### 4.6 Cost & FinOps (FIN-001..008)
-- Idle reservation cost is surfaced and alerted (FIN-001, FIN-002); lean DR + max-not-sum minimises idle standby cost (FIN-003). `[Decided]`
-- Cost-before-expansion: increases carry cost exposure and justification (FIN-004, FIN-005). `[Decided]`
-- Shared-DR **overcommit accounting** exposes `Overcommit_Ratio` per destination so the savings of distributed DR are visible and bounded by a safety ceiling (FIN-006..008, POC-011). `[Derived]`
-
-### 4.7 Provisioning & AEP integration (INT-001..007)
-- ACRME exposes a functional contract: input (customer, exact region, SKU/family, environment, product, intended demand) → output (`DeploymentReadinessResult` + reason + operation handle) (INT-001..003). `[Decided]`
-- All mutating calls are **idempotent** with operation handles and expected-state versions; AEP polls rather than assuming synchronous completion (INT-004..006, NFR-007). `[Decided]`
-- AEP never treats provider quota as proof of consumer deployability (INT-007, POC-001). `[Assumed]`
-
-### 4.8 Observability, governance & operations (OBS, GOV, OPS)
-- **Observability (OBS-001..005):** metrics/alerts for buffer deficit, per-destination DR max-source coverage and gap, source↔destination mapping dashboard, activation state by wave, idle cost, staleness. `[Decided]`
-- **Governance (GOV-001..009):** RBAC, managed identity, approval gates, break-glass, immutable audit of every decision and mutation with before/after values and correlation IDs; versioned scope files with decision traceability (DAT-005). `[Decided]`
-- **Operations (OPS-001..005):** runbooks for DR declaration, standby activation, CVAL release, quota allocation, sharing activation, emergency override, regional recovery, and failback. `[Decided]`
-
----
-
-## 5. End-to-End Functional Flows
-
-1. **Onboarding + placement** (F4): exact-region validation (or geography exception) → CVAL/DR selection → seed write → readiness.
-2. **Steady-state reconciliation** (F5): every ~6 min, compare `Allocated + Buffer` to reserved; scale up (or alert deficit), guarded scale-down, never delete.
-3. **Single-region DR event** (F7): declare → index lookup → priority-wave activation from the shared pool → audited failback.
-4. **DR drill / failback**: scheduled role-flip validating the index, waves, and reversibility without a real incident.
-
-### F5 — Steady-state reconciliation behaviour
-
-```mermaid
-flowchart TD
-    Tick[Reconciliation tick ~6 min] --> Read[Read scope, reservation, allocated, associated, buffer, quota, freshness]
-    Read --> Fresh{State fresh?}
-    Fresh -- No --> Stale[STALE_STATE + refresh]
-    Fresh -- Yes --> Cmp{reserved vs Allocated+Buffer}
-    Cmp -- below --> Up[Attempt scale-up]
-    Up --> Sup{Azure supplies?}
-    Sup -- No --> Def[Hold safe state + expose buffer deficit alert]
-    Sup -- Yes --> Ok[Confirm + snapshot]
-    Cmp -- above --> Guard[Scale-down guards: hold interval, DR earmark, CVAL earmark, maintenance, override, cost]
-    Guard --> Down[Reduce toward target - never below Allocated+Buffer, never delete]
-    Down --> Ok
-    Cmp -- equal --> Ok
-```
-
----
-
-## 6. Functional States and Data (functional view)
-
-**Engine mode machine (functional view, DR-004..008, NFR-002):**
-
-```text
-STEADY_STATE → DR_DECLARATION_PENDING → DR_EVENT_ACTIVE → FAILBACK_PENDING → STEADY_STATE
-                                                     ↘ INCIDENT_HOLD (safe degraded)
-```
-
-Entering `DR_EVENT_ACTIVE` does not auto-authorise service-impacting CVAL action; each action keeps its own policy gate.
-
-**Functional data entities (DAT-001..006):** `CustomerSeedRecord` (PLC-003), `SourceDestinationDRIndex` (DR-018), `CVALEarmarkRecord` (PLC-010), `PlacementPolicy` (versioned catalogue), reservation/quota snapshots with freshness metadata, and the immutable decision/audit log. Full technical schema is in the TDD Section 6.
-
----
-
-## 7. Acceptance Criteria Mapping (baseline Section 20)
-
-| Acceptance theme | Functional evidence | Section |
-|---|---|---|
-| Deployment allowed only when capacity+quota+freshness pass | Readiness states, fail-safe on stale | Section 4.3, F8 |
-| Exact-region-first onboarding, seed reuse | Placement flow, seed record | Section 4.4, F4 |
-| Lean, distributed, max-not-sum DR with source-specific activation | DR capabilities, activation waves | Section 4.5, F6, F7 |
-| Single governed quota pool with Prod protection | Quota capability, earmarks | Section 4.2 |
-| No silent deletion / no silent cross-border DR substitution (cross-geo DR is explicit & catalogued) | Zero-capacity, cross-geo DR (DR-020), `DR_NOT_OFFERED` | Section 4.1, Section 4.5 |
-| Full auditability of decisions and mutations | Governance | Section 4.8 |
-
----
-
-## 8. Assumptions, Decisions, POC Dependencies (baseline Section 22–Section 24)
-
-| Ref | Item | Functional impact |
-|---|---|---|
-| POC-001 | Consumer quota under shared reservation | Readiness must validate consumer quota until proven. |
-| POC-006/007 | DR topology & bootstrap sizing | Confirms distributed model and lean targets. |
-| POC-011 | max-not-sum overcommit safety | Sets overcommit safety ceiling / alert. |
-| DEC-001 | Middle East DR policy | **RESOLVED [Amended v2.4 — 11 Sep 2026]: Middle East DR now offered as cross-geo DR to Europe** (Prod+CVAL in a Middle East region, DR weighted-selected in a Europe Standard region; DR-020, PLC-010b, A-ME1). Supersedes the former `DR_NOT_OFFERED` position. Per-country data-residency carve-outs remain a Legal matter (config). |
-| DEC-002 | Failback duration | ~1-year run vs ~30-day failback. |
-| DEC-003 | Geography exception approver | Governs the PLC-002 exception path. |
-| DEP-001 | Quota Group / `groupType` maturity | Single-pool enforcement depends on feature maturity. |
-
----
-
-## 9. Requirement Traceability Matrix (Baseline v2.4 → FDD)
-
-| Requirement group (IDs) | FDD section(s) |
+| Actor | Responsibility |
 |---|---|
-| REG-001..003 | Section 4.4 (catalogue, per-geography distribution model incl. cross-geo DR, weighted Europe DR selection) |
-| PLC-010a / PLC-010b | Section 4.4 (two-region CVAL/DR co-location; Middle East cross-geo DR override) |
-| ENV-001..007 | Section 4.4 (env separation), Section 4.5 (roles) |
-| CAP-001, CAP-001a (core = production) | Section 4.1, Section 5(2), F5 |
-| CAP-002..019 | Section 4.1, Section 5(2), F5 |
-| CAP-020 (Availability-Set ineligible), CAP-021 (deallocate/migrate-to-AZ onboarding) | Section 4.1 (eligibility & onboarding), F5 |
-| CAP-022 (seed-at-0 matrix + budget governance), CAP-024 (reactive SKU discovery ↔ CAP-019) | Section 4.1, Section 5(2), F5 |
-| CAP-023 (regional + per-AZ CRG structure) | Section 4.1, Section 6 (entities), TDD Section 6 |
-| QUA-001..014 | Section 4.2 |
-| RDY-001..004 | Section 4.3, F8 |
-| PLC-001..010 | Section 4.4, F4 |
-| PLC-011 (even zone-distribution target + rebalancing) | Section 4.4, F4 |
-| DR-001..019 | Section 4.5, F6, F7, Section 6 |
-| FIN-001..008 | Section 4.6 |
-| INT-001..007 | Section 4.7, F1 |
-| DAT-001..006 | Section 6 |
-| OBS-001..005 | Section 4.8 |
-| GOV-001..009 | Section 4.8, Section 7 |
-| NFR-001..010 | Section 4.3 (fail-safe), Section 4.7 (idempotency), Section 5, Section 6 |
-| OPS-001..005 | Section 4.8, Section 5 |
-| OPS-006 (naming convention + counter) | Section 4.8, Section 5 |
-| C-1..C-13 (configurable items incl. naming C-12, zone target C-13) | Section 4.4, Section 7 |
-| POC-001..011 / DEC-001..003 / DEP-001 | Section 8 |
+| Onboarding/product team | Supplies exact Prod region, customer/domain, workload requirements and approved budget. |
+| AEP | Calls the placement/readiness contract before initial and capacity-changing deployment; reports deployment outcome (INT-001/008). |
+| Platform operator | Manages scoped config, approvals, pause/overrides and remediation. |
+| DR coordinator | Authorizes declarations/exercises, CVAL release and business-priority recovery/failback. |
+| FinOps | Reviews buffers, idle cost, source/domain attribution and expansion justification. |
+| Auditor/security | Reviews least privilege, policy exceptions and immutable decision/change evidence. |
+| Architect/business/Legal | Closes design/guarantee decisions, including cross-geo scenario scope and residency clearance. |
 
-*Every Baseline v2.4 requirement ID (including the reservation-model additions CAP-020..024, PLC-011, OPS-006, C-12/C-13) resolves to at least one FDD section above. Detailed component/algorithm-level traceability is completed in the TDD Section 17.*
+Canonical flow: [two-scope pipeline](diagrams/acrme_v4_pipeline.mmd). It replaces the old F1/F4/T7 pipeline views. Canonical sources are local `.mmd`, not a stale rendered historical image.
 
----
+## 3. Policy and region classifications
 
-**Document Status:** Draft for review · **Next:** ratify alongside the TDD; supersede the Executive Design Document (archived).
+[Decided] The versioned catalogue drives REG-001/002/003, not hard-coded environment-to-region mappings.
+
+| Classification/model | Functional rule |
+|---|---|
+| Standard | Eligible for automated scoring after HC/readiness checks. Any Standard region can host permitted Prod, CVAL or DR roles. |
+| Restricted | Never enters automated CVAL/DR scoring; exact Prod requests route through approved exception workflow. |
+| US three-region | Prod anchored; CVAL/DR selected among eligible remaining regions; co-location optional under PLC-010, not universally forbidden. |
+| Europe/Australia/Asia Pacific two-region | CVAL and DR co-locate deterministically in the remaining non-Prod region (PLC-010a). |
+| Middle East cross-geo | Prod/CVAL co-locate locally in separate capacity sets; DR weighted-selected in Europe, with dedicated DR capacity, not local CVAL sacrifice (PLC-010b/DR-020). |
+| Country DR_NOT_OFFERED | Overrides DR assignment before scoring; persist no DR region and an explicit reason (DR-014). No silent substitution. |
+
+[Assumed] A-ME1 residency clearance is not established by this design. Legal approval and HC-10 remain required for applicable customers. Japan East is pending catalogue confirmation, not automatically eligible.
+
+## 4. Functional capabilities
+
+### 4.1 Capacity and topology (CAP-001 through CAP-025, ENV-001 through ENV-007)
+
+- [Decided] Managed scope includes customer/domain, subscription, region, zone, exact SKU/family, environment, resources, policies and config version. Out-of-scope resources are not mutated (CAP-001/GOV-003).
+- [Decided] All workloads in a shared core subscription receive production classification (CAP-001a); non-production must not run there.
+- [Decided] Create/validate resources in Azure before activating their config (CAP-002). Reactive discovery of an in-scope allocated unmanaged SKU/AZ protects at `allocated + buffer` while simultaneously raising governance/budget ratification (CAP-024). It does not authorize mutation outside managed scope.
+- [Decided] Per domain/environment/region and exact SKU/zone, desired target is **allocated VM count + approved buffer** (CAP-003/F.1). Deallocated associations do not increase that desired target; their quota and restart risk remain separately visible.
+- [Decided] CAP-004 currently prevents executable shrink below associated count until dissociation. Preserve that programme guard and report desired versus constrained quantity/cost/remediation; its relationship with acceptance criterion 3 is a pending clarification (section 8, B4). Do not silently dissociate workloads.
+- [Decided] Reconcile toward target at the configurable cadence (six-minute reference, CAP-006). Failure to restore a buffer holds a safe state and alerts the deficit; it is not success.
+- [Decided] A legitimate approved target of zero may retain a count-0 resource under CAP-009 when all guards permit. Intentional retirement, deletion and scope removal require the separate CAP-010 approved workflow. Zero demand never implies permission to delete or implicitly zero DR bootstrap.
+- [Decided] Availability-Set VMs are ineligible; exclude them from target-driving counts and surface remediation. Eligible zonal placement is preferred; non-zonal placement is the permitted exception for unsupported zonal SKUs. No automatic running-workload migration (CAP-020/021).
+- [Decided] Initialize the approved exact-SKU/AZ seed matrix under product budget governance (CAP-022).
+
+| Set class | Ownership and isolation |
+|---|---|
+| `prod` / `crg-pr-*` | [Decided] Domain-specific Prod capacity only; never shared with CVAL/DR or another domain (CAP-025). |
+| `cvdr` / `crg-cvdr-*` | Same-domain CVAL/DR extension; no cross-domain sharing. Release is declaration-gated. |
+| `drf` / `crg-drf-*` | Domain DR Foundation; always present and quota-prestaged, separate from live CVAL. |
+
+[Documented] CAP-023 defaults to one zonal CRG per applicable domain/set/subscription/region, with zones declared at creation and one reservation per exact VM size per zone. Optional per-zone groups are distinct from the default; no-zone `reg` is an exception pinned to one Azure-selected zone, not a region-wide pool. CAP-025 permits the explicit same-domain cvdr exception to general environment separation.
+
+[Decided] Production uses a reservation in the **deploying subscription** until sharing is GA for the approved version (CAP-013). Preview sharing requires explicit approval, same-domain authorization, same region, supported tenant/trust, explicit consumers (at most 100), and physical-zone mapping. Authorization is not allocation; shared capacity is counted once (CAP-014/015). A matching logical zone number in two subscriptions is not sufficient (CAP-016).
+
+Topology: [domain sets and quota ownership](diagrams/acrme_v4_topology.mmd).
+
+### 4.2 Quota governance (QUA-001 through QUA-015)
+
+[Documented] Quota and reserved capacity are independent. A subscription belongs to one Quota Group; that object spans multiple regional/family cells. Actual deployment checks the subscription's quota, not the group's transferable balance (QUA-003/004).
+
+- Customer domain ig subscriptions use the customer's central group; never another customer's group. Cell accounting covers Prod/CVAL/DR with protected logical earmarks, not separate per-family group memberships.
+- Inventory both **VM-family** and **total-regional vCPU** assigned/used/remaining values. Available quota is their lesser remaining value (QUA-007); deallocated usage is not assumed free.
+- Keep observed approved group balance, subscription assignments, engine commitments, protected floors and desired increase requests distinct.
+- Allocation/reclamation is justified and audited. Do not allocate merely because a group has spare quota; never reclaim below usage, committed demand, Prod growth buffer or approved DR need.
+- Confirm transfers on the target subscription before relying on them. An accepted request or pool earmark is not deployable quota.
+- Configurable group/subscription replenishment thresholds default to **85%** under QUA-015; their numeric utilization basis and zero-limit handling require an explicit policy contract (TDD section 8).
+- Quota in a failed region is not a destination capacity/quota source.
+- Provider creation/growth and shared consumer deployment require their respective quota (QUA-013). POC-001 confirms the selected API behavior; it does not make this check optional.
+
+### 4.3 Readiness (RDY-001 through RDY-004)
+
+[Decided] Readiness is evaluated per DPB and intended incremental demand. It requires approved region/zone/SKU and policy, matching resources/authorization, allocatable residual reservation capacity or explicitly approved over-allocation, both quota caps, fresh records and no HC/policy block. Concurrent requests must not spend the same capacity or regional quota twice.
+
+| State | Functional meaning |
+|---|---|
+| READY | Every required gate passes for the recorded intent/snapshot; not an unlimited or perpetual permission. |
+| READY_WITH_RISK | Only an explicitly permitted risk path, such as approved unguaranteed over-allocation. Does not override quota, isolation, stale-state or approval failures. |
+| QUOTA_DEFICIT | Required deployable subscription quota/commitment cannot be established. |
+| RESERVATION_DEFICIT | Required residual reserved coverage is insufficient. |
+| CAPACITY_UNAVAILABLE | [Documented] Azure cannot supply requested additional capacity (RDY-002). |
+| STALE_STATE | Records exceed max age and refresh cannot restore validity. |
+| POLICY_BLOCKED | Scope, HC, authorization or required approval blocks the operation. |
+| VALIDATION_REQUIRED | Essential behavior, mapping, policy term or evidence is unresolved; not a deployment approval. |
+
+[Derived] Return all blocking reasons; a single state does not hide additional failures. A quota shortage is not downgraded to risk simply because a reservation exists. Readiness must be revalidated when intent, snapshot or policy changes.
+
+### 4.4 Placement, domains and zone distribution (PLC, DOM, REG)
+
+[Decided] Exact Prod region is the default validated input; geography-only derivation requires explicit approval and customer acknowledgement (PLC-001/002). Seed changes require approved migration, not upgrades/rebuilds (PLC-003/004/005).
+
+1. Resolve/reuse `CRV(customer,geography)` using the distribution rules in section 3.
+2. Score only customer-aggregate candidates using current capacity, quota, buffers, expected DR, zone support, freshness and fairness (PLC-007/008, F.10/F.11).
+3. Bind each domain's DPB in CRV regions; resolve ig/shard and sets, F.1 sizing, F.9 zone spread and quota draw (F.12). Domain shortage blocks/remediates the DPB, not customer region re-selection.
+4. Check readiness and hold commitments before deployment (PLC-015/INT-006).
+
+[Decided] Fairness counts distinct customers per geography with at least one provisioned/deploying environment; the same live denominator is shared by all scores. F.10 fairness is 1 at zero customers (PLC-012), never a fixed forecast.
+
+[Decided] Per-domain/environment zone target is `round(VMs / zone_count)`; skew is the VM-count difference per F.9. Prefer the eligible least-populated zone; recommend governed rebalancing when configured count-skew tolerance is exceeded. No fixed percentage tolerance is introduced. Rounding/ties and empty-workload policy must be explicit before executable decisions. Combined `RegionZoneLoad = sum across domains` is an observation/alert only, never cross-domain reserve sizing (PLC-016/C-15).
+
+### 4.5 DR Foundation, extension and activation (DR-001 through DR-021)
+
+[Decided] DR planning protects workload **portions** attributed to domain, source and destination, not a complete copy at every destination. For a defined isolated capacity partition, aggregate all demand from one failed source, then take **MAX across non-concurrent source regions** (DR-017/F.6). C-11 is an explicit approved conservative override. Do not net capacity across domains, SKUs or physical zones.
+
+- **Foundation:** dedicated `drf` bootstrap sized by approved product/domain/region/zone/family policy, always present with pre-staged quota. Control planes then business-priority P0/P-1 waves start independently of Preview sharing (DR-007/008/021, C-16).
+- **Extension:** same-domain `cvdr` capacity is released only after authorized declaration/exercise and required action approval. Do not count active CVAL simultaneously as immediately free DR capacity.
+- **Cross-geo:** ME customers use dedicated Europe DR capacity; local CVAL is not sacrificed for European recovery. Country Legal overrides remain effective. Cross-geography concurrent-failure coverage is unresolved B3, not proven by a single-source MAX.
+- [Decided] **Staging (DR-006):** (1) approved bootstrap; (2) already available destination reservation and quota; (3) approved CVAL shutdown/disassociation; (4) supported sharing/reassignment; (5) confirmed pooled quota allocation; (6) Azure quota/capacity requests; (7) report unrecoverable gaps. Earlier stages still require readiness; no zero-latency API guarantee.
+- **Activation:** source->destination index selects the failed source's exact customer/domain standby sets. Activate in authoritative business-priority order; audit partial failure and wave state, preserve seed/lineage and support governed reversal.
+- **Failback/drills:** support extended operation and earlier failback policies without losing identity/history; DEC-002 decides duration. Annual rotation is governed, not inferred from a restored snapshot.
+
+### 4.6 FinOps, observability, governance and operations
+
+[Decided] FIN-001 through FIN-008 require measured idle cost, justification before expansion and customer/domain/environment/region attribution. Single-count shared cvdr cost and per-domain drf cost. Cost-only optimization cannot breach production or bootstrap protection.
+
+[Decided] OBS-001 through OBS-005 include per-domain ig utilization/zone distribution, quota cells, Foundation coverage, max-source coverage, activation, snapshot age, API throttling and combined region-load alerting. Alerts include domain/subscription/SKU/zone, desired/actual, owner, correlation and remediation.
+
+[Decided] GOV-001 through GOV-009 require managed/workload identity, least privilege, separate approval/execution/review, classified customer metadata, time-bound exceptions/overrides and audited break-glass. No secrets in config/logs. OPS-001 through OPS-006 require pause retaining inventory/alerts, maintenance awareness, expiring override protection, ownership/escalation and deterministic config-driven naming. Domain token belongs in subscription identity, not a cross-domain CRG registry key.
+
+### 4.7 AEP contract (INT-001 through INT-008)
+
+[Decided] Input includes customer/realm, domain, product, environment, exact Prod region or approved geography exception, subscription, exact SKU/count, zone requirement, priority, requested time and correlation ID. Output includes CRV and DPB references, ig subscription, domain sets, zone spread, quota-draw route/status, available/required quantities, reasons, exceptions, snapshot timestamp and decision ID.
+
+Idempotency is based on correlation/key plus desired state; a changed payload must not reuse a prior approval. AEP polls tracked operations, associates only validated references and returns deployment outcomes. On partial failure, record and compensate safely or raise a recoverable task (INT-007). Provider quota is never proof of consumer deployability.
+
+## 5. End-to-end operating flows and phases
+
+| Flow | Required order / boundary |
+|---|---|
+| New or existing customer/domain deployment | CRV resolve/reuse -> DPB -> fresh readiness/atomic commitments -> validated AEP deployment -> confirmation/compensation. |
+| Steady state | Read fresh scoped observations -> desired allocated+buffer -> guards/approvals -> confirm quota if needed -> resize retained reservation -> confirm actual -> audit/snapshot. Inventory continues during pause/hold. |
+| DR declaration | Authorize declaration -> pending mode/activation approval -> active incident -> source index -> readiness-gated staged waves -> governed failback. |
+| Drill | Authorized exercise, scoped CVAL actions and rehearsed reversal; no implicit production teardown. |
+
+[Decided] Baseline delivery phases are P1 visibility/Prod protection, P2 quota automation, P3 seed/placement, P4 distributed DR and P5 multi-domain/two-scope binding. This target design covers all five; a partial phase implementation must not claim the complete target. Preserve legacy Phase 1 operator-gated decrease and prohibition on destructive association transfers; changed autonomy requires approval.
+
+## 6. State and data
+
+Five engine modes remain `STEADY_STATE`, `DR_DECLARATION_PENDING`, `DR_EVENT_ACTIVE`, `FAILBACK_PENDING`, `INCIDENT_HOLD`. Steady-state mutation runs only in steady state; DR transfer only in active approved incident scope. CVAL action keeps its own authorization.
+
+[Assumed] The [guarded mode diagram](diagrams/acrme_v4_engine_modes.mmd) proposes retaining interrupted mode/incident identity and returning from hold only through explicit authorized resumption. Freshness restoration alone cannot complete failback or clear DR. Exact resumption approval remains Architect-pending; inventory/alerts continue while blocked.
+
+[Decided] DAT-001 through DAT-006 require durable authoritative state separate from transient responses: customer seed/CRV, domain and ig registries, DPBs, per-domain sets, exact reservations, sharing/zone mappings, quota membership/cells/subscription assignments, DR index/earmarks, deployment intents, activation/operation records, config versions, audit and history. Every decision references its observations and policy. API/schema transitions are versioned with an approved compatibility period, not implicit reinterpretation of legacy records.
+
+## 7. Acceptance mapping
+
+These are required demonstrations, **not executed test results**. Numbers match baseline section 22.
+
+| Baseline acceptance | Required evidence | Functional location |
+|---|---|---|
+| 1 | Scoped inventory of reservations, VM states, quota, sharing and config | 4.1/4.2/6 |
+| 2 | Allocated+buffer target and reconciliation | 4.1/5 |
+| 3 | Associated VM desired/executable distinction and approved remediation; B4 closure | 4.1/8 |
+| 4 | Missing config resource blocked before deployment | 4.1/4.3 |
+| 5 | Consumer shortage fails safely on either quota cap | 4.2/4.3 |
+| 6 | Allocate/reclaim without breaching protection | 4.2 |
+| 7 | Concurrent intents cannot double-spend capacity/quota | 4.3/4.7 |
+| 8 | Fresh machine-readable AEP readiness | 4.3/4.7 |
+| 9 | Seed creation/reuse and controlled change | 4.4 |
+| 10 | Single-source simulation computes per-partition MAX | 4.5 |
+| 11 | Releasable CVAL and authorized impact | 4.5 |
+| 12 | Idle cost/protection deficit reporting | 4.6 |
+| 13 | Complete automated/manual audit | 4.6/6 |
+| 14 | Throttling produces safe stale/degraded behavior | 4.3/6 |
+| 15 | Read-only/dry-run intended changes | 5, TDD section 14 |
+| 16 | Correct source/domain standby activation from index | 4.5 |
+| 17 | Availability-Set exclusion/remediation | 4.1 |
+| 18 | Budgeted count-0 seed matrix/reactive governance | 4.1 |
+| 19 | Default zonal structure, exact-size/zone uniqueness, names | 4.1 |
+| 20 | Per-domain under-represented zone preference/skew action | 4.4 |
+| 21 | Right-size versus intentional retirement workflow | 4.1/5 |
+| 22 | Exact/geography CRV paths with TMS/WMS separate DPBs | 2/4.4 |
+| 23 | Domain prod/cvdr/drf sets and isolation | 4.1 |
+| 24 | Foundation-only bootstrap, then gated extension | 4.5 |
+| 25 | Central customer quota draws/85% replenishment | 4.2 |
+| 26 | Forward forecast/optimization dry-run at customer/domain grain | 1/5, TDD section 14 |
+
+## 8. Decisions, evidence and approval blockers
+
+| Item | Current treatment / closure |
+|---|---|
+| B1 - displayed F.4 | Follow QUA-007/F.12's explicit two-cap requirement; proposed formula correction not applied to baseline. |
+| B2 - F.8 explanation | Equal positive portions give ratio equal to number of sources, not 1; zero-demand reporting convention pending. |
+| B3 - cross-geo failure set | Architect/business must decide global versus per-geography concurrent guarantee; affected cross-geo coverage cannot be certified. |
+| B4 - shrink precedence | Preserve CAP-004 association guard, report constrained target; acceptance wording awaits Architect clarification. |
+| State resumption | TDD section 7 proposes guards; not a new approved ADR. |
+| Formula policy gaps | TDD sections 8/9 define required rounding, normalization, replenishment and quota-charge evidence; unresolved terms return VALIDATION_REQUIRED. |
+| POC-001 | Consumer quota documented; selected API-version confirmation remains. |
+| POC-002/003/004/005 | Sharing order, physical zones, throttle behavior and VM-state semantics remain open. |
+| POC-006/007/008/009/010 | DR topology, bootstrap, quota/reservation buffers and production cadence remain open. |
+| POC-011/012/013 | Overcommit safety, domain-bounded sharing and live two-scope multi-domain flow remain open. |
+| DEC-002/003/004 | Failback duration, geography-exception approver and domain taxonomy pending. |
+| DEP-001 / A-ME1 | Reservation Sharing Preview maturity and Legal residency approval; neither is quota-group maturity. |
+
+## 9. Requirement traceability and release gate
+
+| Current baseline codes | FDD sections |
+|---|---|
+| REG-001/002/003; ENV-001 through ENV-007 | 1/3/4.1/4.5 |
+| CAP-001, CAP-001a, CAP-002 through CAP-025 | 4.1/4.3/5 |
+| QUA-001 through QUA-015; RDY-001 through RDY-004 | 4.2/4.3 |
+| PLC-001 through PLC-005, PLC-007 through PLC-016 | 2/3/4.4; PLC-006 is retired, not an active stage |
+| DOM-001 through DOM-004 | 1/2/4.1/4.4/6 |
+| DR-001 through DR-021 | 4.5/5/6/8 |
+| FIN-001 through FIN-008; OBS-001 through OBS-005 | 4.6 |
+| INT-001 through INT-008; DAT-001 through DAT-006 | 4.7/6 |
+| GOV-001 through GOV-009; OPS-001 through OPS-006 | 4.6/5 |
+| NFR-001 through NFR-010 | 4.3/4.7/5/6; technical details in TDD section 14 |
+| C-1 through C-16; POC-001 through POC-013; DEC-001 through DEC-004; DEP-001 | 3/4/5/8 |
+
+[Derived] **Document consistency is not production ratification.** The TDD section 17 contains per-HC, formula, DR and WAF gates and counterexamples. Baseline clarifications, design approvals and POCs remain release blockers for affected guarantees. No baseline amendment or runtime behavior is approved by this document.

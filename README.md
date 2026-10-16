@@ -79,8 +79,8 @@ acrme-capacity-reservation/
 
 | Artifact | Description |
 |---|---|
-| **Functional Design Document (FDD)** ([`Design/acrme_functional_design_document.md`](Design/acrme_functional_design_document.md)) | Draft last reconciled to v2.4; not yet reconciled to v4.0. The baseline governs on any conflict. |
-| **Technical Design Document (TDD)** ([`Design/acrme_technical_design_document.md`](Design/acrme_technical_design_document.md)) | Draft last reconciled to v2.4; not yet reconciled to v4.0. The baseline governs on any conflict. |
+| **Functional Design Document (FDD)** ([`Design/acrme_functional_design_document.md`](Design/acrme_functional_design_document.md)) | v4.0 reconciliation draft v2.0: two-scope/domain behavior and acceptance mapping; Architect decisions and POC validation pending. Not ratified. |
+| **Technical Design Document (TDD)** ([`Design/acrme_technical_design_document.md`](Design/acrme_technical_design_document.md)) | v4.0 reconciliation draft v2.0: contracts, partitioned algorithms and validation gates; unresolved guarantees remain blocked. Not runtime certification. |
 | **UML Class Diagrams Summary** ([`Design/acrme_uml_class_diagrams_summary.md`](Design/acrme_uml_class_diagrams_summary.md)) | Design-first UML class diagrams (4 sets) for domain model, operation tracking, service layer, and state machines — with explicit gap analysis. UML sources are `Design/uml_01..04_*.md`. |
 
 #### UML Class Diagrams (`Design/uml_*.md`)

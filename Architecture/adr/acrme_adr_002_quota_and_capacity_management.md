@@ -7,6 +7,32 @@
 
 > **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
 
+## Scoped v4.0 reconciliation - quota and capacity (draft)
+
+[Documented] QUA-004/015 require customer-central membership spanning domain
+ig subscriptions: one group object with multiple region/family cells, not
+one simultaneous group membership per cell. The group balance does not pass
+a VM deployment check. Confirm assigned **family and total-regional** quota
+on the target subscription before readiness (QUA-007/013).
+
+[Derived] The legacy `Pool_Limit` CRG-derived sizing expressions below are
+historical desired-budget calculations, not observed approved group quota.
+Separate approved/assigned/transferable balances, pending operations,
+protected claims and procurement need; subtract overlapping usage/earmarks
+only once. A same-group transfer may conserve entitlement but still requires
+confirmed target-subscription quota. Two-group fallback cannot violate
+one-membership-per-subscription. Replenishment defaults are Configurable 85%
+at group/subscription scope (QUA-015); utilization operands remain a policy
+gap, not an invented default.
+
+[Documented] CAP-023/025 replace mandatory regional-plus-per-AZ groups with
+default domain zonal sets (`prod`, `cvdr`, `drf`) and explicit optional/no-zone
+exceptions. CAP-013 keeps Prod in its deploying subscription while sharing
+is Preview; DEP-001 concerns reservation sharing, not quota-group maturity.
+CAP-009 permits guarded legitimate target-zero; CAP-010 separately governs
+intentional retirement. See [TDD sections 5/8/10/11](../../Design/acrme_technical_design_document.md).
+The remainder, including old diagrams, is historical where it differs.
+
 > **About ADRs.** An Architecture Decision Record captures a significant architectural decision, the context that forced it, the options considered, the choice made, and its consequences. This ADR adopts the **single governed quota pool** as the primary model per QUA-004 and updates quota and capacity accounting to match Requirements Baseline v2.4. Evidence tags: `[Documented]`, `[Decided]`, `[Derived]`, `[Assumed]`.
 
 > **v2.4 update — reservation-model gaps.** This revision folds the reviewed architecture-diagram gaps into the capacity-management decision: **reservation eligibility** now explicitly excludes Availability-Set VMs (**CAP-020**) and requires a deallocate/redeploy-to-AZ onboarding precondition (**CAP-021**); the managed estate is initialised as a **seed matrix of count-0 reservations** per eligible SKU×region×AZ under per-product-team budget governance (**CAP-022**, extending CAP-009), reconciled with **reactive SKU/AZ discovery** that auto-creates a reservation and simultaneously raises a scope-file governance item (**CAP-024**, reconciling CAP-019); reservations are organised into an explicit **regional + per-AZ CRG structure per environment** (**CAP-023**, extending CAP-011); VMs are placed toward an **even ≈1/zone_count per-zone distribution with a rebalancing action** (**PLC-011**); a shared **core subscription is classified entirely production** (**CAP-001a**); the **decommissioning-workflow boundary** is made explicit (**CAP-008/CAP-010**); and a deterministic **RG/CRG/subscription naming convention + counter** is adopted (**OPS-006**, config **C-12**; zone tolerance config **C-13**). See the new *Capacity Reservation Model (v2.4)* section below.

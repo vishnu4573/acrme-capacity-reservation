@@ -1,0 +1,96 @@
+classDiagram
+    class CustomerSeedRecord {
+        customer_realm_id
+        geography
+        crv_ref
+        dpb_refs
+        policy_version
+    }
+    class CustomerRegionVector {
+        binding_version
+        distribution_model
+        prod_region
+        cval_region
+        dr_region_or_not_offered
+    }
+    class Domain {
+        customer_id
+        domain_id
+        taxonomy_version
+    }
+    class DomainPlacementBinding {
+        domain_id
+        environment
+        region
+        shard
+        crv_ref
+        ig_ref
+        quota_route
+    }
+    class InstanceGroup {
+        subscription_id
+        domain_id
+        environment
+        region
+    }
+    class ReservationState {
+        resource_id
+        set_class
+        exact_sku
+        physical_zone
+        reserved
+        allocated
+        associated
+    }
+    class QuotaGroup {
+        customer_id
+        group_resource_id
+    }
+    class QuotaCell {
+        group_id
+        region
+        family
+        observed_transferable
+    }
+    class SubscriptionQuota {
+        subscription_id
+        region
+        quota_name
+        observed_limit
+        observed_usage
+    }
+    class DeploymentIntent {
+        request_digest
+        capacity_claims
+        family_and_regional_claims
+        snapshot_refs
+        state
+    }
+    class DRAssignment {
+        assignment_id
+        domain_id
+        source_region
+        destination_ig
+        exact_sku
+        physical_zone
+    }
+    class ActivationRecord {
+        incident_id
+        assignment_id
+        wave
+        confirmed_count
+        state
+    }
+    CustomerSeedRecord "1" --> "1" CustomerRegionVector : binds
+    CustomerSeedRecord "1" --> "1..*" Domain : owns
+    Domain "1" --> "0..*" DomainPlacementBinding : resolves
+    DomainPlacementBinding --> CustomerRegionVector : reuses
+    DomainPlacementBinding --> InstanceGroup : binds
+    InstanceGroup "1" --> "0..*" ReservationState : owns sets
+    QuotaGroup "1" --> "0..*" QuotaCell : accounts
+    QuotaGroup "1" --> "1..*" InstanceGroup : subscription membership
+    InstanceGroup "1" --> "0..*" SubscriptionQuota : observed caps
+    DeploymentIntent --> ReservationState : capacity claims
+    DeploymentIntent --> SubscriptionQuota : shared cap claims
+    DRAssignment --> DomainPlacementBinding : destination
+    DRAssignment "1" --> "0..*" ActivationRecord : activates
