@@ -1,6 +1,13 @@
 {
   "recommendations": [
     "ms-azuretools.vscode-azure-github-copilot",
-    "mermaidchart.vscode-mermaid-chart"
+    "mermaidchart.vscode-mermaid-chart",
+    "ms-azuretools.vscode-bicep",
+    "ms-azuretools.azure-dev",
+    "ms-vscode.vscode-node-azure-pack",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "mechatroner.rainbow-csv",
+    "redhat.vscode-yaml",
+    "tomoki1207.pdf"
   ]
 }
