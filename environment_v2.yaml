@@ -1,0 +1,324 @@
+# Baseline v4.0; SKU/approval extension recorded in Requirements/acrme_sku_financial_approval_baseline_change.md.
+capacity_request_policy:
+  effective_date: "2026-10-23"
+  deployment_scope:
+    virtual_machines: true
+    virtual_machine_scale_sets:
+      enabled: true
+      usage: aks_cluster_node_pools
+    shared_series_allowlist_and_approval_policy: true
+  allowed_vm_series:
+    matching: exact_series_membership
+    size_scope: all_sizes_within_listed_series
+    unlisted_series: not_allowed_for_new_capacity_requests
+    series:
+      - Standard_Ddv5
+      - Standard_Ddsv5
+      - Standard_Dasv5
+      - Standard_Dadsv5
+      - Standard_Dsv6
+      - Standard_Ddsv6
+      - Standard_Dldv6
+      - Standard_Dldsv6
+      - Standard_Dalsv6
+      - Standard_Daldsv6
+      - Standard_Dsv7
+      - Standard_Ddsv7
+      - Standard_Dldv7
+      - Standard_Dldsv7
+      - Standard_Dalsv7
+      - Standard_Daldsv7
+      - Standard_Edv5
+      - Standard_Edsv5
+      - Standard_Easv5
+      - Standard_Eadsv5
+      - Standard_Esv6
+      - Standard_Edsv6
+      - Standard_Easv6
+      - Standard_Eadsv6
+      - Standard_Esv7
+      - Standard_Edsv7
+      - Standard_Easv7
+      - Standard_Eadsv7
+      - Standard_Lsv3
+      - Standard_Lasv4
+      - Standard_Lsv4
+  approval:
+    scope: new_capacity_requests
+    system: Jira
+    required_approvals:
+      - business
+      - finance
+    approval_requirement: all_required
+    evidence: jira_request_and_both_approval_records
+    existing_protective_reconciliation: unchanged
+  # Policy eligibility does not establish platform support or deployment readiness.
+  deployment_validation:
+    exact_vm_size_required: true
+    region_zone_and_subscription_eligibility_required: true
+    reservation_support_required_when_enforced: true
+    capacity_and_both_quota_caps_required: true
+  # Workflow details are not inferred from the family allowlist.
+  pending_decisions:
+    - jira_workflow_and_approver_roles
+    - approval_quantity_scope_validity_and_change_rules
+    - exact_vm_size_to_series_mapping
+    - preview_vm_series_production_policy
+
+compute_subscription_policies:
+  standard:
+    cluster_capacity:
+      max_total_clusters: 16
+      max_active_clusters: 8
+      blue_cluster_slots: 8
+      green_cluster_slots: 8
+    deployment:
+      model: blue_green
+      purpose: reduce_version_and_hotfix_rollout_downtime
+      normal_active_color: blue
+      rollout_replacement_color: green
+      green_slot_purpose: rollout_headroom_not_additional_steady_state_capacity
+      rollout:
+        keep_current_clusters_serving_during_replacement_deployment: true
+        validate_replacement_before_traffic_cutover: true
+        capacity_check: current_and_replacement_overlap
+      # Promotion naming and rollback retention have not been agreed.
+      post_cutover_color_convention: pending_decision
+      rollback_retention_policy: pending_decision
+    dr_clusters:
+      provision: before_dr
+      steady_state:
+        running: true
+        capacity: reduced
+        capacity_target: configurable_per_domain_group_and_region
+      scale_out:
+        trigger: approved_dr_declaration
+        action: scale_existing_dr_clusters
+        capacity_target: approved_recovery_requirement
+        capacity_and_quota_validation_required: true
+      capacity_source: blue_or_green_cluster_slots
+      counts_toward_total_limit: true
+      counts_toward_active_limit: true
+      # Slot availability alone cannot authorize consuming rollout headroom.
+      rollout_headroom_conflict_policy: pending_decision
+    when_limit_reached:
+      trigger: active_cluster_limit_or_insufficient_rollout_headroom
+      action: provision_another_compute_subscription
+      new_subscription_policy: standard
+
+resource_subscription_policies:
+  standard:
+    scale_out:
+      trigger_scope: azure_subscription
+      trigger: any_subscription_level_limit_reached
+      action: provision_another_resource_subscription
+      proactive: false
+      new_subscription_policy: standard
+
+capacity_reservation_policies:
+  standard:
+    sharing:
+      enabled: true
+      scope: domain_group_and_region
+      environments:
+        - CVAL
+        - DR
+      subscription_type: compute_subscription
+      cross_subscription: true
+      cross_domain_group: false
+      cross_region: false
+      production_capacity_shared: false
+      provider_subscription: pending_decision
+      consumer_authorization: explicit_subscription_list
+      accounting: count_shared_capacity_once
+      activation: approved_dr_declaration_and_cval_capacity_release
+      validation:
+        exact_vm_size_and_region_match_required: true
+        physical_zone_alignment_required: true
+        provider_reservation_quota_required: true
+        consumer_family_and_regional_quota_required: true
+      feature_maturity: preview
+      production_dependency_allowed: false
+      fallback: reservation_in_deploying_subscription
+      validation_gates:
+        - POC-001
+        - POC-003
+        - POC-012
+        - DEP-001
+    dr_foundation:
+      subscription: dedicated_dr_compute_subscription
+      capacity: dedicated_reserved_bootstrap
+      always_present: true
+      quota: pre_staged
+      depends_on_sharing: false
+    cross_geography_dr:
+      capacity: dedicated_reserved_in_destination_region
+      source_region_cval_capacity_shared: false
+    pending_decisions:
+      - shared_crg_provider_ownership_per_domain_group_and_region
+      - dedicated_dr_subscription_topology_validation_POC-006
+
+environment_profiles:
+  standard:
+    subscription_model: dedicated_per_environment_and_domain_group
+    capacity_reservation_policy: standard
+    environments:
+      Prod:
+        domain_groups:
+          TMS:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+          WMS:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+          Domain_group_n:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+      CVAL:
+        domain_groups:
+          TMS:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+          WMS:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+          Domain_group_n:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+      DR:
+        readiness:
+          setup: before_dr
+          testing: required_before_readiness_certification
+          certification: required_before_declaring_dr_ready
+          evidence: test_results_and_certification_record
+        domain_groups:
+          TMS:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+          WMS:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+          Domain_group_n:
+            compute_subscription:
+              capacity_policy: standard
+            resource_subscription:
+              capacity_policy: standard
+              resources: Azure PaaS Resources
+
+geographies:
+  United States:
+    aliases:
+      - US
+    distribution_model: three_region
+    approved_regions:
+      West US 3:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      Central US:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      Canada Central:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      East US 2:
+        classification: restricted
+        auto_selectable: false
+        explicit_production_region_allowed: true
+        exception_required: true
+        environment_profile: standard
+  Europe:
+    aliases:
+      - EU
+    distribution_model: two_region
+    approved_regions:
+      Switzerland North:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      Sweden Central:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      North Europe:
+        classification: restricted
+        auto_selectable: false
+        explicit_production_region_allowed: true
+        exception_required: true
+        environment_profile: standard
+      West Europe:
+        classification: restricted
+        auto_selectable: false
+        explicit_production_region_allowed: true
+        exception_required: true
+        environment_profile: standard
+  Australia:
+    aliases:
+      - AU
+    distribution_model: two_region
+    approved_regions:
+      Australia East:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      Australia Southeast:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+  Asia Pacific:
+    aliases:
+      - APAC
+    distribution_model: two_region
+    approved_regions:
+      East Asia:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      Southeast Asia:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+  Middle East:
+    distribution_model: cross_geography_dr
+    approved_regions:
+      Saudi Arabia Central:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+      UAE North:
+        classification: standard
+        auto_selectable: true
+        environment_profile: standard
+    dr:
+      offered: true
+      destination_geography: Europe
+      destination_region_class: standard
+      destination_region_selection: weighted_capacity_placement
+      capacity: dedicated_reserved
+      country_override_flag: DR_NOT_OFFERED

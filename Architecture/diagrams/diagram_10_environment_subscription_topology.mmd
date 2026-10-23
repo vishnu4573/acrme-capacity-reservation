@@ -1,0 +1,55 @@
+flowchart TB
+    TITLE["ACRME Environment and Subscription Topology"]
+
+    subgraph GEO["Geographies and approved Azure regions"]
+        direction LR
+        US["US<br/>West US 3, Central US, Canada Central<br/>East US 2: restricted; exception required"]
+        EU["Europe (EU)<br/>Switzerland North, Sweden Central<br/>North Europe and West Europe: restricted; exception required"]
+        AU["Australia<br/>Australia East, Australia Southeast"]
+        APAC["Asia Pacific (APAC)<br/>East Asia, Southeast Asia"]
+        ME["Middle East<br/>Saudi Arabia Central, UAE North"]
+    end
+
+    TITLE --> GEO
+    ME -.->|"DR offered cross-geo"| MEDR["Europe Standard DR destination<br/>Weighted capacity placement<br/>Dedicated reserved DR capacity"]
+    MEDR -.-> EU
+
+    GEO --> REGION["Each configured Azure region"]
+    REGION --> PROFILE["Shared environment profile"]
+    PROFILE --> PROD["Prod"]
+    PROFILE --> CVAL["CVAL"]
+    PROD --> DOMAINS["Domain groups in each environment<br/>TMS | WMS | Domain_group_n"]
+    CVAL --> DOMAINS
+
+    DOMAINS --> COMPUTE["Compute Subscription"]
+    DOMAINS --> RESOURCE["Resource Subscription<br/>Azure PaaS resources"]
+
+    COMPUTE --> CPOLICY["Compute subscription policy<br/>Up to 8 steady-state active clusters<br/>8 blue + 8 green slots; 16 total during overlap"]
+    CPOLICY --> CLUSTERS["Blue-green version and hotfix rollout<br/>Blue: normal active clusters, up to 8<br/>Green: replacement headroom, not extra steady-state capacity"]
+    CLUSTERS --> ROLLOUT["Keep current clusters serving<br/>Deploy and validate replacements before traffic cutover<br/>Check slots, VM capacity and quota for overlap"]
+    ROLLOUT --> CUTOVER["Switch traffic to validated replacement<br/>Post-cutover color naming and rollback retention: pending decisions"]
+    CPOLICY --> DRCLUSTERS["DR clusters provisioned only during DR<br/>Use blue or green slots within the same 16-slot total<br/>DR versus rollout-headroom policy: pending decision"]
+    CLUSTERS --> CLIMIT{"Active limit reached or insufficient<br/>headroom for required rollout?"}
+    CLIMIT -->|"No"| CCONTINUE["Admit new workload only within active limit<br/>and with replacement headroom preserved"]
+    CLIMIT -->|"Yes"| CNEW["Provision another compute subscription<br/>Apply the same compute policy"]
+    CNEW -.-> CPOLICY
+
+    RESOURCE --> RPOLICY["Resource subscription policy<br/>No proactive scale-out"]
+    RPOLICY --> RLimit{"Any Azure subscription-level limit reached?"}
+    RLimit -->|"No"| RCONTINUE["Continue using current subscription"]
+    RLimit -->|"Yes"| RNEW["Provision another resource subscription<br/>Apply the same resource policy"]
+    RNEW -.-> RPOLICY
+
+    classDef titleBox fill:#0078D4,stroke:#004578,stroke-width:2px,color:#FFF
+    classDef geographyBox fill:#E3F2FD,stroke:#0078D4,stroke-width:1px,color:#111
+    classDef policyBox fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#111
+    classDef resourceBox fill:#E0F2F1,stroke:#00897B,stroke-width:1px,color:#111
+    classDef decisionBox fill:#FFF8E1,stroke:#FFB300,stroke-width:2px,color:#111
+    classDef scaleBox fill:#FCE4EC,stroke:#C2185B,stroke-width:1px,color:#111
+
+    class TITLE titleBox
+    class US,EU,AU,APAC,ME,MEDR geographyBox
+    class CPOLICY,RPOLICY policyBox
+    class COMPUTE,RESOURCE,CLUSTERS,ROLLOUT,CUTOVER,DRCLUSTERS,DOMAINS,PROFILE,PROD,CVAL,REGION resourceBox
+    class CLIMIT,RLimit decisionBox
+    class CNEW,RNEW scaleBox

@@ -191,10 +191,12 @@ Deficit(p)       = max(0, DesiredTarget(p) - Reserved(p))            # F.3
 ```text
 FamilyHeadroom(s,r,f) = observed_family_limit - observed_family_usage    # vCPU
 RegionalHeadroom(s,r) = observed_regional_limit - observed_regional_usage
-AvailableQuota(s,r,f) = min(FamilyHeadroom, RegionalHeadroom)            # QUA-007/F.12
+AvailableQuota(s,r,f) = min(FamilyHeadroom(s,r,f), RegionalHeadroom(s,r)) # QUA-007/F.12
 ```
 
-F.4's family-only display is pending B1 correction; the two-cap gate above follows explicit QUA-007. Regional quota is shared across all families: compare sum of the request's incremental regional debits against regional residual, not each family independently.
+[Decided] B1 accepted by the user on 22 October 2026: use the two-cap formula above with explicit subscription/shard scope, consistent with QUA-007/F.12. `s` is the actual subscription/shard resolved by the domain DPB, `r` the bound region and `f` the VM family; all limits, usage and headroom are vCPU. The baseline F.4 display amendment remains unapplied.
+
+[Documented] Total-regional quota is per subscription and region, not a shared limit across domain subscriptions (QUA-002/007). Each shard is evaluated independently; spare quota in another shard does not make the bound subscription ready. Any shard reassignment requires the approved binding policy. Regional quota is shared across families within that subscription: compare the sum of the request's incremental regional debits against one regional residual, not each family independently. B1 does not approve outstanding API charge semantics or a new shard-routing policy.
 
 [Derived] Keep these separate:
 
@@ -407,7 +409,8 @@ Dry-run covers reservation/quota changes, CRV/DPB placement, DR scenarios, costs
 
 | Item | Required treatment |
 |---|---|
-| B1/B2 | Proposed baseline wording for displayed F.4 / F.8 arithmetic; baseline file unchanged; two-cap requirement and positive-demand math retained |
+| B1 | Accepted 22 October 2026: explicit subscription/shard two-cap formula in section 8.3; baseline F.4 display amendment unapplied; API charge semantics remain gated |
+| B2 | Proposed baseline wording for F.8 arithmetic; baseline file unchanged; positive-demand math retained; zero-demand reporting approval pending |
 | B3 | Architect/business approval of cross-geo scenario guarantee; no silent global-single-failure assumption |
 | B4 | Preserve CAP-004 current guard; seek desired/executable/acceptance clarification |
 | Design approvals | Mode resumption, factor normalization/ties, threshold utilization, zone rounding, incremental quota paths, multi-claim mechanism, API compatibility and primary-state precedence remain explicit |

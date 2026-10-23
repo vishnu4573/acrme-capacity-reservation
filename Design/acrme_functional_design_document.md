@@ -225,7 +225,7 @@ These are required demonstrations, **not executed test results**. Numbers match 
 
 | Item | Current treatment / closure |
 |---|---|
-| B1 - displayed F.4 | Follow QUA-007/F.12's explicit two-cap requirement; proposed formula correction not applied to baseline. |
+| B1 - displayed F.4 | [Decided] Accepted 22 October 2026: lesser family/total-regional headroom on the actual DPB subscription/shard, independently per region. TDD section 8.3 records scope; baseline display amendment unapplied. |
 | B2 - F.8 explanation | Equal positive portions give ratio equal to number of sources, not 1; zero-demand reporting convention pending. |
 | B3 - cross-geo failure set | Architect/business must decide global versus per-geography concurrent guarantee; affected cross-geo coverage cannot be certified. |
 | B4 - shrink precedence | Preserve CAP-004 association guard, report constrained target; acceptance wording awaits Architect clarification. |

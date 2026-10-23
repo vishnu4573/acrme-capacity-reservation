@@ -21,7 +21,9 @@ it does not ratify all historical scenarios below.
 | Scenario 21 | [Documented] F.9/PLC-016 use per-domain integer VM-count skew against `round(VMs/ZoneCount)`, not a fixed 0.10 percentage drift. Combined region load is observation only. |
 
 ```text
-AvailableQuota = min(FamilyLimit-FamilyUsage, RegionalLimit-RegionalUsage)   # QUA-007
+FamilyHeadroom(s,r,f) = FamilyLimit(s,r,f) - FamilyUsage(s,r,f)             # vCPU
+RegionalHeadroom(s,r) = RegionalLimit(s,r) - RegionalUsage(s,r)            # vCPU
+AvailableQuota(s,r,f) = min(FamilyHeadroom(s,r,f), RegionalHeadroom(s,r))   # QUA-007
 QuotaDeficit = max(0, IncrementalUnchargedRequest - usable residual quota) # F.5; holds distinct
 Overcommit = sum(source portions)/max(source portions)                    # positive demand
 ```
@@ -29,9 +31,16 @@ Overcommit = sum(source portions)/max(source portions)                    # posi
 [Derived] Reserved 10/allocated 9/request 2 has deficit 1. Family free 40,
 regional free 4/request 8 vCPU has deficit 4. Equal positive portions 100/100
 give ratio 2, not 1. Separately isolated domains 120/80 and 20/60 need
-120+60=180, not pooled MAX 140. B1-B4 baseline wording is proposed only;
+120+60=180, not pooled MAX 140. B2-B4 baseline wording remains proposed;
 empty ratio, score normalization, zone ties/rounding, threshold utilization
 and charge semantics remain explicit policy/evidence gaps in the TDD.
+
+[Decided] B1's two-cap formula with explicit subscription/shard scope was
+accepted on 22 October 2026. `s` is the actual DPB subscription/shard, `r`
+the bound region and `f` the VM family. Evaluate each shard independently,
+not against a domain-wide combined balance; all headroom is in vCPU.
+The baseline F.4 display amendment remains unapplied. Acceptance does not
+resolve API charge semantics or authorize automatic shard reassignment.
 
 The remainder is the historical scenario corpus, including old labels such
 as "Current"/"Decided"; those labels do not override this scoped correction
