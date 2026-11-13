@@ -1,0 +1,12 @@
+# ACRME Placement Engine — Python Dependencies
+#
+# Core engine (mock data mode) needs only Python 3.10+ stdlib.
+# Azure collector requires the packages below.
+
+# Azure SDK — for azure_collector.py
+azure-identity>=1.15.0
+azure-mgmt-compute>=31.0.0
+azure-mgmt-quota>=1.1.0
+azure-mgmt-reservations>=3.0.0
+azure-mgmt-resource>=23.0.0
+azure-mgmt-resourcegraph>=8.0.0
