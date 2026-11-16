@@ -19,8 +19,13 @@
 | Expanded reference | `Requirements/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
 | Code glossary | `Reference-Material/reference/acrme_requirements_code_glossary.md` (one-line definitions + links) |
 | Consistency audit | `Requirements/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |
+| Deployment standard under review | `environment_v2.yaml` — deployment configuration, effective 2026-10-23; not a substitute for the baseline or proof of runtime enforcement |
+| Related deployment-policy proposal | `Requirements/acrme_sku_financial_approval_baseline_change.md` — user-confirmed series/approval policy; baseline incorporation and runtime implementation pending |
+| Other environment configuration | `environment.yaml` — differs from `environment_v2.yaml`; report the discrepancy and do not silently select or merge values |
 
 Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the v4.0 baseline; re-check them if the version changed.
+
+The user may identify `environment_v2.yaml` as the deployment standard to review. Use it as the configuration being evaluated, cite its exact key and effective date, and check linked decisions/proposals. It is not normative over baseline requirements, and a YAML setting does not establish that the policy is approved, deployed, or enforced. Until the owner resolves differences with `environment.yaml`, flag the authority/status conflict rather than asserting one repository-wide canonical environment file.
 
 The FDD, TDD, POC workbook/suite, glossary, calculation reference, and several mockups/reference
 documents still contain earlier-baseline material. Unless an artefact explicitly records a
@@ -37,6 +42,7 @@ authority over the v4.0 baseline.
 | Scope in/out | §5 | — | — |
 | Region strategy, catalogue, geography models | §6 | REG-001..003, PLC-010/010a/010b, DR-020 | `Mockups/build_acrme_whatif_acrme_regions.py` (catalogue), `Mockups/acrme_4region_model_comparison.md` |
 | Environment policy (Prod / CVAL / DR isolation, core sub) | §7 | ENV-001..007 | ADR-001, ADR-007 |
+| Deployment configuration & readiness policy (new-request series/approvals, subscription limits, blue/green rollout, DR foundation, reservation sharing, geography profiles) | §7–§10, §13, §15, §18, §23, §25 | ENV-001..007, CAP-001..025, QUA-001..015, DR-001..021, GOV-001..009 | `environment_v2.yaml`; `Requirements/acrme_sku_financial_approval_baseline_change.md` |
 | Capacity reservation mgmt (target, reconcile, zero-not-delete, sharing, zonal CRG, seed matrix) | §8 | CAP-001..025, CAP-001a | ADR-002, ADR-007, `Reference-Material/reference/acrme_cr_crg_deployment_layout.md`, `acrme_crg_cr_foundation_provisioning_plan.md` |
 | Quota (two caps, Quota Groups, earmarks, consumer quota) | §9 | QUA-001..015 | ADR-002, ADR-006 (`adrme_adr_006_quota_reservation_enforcement_boundary.md`) |
 | Combined readiness | §10 | RDY-001..004 | `Mockups/acrme_sku_placement_whatif_user_guide.md` (6-state readiness) |
@@ -54,7 +60,7 @@ authority over the v4.0 baseline.
 | Acceptance criteria | §22 | — | POC workbook |
 | Delivery phases | §23 | — | `Reference-Material/backlog/acrme_epics_stories_tasks.md` |
 | Configurable items | §24 | C-xx (C-01..C-16) | calculation logic reference (constants) |
-| Pending decisions & POCs | §25 | POC-001..011, DEC-001..003, DEP-001 | `POC-Test-Scripts/acrme_poc_workbook_v2_4.md` |
+| Pending decisions & POCs | §25 | POC-001..013, DEC-001..003, DEP-001 | `POC-Test-Scripts/acrme_poc_workbook_v2_4.md` |
 | Assumptions, constraints, risks | §26 | A-ME1 | — |
 | Requirement summary | §27 | — | — |
 | Forward-items impact evaluation | §28 | — | — |

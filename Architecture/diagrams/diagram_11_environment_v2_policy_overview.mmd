@@ -1,0 +1,122 @@
+flowchart TB
+    TITLE["ACRME Environment v2 Policy Overview<br/>Configuration intent, not runtime-enforcement evidence"]
+    STATUS["Source: environment_v2.yaml<br/>Effective date: 2026-10-23 | Baseline: v4.0<br/>environment.yaml differs by 84 lines; configuration authority unresolved"]
+    TITLE --> STATUS
+
+    subgraph REGIONS["Geography and Region Policy"]
+        direction LR
+        US["United States<br/>West US 3 · Central US · Canada Central<br/>East US 2: restricted; exception required"]
+        EU["Europe<br/>Switzerland North · Sweden Central<br/>North Europe · West Europe: restricted; exception required"]
+        AU["Australia<br/>Australia East · Australia Southeast"]
+        APAC["Asia Pacific<br/>East Asia · Southeast Asia"]
+        ME["Middle East<br/>Saudi Arabia Central · UAE North<br/>DR to weighted-selected Europe Standard region"]
+    end
+
+    STATUS --> REGIONS
+    REGIONS --> REGIONAL_PROFILE["Same environment profile in each configured region"]
+
+    subgraph ENVIRONMENTS["Per-Region Environment and Domain Layout"]
+        direction LR
+        PROD["Prod"]
+        CVAL["CVAL"]
+        DR["DR"]
+        PROD --> PROD_DOMAINS["TMS · WMS · Domain_group_n"]
+        CVAL --> CVAL_DOMAINS["TMS · WMS · Domain_group_n"]
+        DR --> DR_DOMAINS["TMS · WMS · Domain_group_n"]
+        PROD_DOMAINS --> SUBS["Dedicated per environment and domain group<br/>Compute subscription + Resource subscription"]
+        CVAL_DOMAINS --> SUBS
+        DR_DOMAINS --> SUBS
+    end
+
+    REGIONAL_PROFILE --> ENVIRONMENTS
+
+    subgraph COMPUTE["Compute Subscription | Blue-Green and DR"]
+        direction LR
+        COMPUTE_LIMIT["16 total cluster slots<br/>8 blue + 8 green<br/>Maximum 8 active clusters"]
+        BLUEGREEN["Normal active color: blue<br/>Green is rollout replacement/headroom<br/>Current and replacement capacity overlap"]
+        ROLLOUT["Keep current clusters serving<br/>Validate replacement before traffic cutover"]
+        CUTOVER["Post-cutover color convention<br/>and rollback retention: pending decisions"]
+        DR_LIFECYCLE["DR clusters exist before DR<br/>Reduced steady-state capacity<br/>Approved declaration scales existing clusters"]
+        DR_LIMIT["DR counts toward total and active limits<br/>Rollout-headroom conflict policy: pending decision"]
+        SCALE_COMPUTE["At active-cluster limit or insufficient rollout headroom<br/>Provision another compute subscription<br/>Apply same policy"]
+        COMPUTE_LIMIT --> BLUEGREEN --> ROLLOUT --> CUTOVER
+        COMPUTE_LIMIT --> DR_LIFECYCLE --> DR_LIMIT
+        COMPUTE_LIMIT --> SCALE_COMPUTE
+    end
+
+    SUBS --> COMPUTE
+
+    subgraph RESERVATIONS["Capacity Reservation and DR Policy"]
+        direction LR
+        PROD_ISOLATION["Prod reservation capacity stays isolated<br/>No Prod capacity sharing"]
+        SHARING["CVAL ↔ DR sharing<br/>Same domain group + region only<br/>Cross-subscription; explicit consumer list<br/>Preview feature"]
+        FOUNDATION["DR Foundation<br/>Dedicated DR compute subscription<br/>Always present, reserved bootstrap + pre-staged quota<br/>Independent of sharing"]
+        DR_TRIGGER["Approved DR declaration<br/>and CVAL capacity release"]
+        SHARING --> DR_TRIGGER
+        FOUNDATION --> DR_TRIGGER
+        FALLBACK["Production fallback:<br/>reservation in deploying subscription<br/>No production dependency on Preview sharing"]
+        DR_TRIGGER --> FALLBACK
+        SHARING -.->|"Middle East uses dedicated destination capacity; source CVAL is not shared"| ME
+    end
+
+    SUBS --> RESERVATIONS
+
+    subgraph RESOURCE_POLICY["Resource Subscription Scale-Out"]
+        direction LR
+        RESOURCE_LIMIT{"Any Azure subscription-level limit reached?"}
+        RESOURCE_WAIT["Keep using current resource subscription"]
+        RESOURCE_NEW["Provision another resource subscription<br/>Apply same policy"]
+        RESOURCE_LIMIT -->|"No"| RESOURCE_WAIT
+        RESOURCE_LIMIT -->|"Yes"| RESOURCE_NEW
+    end
+
+    SUBS --> RESOURCE_POLICY
+
+    subgraph NEW_CAPACITY["New Capacity Request Policy | VMs and AKS VMSS Node Pools"]
+        direction LR
+        ALLOWLIST["Series allowlist<br/>31 unique series · exact series membership<br/>All sizes in listed series; unlisted series blocked"]
+        APPROVAL["Jira request<br/>Business AND Finance approval required<br/>Keep request and both approval records"]
+        READINESS["Separate technical readiness checks<br/>Exact VM size · region/zone/subscription eligibility<br/>Reservation support when enforced<br/>Capacity + VM-family quota + regional quota"]
+        REQUEST_READY{"Approved and technically ready?"}
+        ALLOWLIST --> APPROVAL --> READINESS --> REQUEST_READY
+        NO_REQUEST["Do not authorize new capacity"]
+        PROCEED["Proceed through existing deployment controls"]
+        REQUEST_READY -->|"No"| NO_REQUEST
+        REQUEST_READY -->|"Yes"| PROCEED
+        RECONCILE["Existing protective reconciliation unchanged<br/>No retroactive new-request approval gate"]
+        APPROVAL -.-> RECONCILE
+    end
+
+    COMPUTE --> NEW_CAPACITY
+    RESOURCE_POLICY --> NEW_CAPACITY
+
+    subgraph ALLOWLIST_GROUPS["Allowed VM Series Groups (all sizes within each listed series)"]
+        direction LR
+        DV5["D v5<br/>Ddv5 · Ddsv5 · Dasv5 · Dadsv5"]
+        DV6["D v6<br/>Dsv6 · Ddsv6 · Dldv6 · Dldsv6 · Dalsv6 · Daldsv6"]
+        DV7["D v7<br/>Dsv7 · Ddsv7 · Dldv7 · Dldsv7 · Dalsv7 · Daldsv7"]
+        EV5["E v5<br/>Edv5 · Edsv5 · Easv5 · Eadsv5"]
+        EV6["E v6<br/>Esv6 · Edsv6 · Easv6 · Eadsv6"]
+        EV7["E v7<br/>Esv7 · Edsv7 · Easv7 · Eadsv7"]
+        LVS["L series<br/>Lsv3 · Lasv4 · Lsv4"]
+    end
+    ALLOWLIST --> ALLOWLIST_GROUPS
+
+    OPEN["Open items remain open<br/>Jira workflow/approver roles · approval scope and change rules<br/>Exact VM-size-to-series mapping · Preview-series production policy<br/>Sharing provider ownership · POC-006 DR subscription topology"]
+    NEW_CAPACITY --> OPEN
+
+    classDef titleBox fill:#0078D4,stroke:#004578,stroke-width:2px,color:#FFFFFF
+    classDef statusBox fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#111111
+    classDef geoBox fill:#E3F2FD,stroke:#0078D4,stroke-width:1px,color:#111111
+    classDef envBox fill:#E0F2F1,stroke:#00897B,stroke-width:1px,color:#111111
+    classDef policyBox fill:#FFF8E1,stroke:#FFB300,stroke-width:1px,color:#111111
+    classDef decisionBox fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#111111
+    classDef openBox fill:#F3E5F5,stroke:#7B1FA2,stroke-width:1px,color:#111111
+
+    class TITLE titleBox
+    class STATUS statusBox
+    class US,EU,AU,APAC,ME geoBox
+    class PROD,CVAL,DR,PROD_DOMAINS,CVAL_DOMAINS,DR_DOMAINS,SUBS envBox
+    class COMPUTE_LIMIT,BLUEGREEN,ROLLOUT,CUTOVER,DR_LIFECYCLE,DR_LIMIT,SCALE_COMPUTE,PROD_ISOLATION,SHARING,FOUNDATION,DR_TRIGGER,FALLBACK,RESOURCE_WAIT,RESOURCE_NEW,ALLOWLIST,APPROVAL,READINESS,NO_REQUEST,PROCEED,RECONCILE,DV5,DV6,DV7,EV5,EV6,EV7,LVS policyBox
+    class RESOURCE_LIMIT,REQUEST_READY decisionBox
+    class OPEN openBox

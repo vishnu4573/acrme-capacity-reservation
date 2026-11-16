@@ -912,11 +912,13 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 ### SK-13 — Grounded Research & Design
 
-**Purpose:** Wrapper procedure that keeps every ACRME research finding and design output traceable to the current baseline and Microsoft Learn. It sequences SK-01, SK-02, SK-03, SK-06 and SK-09 and adds baseline-version resolution, evidence tagging, an open-items register, output templates, and an automated lint.
+**Purpose:** Wrapper procedure that keeps every ACRME research finding and design output traceable to the current baseline, Microsoft Learn, and (when relevant) the requested deployment standard. It sequences SK-01, SK-02, SK-03, SK-06 and SK-09 and adds baseline-version resolution, evidence tagging, deployment-policy checks, an open-items register, output templates, and an automated lint.
 
-**Trigger:** Any Azure capacity/quota/zone/sharing research question, or any new or revised design note, ADR, reference doc, or mockup logic. Also covers the v4.0 domain-group model (DOM-001–004), two-scope pipeline (CRV/DPB), and unified formula reference (F.1–F.13).
+**Trigger:** Any Azure capacity/quota/zone/sharing research question, deployment-standard review, or any new or revised design note, ADR, reference doc, or mockup logic. Also covers the v4.0 domain-group model (DOM-001–004), two-scope pipeline (CRV/DPB), and unified formula reference (F.1–F.13).
 
 **Research and fact-checking tools:** Use Microsoft Learn MCP to search and fetch official documentation, and relevant Azure MCP documentation/best-practice/service guidance to cross-check platform claims. Discover available tools and schemas first; follow Step 3 of the executable skill for the full procedure. Cite official URLs, access dates, API versions, and Preview/GA status; disclose missing MCP capabilities and any official-documentation fallback. MCP retrieval is not POC evidence and does not authorize live environment access or changes.
+
+**Deployment-standard checks:** For deployment policy/configuration/readiness, inspect `environment_v2.yaml`, its effective date, and linked decision/proposal files; cite exact YAML keys. Separate request eligibility/approval from technical readiness and runtime enforcement. Compare `environment.yaml`; until the owner resolves their divergence, report the authority issue without silently selecting or merging settings. An open/conflicting setting that affects readiness blocks a readiness claim.
 
 **Implementation (executable — the procedure lives there, not here):**
 
@@ -925,11 +927,11 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 | Skill | `.github/skills/grounding-acrme-research-design/SKILL.md` |
 | Source map | `.github/skills/grounding-acrme-research-design/references/source-map.md` |
 | Evidence tags, locked facts, open items | `.github/skills/grounding-acrme-research-design/references/evidence-and-gaps.md` |
-| Output templates | `.github/skills/grounding-acrme-research-design/references/output-templates.md` |
-| Lint / baseline resolver | `.github/skills/grounding-acrme-research-design/scripts/check_grounding.py` |
+| Output templates (baseline, environment-standard, HC and WAF gates) | `.github/skills/grounding-acrme-research-design/references/output-templates.md` |
+| Baseline resolver, deployment-standard audit / lint | `.github/skills/grounding-acrme-research-design/scripts/check_grounding.py` |
 | Agent persona that runs it | `.github/agents/acrme-research-designer.agent.md` |
 
-**Outputs:** Research Brief or Design Note with header block, gate block, WAF block, and a clean `check_grounding.py` run (0 errors).
+**Outputs:** Research Brief or Design Note with header block, baseline and deployment-standard gate (when relevant), HC/WAF checks as applicable, and a clean `check_grounding.py` run (0 errors).
 
 **Owner:** Azure Capacity & Platform Architect
 

@@ -1,6 +1,6 @@
 ---
 name: grounding-acrme-research-design
-description: Grounds any ACRME (Azure Capacity & Quota Management / capacity-reservation engine) research or design work in the current requirements baseline, Microsoft Learn, and the repo's decided artefacts. Resolves which baseline version is current, maps the question to the authoritative sources, enforces evidence tags (Documented/Tested/Decided/Derived/Assumed), surfaces open POCs and spec gaps as blockers, runs baseline/HC/formula/DR/WAF gates, and lints the output before delivery. Use when researching Azure Capacity Reservations, CRGs, quota groups, zones, sharing, region placement, scoring (PS_Prod/PS_NonProd/PS_DR), DR sizing, or when drafting or revising any ACRME design note, ADR, reference doc, or mockup logic.
+description: Grounds ACRME research, design, and deployment-standard reviews in the current requirements baseline, Microsoft Learn, and repository decisions/configuration. Use for Azure Capacity Reservations, CRGs, quota groups, zones, sharing, region placement, scoring, DR sizing, environment_v2.yaml, VM-series eligibility/approvals, subscription policy, or blue/green deployment rules; also use when drafting or reviewing ACRME design notes, ADRs, reference docs, or mockup logic.
 ---
 
 # Grounding ACRME research & design
@@ -19,25 +19,30 @@ python3 .github/skills/grounding-acrme-research-design/scripts/check_grounding.p
 ```
 The script reads the Document Control `Version` row of every repository baseline candidate (`Requirements/acrme_requirements_baseline_v*.md`) and reports the highest. To include an external/uploaded copy, pass `--uploaded-baseline <path>` or set `ACRME_UPLOADED_BASELINE`; the checker has no host-specific upload path. **The filename is not the version.** If candidates disagree, use the highest version, state the drift in your output, and do not cite the stale copy.
 
-Then read, from the current baseline: Version History (top rows since the last version you knew), §2 Strategic Drivers, §3 Design Principles, §23 Pending Decisions & POCs, and every section mapped to your topic in `references/source-map.md`.
+Then read, from the current baseline: Version History (top rows since the last version you knew), §2 Strategic Drivers, §3 Design Principles, §25 Pending Decisions & POCs, and every section mapped to your topic in `references/source-map.md`. Read §23 for delivery-phase scope when applicable.
+
+For deployment-policy questions, also read `environment_v2.yaml` and the relevant decision/proposal documents. The repository currently also contains `environment.yaml`, which differs in DR provisioning and omits the reservation-sharing/environment-profile policies present in v2. Treat `environment_v2.yaml` as the requested comparison target when the user names it, but do not claim it is the uniquely approved or implemented standard until the owning team resolves the discrepancy. Report material differences; do not silently select or merge values.
 
 ### Step 1 — Classify the ask
-Pick one: **Research** (what does Azure/the baseline say?), **Design** (new or changed mechanism), **Formula** (scoring, sizing, headroom), **Review** (check an existing doc). Name the delivery phase(s) touched (baseline §21: P1 Visibility & Prod Protection, P2 Quota Pool, P3 Placement & Seed, P4 Distributed DR) and note downstream phase impact — a Phase 1 change can break Phase 4 DR assumptions.
+Pick one: **Research** (what does Azure/the baseline say?), **Design** (new or changed mechanism), **Formula** (scoring, sizing, headroom), **Review** (check an existing doc). Name the delivery phase(s) touched (baseline §23: P1 Visibility & Prod Protection, P2 Quota Pool, P3 Placement & Seed, P4 Distributed DR, P5 Multi-Domain Model & Two-Scope Binding) and note downstream phase impact — a Phase 1 change can break Phase 4 DR assumptions.
 
 ### Step 2 — Load sources by rank
-Use `references/source-map.md` to find the exact files and sections. Rank when sources disagree:
-1. Microsoft Learn / Azure docs (platform behaviour)
-2. Current requirements baseline (programme requirements and decisions)
-3. Accepted ADRs in `Architecture/adr/` and the hard-constraints reference
-4. Calculation logic reference (formulas and constants)
-5. Design docs, walkthroughs, mockups, POC workbook
-6. Prior conversation context or memory — never sufficient on its own
+Use `references/source-map.md` to find the exact files and sections. Apply authority by subject:
+- Azure platform behaviour: Microsoft Learn / Azure documentation.
+- Programme requirements and decisions: the current requirements baseline, then accepted ADRs and the hard-constraints reference.
+- Calculation details: the baseline §21, then the calculation logic reference.
+- Deployment-standard settings: `environment_v2.yaml` is the configuration under review when that file is named. It describes intended policy values; it does not prove runtime enforcement or override baseline requirements. Check its effective date, related decision/proposal, pending decisions, and `environment.yaml` for drift.
+- Design docs, walkthroughs, mockups, and POC workbooks are supporting or historical evidence unless explicitly accepted/reconciled.
+- Prior conversation context or memory is never sufficient on its own.
 
-A higher-rank source wins. If Microsoft Learn contradicts the baseline, do not silently pick one: report the conflict as a baseline-change candidate.
+Do not silently resolve conflicts between sources. A baseline conflict blocks alignment; an environment-file mismatch or unresolved decision is reported as a configuration-authority issue and blocks any dependent deployment-readiness claim until the owner resolves it.
 
 ### Step 3 — Research and tag every claim
 Apply the tag rules and check the open-items register in `references/evidence-and-gaps.md`. Hard rules:
 - Every Azure-behaviour claim carries a tag and, for `[Documented]`, a Learn URL or baseline code.
+- For deployment-policy claims, cite the precise YAML path and effective date in `environment_v2.yaml`; cite the associated decision/proposal where available. A configured value is not proof of deployed behavior, approval completion, or runtime enforcement.
+- For new-capacity-request eligibility, keep policy approval separate from technical readiness: exact VM size, region/zone/subscription eligibility, reservation support when enforced, available capacity, and both quota caps remain separate checks. Do not apply a new-request approval gate retroactively to protective reconciliation.
+- For deployment reviews, check the selected environment profile, compute/resource subscription limits, blue/green overlap and replacement validation, DR foundation/readiness, geography and region classifications, and reservation-sharing scope/fallback. Record relevant `pending_decisions` and POC gates; do not infer their closure.
 - Any formula term without a defined source, scope, and data type is a **spec gap** — flag it as a blocker, never invent a definition. (`total_customers` in γ was such a gap; it is now decided — PLC-012, A.10.)
 - Preview features (Capacity Reservation Sharing, DEP-001) are never a production dependency.
 - Use Microsoft Learn MCP and Azure MCP for Azure research and fact-checking, following the procedure below.
@@ -56,10 +61,12 @@ Constraints that cannot be relaxed without a new ADR plus business approval:
 - Hard constraints HC-1..HC-11 as defined in `Reference-Material/reference/acrme_hard_constraints_reference.md` (Part 2 summary table is authoritative for HC numbering).
 - Baseline §3 design principles (production first, allocated-drives-reservations, lean DR bootstrap, max-not-sum DR sizing, zero-not-delete, config-driven policy).
 - Rejected directions: multi-cloud DR, large fixed DR reserve, region hard-bound to an environment, Bicep for engine runtime logic.
+- Deployment-policy checks must preserve baseline production protection and environment/capacity isolation. In `environment_v2.yaml`, sharing is limited to the configured CVAL/DR domain-and-region scope and is Preview; production must not depend on it. DR Foundation is dedicated and independent of sharing. Treat provider ownership, subscription topology, rollout/headroom conflict handling, approval workflow/scope, and SKU mapping as unresolved where the configuration or linked proposal says pending.
 
 ### Step 5 — Gate the output
 Produce the gate block from `references/output-templates.md`:
 - **Baseline compliance** (SK-01 in `Skills.md`): ALIGNED / CONFLICT / NOT COVERED / EXTENDS per code. Any CONFLICT blocks.
+- **Deployment-standard compliance** (when deployment policy/configuration/readiness is in scope): use the separate gate in `references/output-templates.md`; compare the relevant `environment_v2.yaml` settings, linked decisions, and `environment.yaml` drift. Mark unresolved settings OPEN. A CONFLICT or OPEN item that affects the claim blocks a deployment-readiness assertion; use N/A only when the standard is not relevant.
 - **Hard constraints**: PASS / FAIL / N/A for HC-1..HC-11. Any FAIL blocks.
 - **Formula check** (SK-06) when capacity, quota, scoring, or DR numbers change — recompute one worked example.
 - **DR sizing** (SK-09) when DR is touched — max-not-sum across non-concurrent sources.
@@ -71,6 +78,10 @@ Use the Research Brief or Design Note template in `references/output-templates.m
 ### Step 7 — Lint before delivery
 ```bash
 python3 .github/skills/grounding-acrme-research-design/scripts/check_grounding.py path/to/output.md
+```
+Deployment-policy outputs are detected automatically and checked for the deployment-standard gate, exact configuration-key citation, and effective date. Run `--deployment-standard` to audit `environment_v2.yaml` directly and report drift against `environment.yaml`, including when there are no output files:
+```bash
+python3 .github/skills/grounding-acrme-research-design/scripts/check_grounding.py --deployment-standard
 ```
 Fix every ERROR. Review every WARN and either fix it or justify it in the doc. Exit code 0 = no errors.
 
@@ -84,7 +95,7 @@ Fix every ERROR. Review every WARN and either fix it or justify it in the doc. E
 - `references/source-map.md` — topic → baseline section → codes → repo artefact.
 - `references/evidence-and-gaps.md` — evidence tag rules, locked Azure facts, open POC/decision/gap register.
 - `references/output-templates.md` — Research Brief, Design Note, gate block, WAF block.
-- `scripts/check_grounding.py` — baseline resolver and output linter (stdlib only, Python 3.8+).
+- `scripts/check_grounding.py` — baseline resolver, deployment-standard audit, and output linter (stdlib only, Python 3.8+).
 
 ## Related
 - `Agents.md` (Agent 1 — Architect) and `.github/agents/acrme-research-designer.agent.md` — the agent persona that runs this skill.

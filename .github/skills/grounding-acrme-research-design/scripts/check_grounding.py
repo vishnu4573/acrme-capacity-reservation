@@ -6,11 +6,14 @@
 2. Lints research/design markdown: unknown requirement codes, stale baseline
    citations, untagged Azure-behaviour claims, unflagged spec gaps, Preview
    sharing used as a production dependency, and rejected design directions.
+3. Optionally checks the deployment standard and requires deployment-related
+   outputs to include its gate, source citation, and known config-drift notice.
 
 Exit code: 0 = no errors, 1 = errors found, 2 = usage/setup problem.
 Stdlib only.
 """
 import argparse
+import difflib
 import glob
 import os
 import re
@@ -66,6 +69,175 @@ SHARING_PROD_RE = re.compile(
     re.I,
 )
 SHARING_SAFE_RE = re.compile(r"Preview|DEP-001|CAP-013|not GA|until .*GA|deploying subscription", re.I)
+DEPLOYMENT_RE = re.compile(
+    r"environment_v2\.yaml|capacity_request_policy|deployment.standard|"
+    r"deployment readiness|blue.green|series allowlist|VM.series",
+    re.I,
+)
+ENVIRONMENT_EFFECTIVE_DATE = "2026-10-23"
+DEPLOYMENT_CONFIG_PATHS = (
+    "capacity_request_policy.effective_date",
+    "capacity_request_policy.allowed_vm_series.series",
+    "capacity_request_policy.approval.scope",
+    "capacity_request_policy.approval.required_approvals",
+    "capacity_request_policy.approval.evidence",
+    "capacity_request_policy.deployment_validation.exact_vm_size_required",
+    "capacity_request_policy.deployment_validation.region_zone_and_subscription_eligibility_required",
+    "capacity_request_policy.deployment_validation.reservation_support_required_when_enforced",
+    "capacity_request_policy.deployment_validation.capacity_and_both_quota_caps_required",
+    "compute_subscription_policies.standard.cluster_capacity.max_total_clusters",
+    "compute_subscription_policies.standard.cluster_capacity.max_active_clusters",
+    "compute_subscription_policies.standard.deployment.model",
+    "compute_subscription_policies.standard.deployment.rollout.capacity_check",
+    "compute_subscription_policies.standard.deployment.rollout.validate_replacement_before_traffic_cutover",
+    "compute_subscription_policies.standard.dr_clusters.provision",
+    "compute_subscription_policies.standard.dr_clusters.rollout_headroom_conflict_policy",
+    "resource_subscription_policies.standard.scale_out.trigger_scope",
+    "capacity_reservation_policies.standard.sharing.scope",
+    "capacity_reservation_policies.standard.sharing.production_capacity_shared",
+    "capacity_reservation_policies.standard.sharing.feature_maturity",
+    "capacity_reservation_policies.standard.sharing.production_dependency_allowed",
+    "capacity_reservation_policies.standard.sharing.fallback",
+    "capacity_reservation_policies.standard.sharing.provider_subscription",
+    "capacity_reservation_policies.standard.dr_foundation.depends_on_sharing",
+    "capacity_reservation_policies.standard.pending_decisions",
+    "environment_profiles.standard.subscription_model",
+    "geographies",
+)
+DEPLOYMENT_EXPECTED_VALUES = {
+    "capacity_request_policy.effective_date": ENVIRONMENT_EFFECTIVE_DATE,
+    "capacity_request_policy.allowed_vm_series.matching": "exact_series_membership",
+    "capacity_request_policy.approval.scope": "new_capacity_requests",
+    "capacity_request_policy.approval.approval_requirement": "all_required",
+    "capacity_request_policy.approval.existing_protective_reconciliation": "unchanged",
+    "capacity_request_policy.deployment_validation.exact_vm_size_required": "true",
+    "capacity_request_policy.deployment_validation.region_zone_and_subscription_eligibility_required": "true",
+    "capacity_request_policy.deployment_validation.reservation_support_required_when_enforced": "true",
+    "capacity_request_policy.deployment_validation.capacity_and_both_quota_caps_required": "true",
+    "compute_subscription_policies.standard.deployment.model": "blue_green",
+    "compute_subscription_policies.standard.deployment.rollout.capacity_check": "current_and_replacement_overlap",
+    "compute_subscription_policies.standard.deployment.rollout.validate_replacement_before_traffic_cutover": "true",
+    "compute_subscription_policies.standard.dr_clusters.provision": "before_dr",
+    "capacity_reservation_policies.standard.sharing.scope": "domain_group_and_region",
+    "capacity_reservation_policies.standard.sharing.production_capacity_shared": "false",
+    "capacity_reservation_policies.standard.sharing.feature_maturity": "preview",
+    "capacity_reservation_policies.standard.sharing.production_dependency_allowed": "false",
+    "capacity_reservation_policies.standard.sharing.fallback": "reservation_in_deploying_subscription",
+    "capacity_reservation_policies.standard.dr_foundation.depends_on_sharing": "false",
+}
+def parse_simple_yaml_paths(path):
+    """Extract dotted keys and list values from the repository's indentation-based policy YAML."""
+    values = {}
+    stack = []
+    with open(path, encoding="utf-8") as fh:
+        for line_no, raw_line in enumerate(fh, 1):
+            line = raw_line.rstrip()
+            if not line.strip() or line.lstrip().startswith("#") or line.lstrip().startswith("---"):
+                continue
+            indent = len(line) - len(line.lstrip(" "))
+            content = line.strip()
+            if content.startswith("- "):
+                if stack:
+                    key_path = ".".join(key for _, key in stack)
+                    if not isinstance(values.get(key_path), list):
+                        values[key_path] = []
+                    values[key_path].append(content[2:].strip().strip("'\""))
+                continue
+            match = re.match(r"([^:#][^:]*):(?:\s*(.*))?$", content)
+            if not match:
+                continue
+            key, raw_value = match.group(1).strip(), (match.group(2) or "").strip()
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            key_path = ".".join([*(entry[1] for entry in stack), key])
+            value = re.sub(r"\s+#.*$", "", raw_value).strip()
+            if not value:
+                values.setdefault(key_path, None)
+                stack.append((indent, key))
+            else:
+                values[key_path] = value.strip("'\"")
+    return values
+
+
+def deployment_standard_status(repo):
+    """Return config errors and warnings without treating file drift as an authority decision."""
+    errors, warns = [], []
+    v2_path = os.path.join(repo, "environment_v2.yaml")
+    legacy_path = os.path.join(repo, "environment.yaml")
+    if not os.path.isfile(v2_path):
+        return [f"deployment standard not found: {v2_path}"], warns
+
+    try:
+        v2_values = parse_simple_yaml_paths(v2_path)
+    except OSError as exc:
+        return [f"cannot read deployment standard {v2_path}: {exc}"], warns
+
+    missing = [key for key in DEPLOYMENT_CONFIG_PATHS if key not in v2_values]
+    if missing:
+        errors.append("environment_v2.yaml is missing required policy keys: " + ", ".join(missing))
+    changed = [
+        f"{key}={v2_values.get(key)!r} (expected {expected!r})"
+        for key, expected in DEPLOYMENT_EXPECTED_VALUES.items()
+        if key in v2_values and v2_values[key] != expected
+    ]
+    if changed:
+        errors.append(
+            "environment_v2.yaml differs from the deployment guardrails encoded by this checker; "
+            "review the new standard and update the checker if the change is intentional: " + "; ".join(changed)
+        )
+    series = v2_values.get("capacity_request_policy.allowed_vm_series.series", [])
+    if not isinstance(series, list) or not series:
+        errors.append("environment_v2.yaml must contain a non-empty allowed VM-series list")
+    elif len(series) != len(set(series)):
+        errors.append("environment_v2.yaml allowed VM-series list contains duplicates")
+    approvals = v2_values.get("capacity_request_policy.approval.required_approvals", [])
+    if not isinstance(approvals, list) or not {"business", "finance"}.issubset(set(approvals)):
+        errors.append("environment_v2.yaml must require both business and finance approval")
+
+    if not os.path.isfile(legacy_path):
+        warns.append("environment.yaml is absent; cannot compare deployment configuration drift")
+    else:
+        with open(legacy_path, encoding="utf-8") as fh:
+            legacy_lines = fh.readlines()
+        with open(v2_path, encoding="utf-8") as fh:
+            v2_lines = fh.readlines()
+        if legacy_lines != v2_lines:
+            delta = list(difflib.unified_diff(
+                legacy_lines, v2_lines, fromfile="environment.yaml",
+                tofile="environment_v2.yaml", n=0,
+            ))
+            changed = sum(1 for line in delta if line.startswith(("+", "-")) and not line.startswith(("+++", "---")))
+            warns.append(
+                f"environment.yaml and environment_v2.yaml differ ({changed} changed lines); "
+                "configuration authority is unresolved (ENV-V2-001), not auto-selected"
+            )
+    return errors, warns
+
+
+def lint_deployment_output(text, deployment_drift):
+    errors, warns = [], []
+    if not DEPLOYMENT_RE.search(text):
+        return errors, warns
+
+    if not re.search(r"Deployment-standard compliance", text, re.I):
+        errors.append("deployment-related output is missing the Deployment-standard compliance gate")
+    elif not re.search(
+        r"Deployment-standard compliance.{0,100}\b(ALIGNED|BLOCKED|OPEN|N/A)\b",
+        text,
+        re.I | re.S,
+    ):
+        errors.append("deployment-standard gate must state ALIGNED, BLOCKED, OPEN, or N/A")
+    if ENVIRONMENT_EFFECTIVE_DATE not in text:
+        errors.append(
+            f"deployment-related output must cite environment_v2.yaml effective date {ENVIRONMENT_EFFECTIVE_DATE}"
+        )
+    if not any(key in text for key in DEPLOYMENT_CONFIG_PATHS):
+        errors.append("deployment-related output must cite at least one exact environment_v2.yaml key path")
+    if deployment_drift and not re.search(r"environment\.yaml|ENV-V2-001|configuration authority", text, re.I):
+        errors.append(
+            "deployment-related output must disclose environment.yaml drift and unresolved configuration authority"
+        )
+    return errors, warns
 
 
 def parse_version(text):
@@ -130,7 +302,7 @@ def paragraphs(text):
         yield start, "\n".join(buf)
 
 
-def lint(path, repo, current_version, codes):
+def lint(path, repo, current_version, codes, deployment_drift=False):
     errors, warns = [], []
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
@@ -172,6 +344,9 @@ def lint(path, repo, current_version, codes):
                 errors.append(f"L{ln}: `{term}` still described as a spec gap — now decided: {why}")
         if uses and not any(cite_re.search(p) for _, p in uses):
             warns.append(f"L{uses[0][0]}: `{term}` used {len(uses)}x without citing PLC-012/A.10 — {why}")
+    deployment_errors, deployment_warns = lint_deployment_output(text, deployment_drift)
+    errors.extend(deployment_errors)
+    warns.extend(deployment_warns)
     return errors, warns
 
 
@@ -185,6 +360,11 @@ def main():
         help="optional external baseline copy to compare (or set ACRME_UPLOADED_BASELINE)",
     )
     ap.add_argument("--baseline-only", action="store_true", help="only resolve the current baseline")
+    ap.add_argument(
+        "--deployment-standard",
+        action="store_true",
+        help="audit environment_v2.yaml, report environment.yaml drift, and enforce deployment-output checks",
+    )
     ap.add_argument("--max-warn", type=int, default=25, help="max warnings printed per file")
     args = ap.parse_args()
 
@@ -201,19 +381,42 @@ def main():
     stale = [(v, p) for v, p, _ in found if vkey(v) < vkey(cur_version)]
     for v, p in stale:
         print(f"  DRIFT: {p} is v{v} (behind v{cur_version}) — do not cite it")
-    if args.baseline_only:
+    if args.baseline_only and not args.deployment_standard:
         return 0
-    if not args.files:
+    if not args.files and not args.deployment_standard:
         ap.error("pass at least one file, or --baseline-only")
 
-    codes = known_codes(args.repo, cur_text)
+    deployment_related = args.deployment_standard
+    for path in args.files:
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as fh:
+                if DEPLOYMENT_RE.search(fh.read()):
+                    deployment_related = True
+                    break
+    deployment_drift = False
     total_errors = 0
+    if deployment_related:
+        config_errors, config_warns = deployment_standard_status(args.repo)
+        deployment_drift = any("configuration authority is unresolved" in warning for warning in config_warns)
+        print("\nDeployment standard audit (environment_v2.yaml):")
+        for error in config_errors:
+            print(f"  ERROR {error}")
+        for warning in config_warns:
+            print(f"  WARN  {warning}")
+        if not config_errors and not config_warns:
+            print("  PASS: required deployment policy keys and guardrail values are present")
+        total_errors += len(config_errors)
+
+    if args.baseline_only:
+        return 1 if total_errors else 0
+
+    codes = known_codes(args.repo, cur_text)
     for f in args.files:
         if not os.path.exists(f):
             print(f"\n{f}: ERROR file not found")
             total_errors += 1
             continue
-        errors, warns = lint(f, args.repo, cur_version, codes)
+        errors, warns = lint(f, args.repo, cur_version, codes, deployment_drift)
         total_errors += len(errors)
         print(f"\n{f}: {len(errors)} error(s), {len(warns)} warning(s)")
         for e in errors:

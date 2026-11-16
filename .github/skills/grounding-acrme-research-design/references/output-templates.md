@@ -14,7 +14,7 @@
 
 **Type:** Research Brief | Design Note | ADR delta | Review
 **Baseline:** v<X.Y> (<date>) — resolved via check_grounding.py on <date>
-**Phases touched:** P1 | P2 | P3 | P4  (downstream impact: <none | …>)
+**Phases touched:** P1 | P2 | P3 | P4 | P5  (downstream impact: <none | …>)
 **Codes in scope:** <CAP-0xx, QUA-0xx, …>
 **Status:** Draft | For review | Accepted
 ```
@@ -86,6 +86,12 @@ config items with defaults marked Configurable. No summaries in place of rules.>
 **Baseline compliance (SK-01):** COMPLIANT | BLOCKED
 | Code | Baseline statement | This design | Status |
 |---|---|---|---|
+
+**Deployment-standard compliance (when deployment policy/configuration/readiness is in scope):** ALIGNED | BLOCKED | OPEN | N/A
+| YAML key / decision | Standard setting | This design or claim | Status (ALIGNED / CONFLICT / OPEN / N/A) | Evidence / owner action |
+|---|---|---|---|---|
+
+Use `environment_v2.yaml` as the requested configuration when named; cite the exact key and effective date. Compare `environment.yaml` and linked decisions/proposals. A YAML entry documents configured intent, not approval, deployment, or enforcement. Mark unresolved settings OPEN. Any CONFLICT or OPEN item affecting a deployment-readiness claim blocks that claim; use N/A only when deployment-standard policy is not relevant.
 
 **Hard constraints (HC reference Part 2):** COMPLIANT | BLOCKED
 | HC | Name | Affected | PASS/FAIL/N/A | Evidence |
