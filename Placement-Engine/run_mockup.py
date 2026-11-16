@@ -110,6 +110,17 @@ Examples:
         "--verbose", "-v", action="store_true",
         help="Enable debug logging",
     )
+    parser.add_argument(
+        "--seed-dir", "-s", default=None,
+        help="Directory for customer seed records (PLC-003/004/005). "
+             "Omit to run stateless (no seed persistence).",
+    )
+    parser.add_argument(
+        "--force-reselect", action="store_true",
+        help="Force re-run Phase 1 even if a seed record exists "
+             "(PLC-005 migration override). Previous seed is preserved "
+             "in migration_history.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -189,10 +200,13 @@ Examples:
                 if r.region_id not in existing_ids:
                     combined_regions.append(r)
 
+        seed_path = Path(args.seed_dir) if args.seed_dir else None
         report = run_placement(
             customer=customer,
             regions=combined_regions,
             policy=policy,
+            seed_dir=seed_path,
+            force_reselect=args.force_reselect,
         )
         reports.append(report)
 
