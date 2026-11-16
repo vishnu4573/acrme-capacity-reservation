@@ -88,6 +88,16 @@ def generate_report(report: PlacementReport) -> str:
     lines.append(f"**Policy Version:** {p.policy_version}")
     lines.append(f"**Timestamp:** {report.timestamp}")
     lines.append(f"**Overall Status:** `{report.overall_status}`")
+
+    # Seed record status (PLC-003/004/005)
+    if report.seed_hit:
+        lines.append(f"**Seed Record:** 📀 REUSED — Phase 1 (CRV) skipped; regions loaded from existing seed (PLC-004)")
+    elif report.seed_migrated:
+        lines.append(f"**Seed Record:** 🔄 MIGRATED — Phase 1 re-run; previous seed overwritten (PLC-005 force-reselect)")
+    elif report.seed_written:
+        lines.append(f"**Seed Record:** ✅ CREATED — first placement; seed written for future reuse (PLC-003)")
+    else:
+        lines.append(f"**Seed Record:** ➖ disabled (stateless mode)")
     lines.append(f"")
 
     # Customer demand summary
@@ -109,9 +119,16 @@ def generate_report(report: PlacementReport) -> str:
 
     # Phase 1: CRV
     lines.append(f"---")
-    lines.append(f"## Phase 1 — Customer Region Vector (CRV)")
-    lines.append(f"")
-    lines.append(f"**Path:** `{crv.path_used}` | **Distribution Model:** `{crv.distribution_model.value}`")
+    if report.seed_hit:
+        lines.append(f"## Phase 1 — Customer Region Vector (CRV) 📀 SEED REUSE")
+        lines.append(f"")
+        lines.append(f"**CRV loaded from seed record (PLC-004).** Phase 1 scoring was not executed.")
+        lines.append(f"")
+        lines.append(f"**Original Path:** `{crv.path_used}` | **Distribution Model:** `{crv.distribution_model.value}`")
+    else:
+        lines.append(f"## Phase 1 — Customer Region Vector (CRV)")
+        lines.append(f"")
+        lines.append(f"**Path:** `{crv.path_used}` | **Distribution Model:** `{crv.distribution_model.value}`")
     lines.append(f"")
 
     # CRV result box
