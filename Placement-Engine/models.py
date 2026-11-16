@@ -319,3 +319,7 @@ class PlacementReport:
     dpb_results: list[DPBResult] = field(default_factory=list)
     overall_status: str = "PENDING"
     timestamp: str = ""
+    # Seed record status (PLC-003/004/005)
+    seed_hit: bool = False       # CRV loaded from existing seed (Phase 1 skipped)
+    seed_written: bool = False   # New seed created (first placement)
+    seed_migrated: bool = False  # Seed overwritten (force-reselect / PLC-005)
