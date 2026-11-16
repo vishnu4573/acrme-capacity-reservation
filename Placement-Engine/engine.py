@@ -5,11 +5,14 @@ Implements the two-scope placement pipeline:
   Phase 2: DPB (Domain Placement Binding) — domain scope
 
 Per v4.0 baseline F.11/F.12, PLC-013..PLC-016.
+Seed-record support per PLC-003/004/005 (Scenario 20).
 """
 from __future__ import annotations
 
+import logging
 import math
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from hard_constraints import run_crv_hc_gate, run_dpb_hc_gate
@@ -20,6 +23,9 @@ from models import (
     ScoringDetail, ZonePlacement,
 )
 from scoring import score_region
+from seed_store import load_seed, save_seed, update_seed_for_migration
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -416,8 +422,20 @@ def run_placement(
     regions: list[RegionSnapshot],
     policy: PlacementPolicy | None = None,
     dr_destination_regions: list[RegionSnapshot] | None = None,
+    *,
+    seed_dir: Path | None = None,
+    force_reselect: bool = False,
 ) -> PlacementReport:
-    """Run the full CRV → DPB placement pipeline for a customer."""
+    """Run the full CRV → DPB placement pipeline for a customer.
+
+    Seed-record behaviour (PLC-003/004/005, Scenario 20):
+      - If a seed record exists for (customer, geography) and
+        force_reselect is False → skip Phase 1, load CRV from seed.
+      - If no seed exists → run Phase 1, write a new seed record.
+      - If force_reselect is True → run Phase 1, overwrite the seed
+        (migration history preserved).
+      - If seed_dir is None → seed records are disabled (stateless).
+    """
     if policy is None:
         policy = PlacementPolicy()
     if not policy.validate():
@@ -425,7 +443,46 @@ def run_placement(
             f"Policy weight-sum invariant violated: "
             f"{policy.alpha + policy.beta + policy.gamma + policy.delta + policy.epsilon:.4f} ≠ 1.0")
 
-    crv = resolve_crv(customer, regions, policy)
+    seed_hit = False
+    seed_written = False
+    seed_migrated = False
+
+    # --- Seed record gate (PLC-004) ---
+    if seed_dir is not None and not force_reselect:
+        existing = load_seed(customer.customer_id, customer.geography, seed_dir)
+        if existing is not None:
+            crv = existing.to_crv()
+            seed_hit = True
+            logger.info(
+                "SEED HIT for %s / %s — skipping Phase 1 (CRV from seed: "
+                "Prod=%s, CVAL=%s, DR=%s)",
+                customer.customer_id, customer.geography,
+                crv.prod_region, crv.cval_region, crv.dr_region,
+            )
+
+    if not seed_hit:
+        # Phase 1: full CRV resolution
+        crv = resolve_crv(customer, regions, policy)
+
+        # Write or migrate seed record
+        if seed_dir is not None and crv.prod_region:
+            if force_reselect:
+                update_seed_for_migration(
+                    customer.customer_id, customer.geography,
+                    crv, policy.policy_version,
+                    reason="force-reselect (PLC-005 migration)",
+                    seed_dir=seed_dir,
+                )
+                seed_migrated = True
+                crv.warnings.append(
+                    "Seed record MIGRATED — previous regions overwritten "
+                    "(PLC-005 force-reselect)")
+            else:
+                save_seed(crv, policy.policy_version, seed_dir)
+                seed_written = True
+                crv.warnings.append("Seed record CREATED (first placement, PLC-003)")
+
+    # Phase 2: DPB
     dpb = resolve_dpb(customer, crv, regions, policy)
 
     overall = "PASS"
@@ -443,4 +500,7 @@ def run_placement(
         dpb_results=dpb,
         overall_status=overall,
         timestamp=datetime.now(timezone.utc).isoformat(),
+        seed_hit=seed_hit,
+        seed_written=seed_written,
+        seed_migrated=seed_migrated,
     )
