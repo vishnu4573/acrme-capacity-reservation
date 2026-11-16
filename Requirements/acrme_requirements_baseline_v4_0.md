@@ -12,9 +12,9 @@
 | Field                   | Value                                                                                                                             |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | **Title**               | Azure Capacity & Quota Management — Consolidated Requirements Baseline                                                            |
-| **Version**             | **4.0 — unified clean-slate rewrite (harmonises all v2.x carried-forward text with the v3.0 multi-domain customer model; unified formula reference; removes legacy single-scope ambiguity)** |
+| **Version**             | **4.0.1 — DPB ownership boundary refinement (DPB outputs capacity envelope; Instance Group is service-deployment-scoped)** |
 | **Status**              | Working baseline — single self-consistent voice; no legacy amendment layers           |
-| **Baseline date**       | 14 October 2026 (supersedes v3.0 / 8 Oct 2026)                                                                            |
+| **Baseline date**       | 16 November 2026 (supersedes v4.0 / 14 Oct 2026)                                                                            |
 | **Owners**              | Vishnuvardhan Reddy (design/requirements), Roy Szabady (strategy/business alignment)                                              |
 | **Contributors**        | Azure Platform Support (Anu — deployment pipeline), Jason (quota tooling/code), Melvin Stephen (CVP — quota-as-governor strategy) |
 | **Primary consumers**   | Exosphere, Stratosphere, AEP, product platform teams, operations, FinOps, security & governance                                   |
@@ -26,6 +26,7 @@
 | Version | Date           | Change                                                                                                                                                                                                                                                                                                                                             |
 |---------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **4.0** | **14 Oct 2026** | **Clean-slate rewrite.** All v2.x carried-forward requirements rewritten in unified v3.0/multi-domain vocabulary. Redundancies removed: PLC-006 retired (subsumed by PLC-013); PLC-004/PLC-009 amended to reference domain groups and PLC-015 pipeline; PLC-003 seed-record fields updated with CRV/DPB/domain token; PLC-007/008 explicitly state customer-aggregate scope; PLC-011 amended with per-domain scope note (PLC-016); DR-002/003/004/018 re-scoped with domain qualifier; CAP-023 reconciled with CAP-025; FIN-001/004 include domain dimension; A.1–A.9 reconciled with A.12 in unified Formulas & Calculation Reference section. No requirement content added or removed — only harmonised. Hard Constraints unchanged (HC-1..HC-11). |
+| **4.0.1** | **16 Nov 2026** | **DPB ownership boundary refinement.** PLC-014 rewritten: DPB outputs the **capacity envelope** (subscription, CRG set, CR sizing, zone targets, quota draw) — it does NOT determine Instance Group. Instance Group is an **output of service deployment**, determined by the Service Owner / Product Automation **after** receiving the DPB context. DOM-002 updated: subscription ownership remains placement-engine-scoped; IG determination is explicitly service-deployment-scoped. Glossary entries updated for Domain group, DPB, Instance group, Quota pool. F.12 formula set updated: `ig(D,E) = Lookup(...)` removed; replaced with `Sub(D,E)` subscription resolution. INT-004/INT-008 updated to reflect capacity-envelope output (no IG). Observability / data / forward-items references updated from "ig" to "domain subscription". Hard Constraints unchanged (HC-1..HC-11). |
 | 3.0 | 8 Oct 2026 | Multi-domain customer model folded in. Domain-group CRGs per environment & region; two-scope region selection (CRV customer-scoped, DPB domain-scoped); DR Foundation; forward-items evaluation. Added PLC-013..016, DOM-001..004, CAP-025, DR-021, QUA-015, C-14/C-15/C-16. Carried-forward requirements verbatim from v2.5; only Section 11 and dependent sections amended. |
 | 2.5     | 24 Sep 2026    | Foundation aligned to Microsoft Learn. Sharing stays Preview; QUA-013 documented; two-cap quota model; CAP-023 zonal CRG structure; CAP-016 logical zone numbers per subscription. |
 | 2.5 (amended) | 7 Oct 2026 | γ fairness denominator defined — PLC-012 geography customer count. |
@@ -111,8 +112,10 @@ The target solution is a **Capacity & Quota Management Engine** that:
     production and DR controls;
 -   treats each customer as **one placement identity with many capacity
     lanes** — region selection is bound once per customer (Customer
-    Region Vector, CRV), while Instance Groups and capacity are
-    domain-group-scoped (Domain Placement Binding, DPB); and
+    Region Vector, CRV), while capacity envelopes (subscription, CRG
+    set, CR sizing, zone targets, quota draw) are domain-group-scoped
+    (Domain Placement Binding, DPB); Instance Group determination is
+    a service-deployment concern, downstream of the DPB; and
 -   produces auditable evidence for operations and compliance (e.g., SOC
     2 DR assertions).
 
@@ -172,7 +175,7 @@ These drivers shape every requirement below.
 -   **Multi-domain customer model.** A customer may own multiple
     **domain groups** (e.g., TMS, WMS). Region selection is customer-scoped
     (one CRV per customer × geography, reused by all domains). Capacity
-    and instance groups are domain-scoped (one DPB per domain × environment
+    and capacity envelopes are domain-scoped (one DPB per domain × environment
     × region). This two-scope separation is the structural core of the
     engine's placement pipeline.
 -   **No multi-cloud.** Multi-cloud DR has been repeatedly rejected at
@@ -236,16 +239,16 @@ These drivers shape every requirement below.
 | **Core subscription**                | A shared platform/"core" subscription whose VMs are **all classified production** for reservation and buffer purposes (CAP-001a); non-production workloads must not run there (ENV-003). |
 | **Customer Region Vector (CRV)**     | Customer-scoped, cached region binding `(geography, distribution model, prod, cval, dr)` decided once per customer × geography and reused by **all** domain groups (PLC-013). |
 | **CVAL**                             | Customer validation environment; its capacity may contribute to DR readiness.                              |
-| **Domain group**                     | A workload-domain grouping of a customer's capacity (`wl-*` token, e.g. TMS, WMS) sharing one customer seed row but owning **separate instance groups** (ig) per environment/region (PLC-014, DOM-001/002). Domain is the unit of ig/capacity binding; the customer is the unit of region binding (PLC-013). |
-| **Domain Placement Binding (DPB)**   | The deterministic per-domain capacity binding `DPB(D,E)` that resolves ig subscription, CRG set, CR sizing, zone distribution, and quota draw for one domain × environment × region, using the pre-bound CRV region (PLC-014). |
+| **Domain group**                     | A workload-domain grouping of a customer's capacity (`wl-*` token, e.g. TMS, WMS) sharing one customer seed row but owning **separate capacity envelopes** (subscription, CRG set, CR sizing, zone targets, quota draw) per environment/region (PLC-014, DOM-001/002). Domain is the unit of capacity-envelope binding; the customer is the unit of region binding (PLC-013). Instance Group determination is downstream (service deployment). |
+| **Domain Placement Binding (DPB)**   | The deterministic per-domain capacity binding `DPB(D,E)` that resolves subscription, CRG set, CR sizing, zone distribution, and quota draw for one domain × environment × region, using the pre-bound CRV region (PLC-014). DPB outputs the **capacity envelope**; it does **not** determine Instance Group — that is a service-deployment decision (Service Owner / Product Automation). |
 | **DR bootstrap capacity**            | Minimum deployed/reserved platform capacity required to initiate recovery orchestration.                   |
 | **DR Foundation CRG set**            | The dedicated DR-bootstrap CRG set of a domain in its DR region — structural base capacity, always present with pre-staged quota; extendable on failover via the domain's own CVAL/DR shared CRG (CAP-025, DR-021). |
-| **Instance group (ig)**              | The subscription-bound capacity set that materialises **one domain × environment × region**: its subscription(s), CRG set (CAP-025), and quota draw. ig is domain-group-scoped; the region of an ig always comes from the customer's CRV (PLC-014). |
+| **Instance group (ig)**              | The deployment-time grouping that materialises a service within a domain × environment × region. The **Service Owner / Product Automation** determines the appropriate Instance Group during service deployment, using the capacity envelope provided by DPB (PLC-014) as context. Region placement is an **input** to service deployment; Instance Group is an **output** of service deployment. ig is never determined by the placement engine. |
 | **Seed reservation**                 | A managed reservation created at reserved quantity **0** for an eligible SKU × region × availability zone, as part of the initial **seed matrix** (CAP-022); reconciliation scales it up from 0 when allocated demand first appears. *Distinct from the placement **seed record** below.* |
 | **Seed matrix**                      | The full set of count-0 **seed reservations** across every eligible SKU/AZ combination in the scope file (CAP-022), governed by product-team budget approval. |
 | **Consumer subscription**            | Subscription where a VM deploys and consumes a *shared* reservation owned elsewhere.                       |
 | **Provider subscription**            | Subscription that owns a reservation shared with other subscriptions.                                      |
-| **Quota pool / quota group**         | An Azure Quota Group moves unused quota onto a member subscription. Deploy-time checks that subscription's **VM-family** vCPU and **total regional** vCPU, not the group limit. One subscription belongs to one group; each transfer is scoped to one region and one VM family (QUA-003, QUA-004). All of a customer's domain ig subscriptions belong to a centrally managed quota group per region × VM-family cell (QUA-015). |
+| **Quota pool / quota group**         | An Azure Quota Group moves unused quota onto a member subscription. Deploy-time checks that subscription's **VM-family** vCPU and **total regional** vCPU, not the group limit. One subscription belongs to one group; each transfer is scoped to one region and one VM family (QUA-003, QUA-004). All of a customer's domain subscriptions belong to a centrally managed quota group per region × VM-family cell (QUA-015). |
 | **Quota hoarding**                   | Governance practice of collecting default per-region quota into a family pool for controlled reallocation. |
 | **Seed record** (a.k.a. **placement seed**) | Authoritative customer record holding: customer/realm identifier, geography, distribution model, production region, CVAL region, DR region (or `NOT_OFFERED`), CRV vector (PLC-013), domain groups and their DPB references (PLC-014), products covered, decision timestamp, policy/engine version, capacity-snapshot reference, exception reference (if any), and approval metadata. *Distinct from a **seed reservation** — "seed record" is about **where** a customer is placed; "seed reservation" is a **zero-count reservation object** waiting to scale.* |
 | **Total customers (geography)** | Count of distinct customers with at least one environment (Prod, CVAL or DR) provisioned or being deployed in any region of a geography. Denominator of the γ distribution-fairness term; one live count per geography, shared by all environments (PLC-012, F.10). |
@@ -592,7 +595,7 @@ simultaneously raises a scope-file governance item** (CAP-019).
 **CAP-025 — Domain-group CRG structure per Domain × Environment ×
 Region.** For each **domain group** (DOM-001) and each **environment**
 (Prod, CVAL/NonProd, DR) in each **region** of the customer's CRV
-(PLC-013), the engine maintains a dedicated CRG set on that domain's ig
+(PLC-013), the engine maintains a dedicated CRG set on that domain's
 subscription (PLC-014), which is **never mixed with another domain's CRG
 set**:
 
@@ -689,14 +692,14 @@ values, actor/workload identity, policy reason, correlation ID, and
 timestamp.
 
 **QUA-015 — Central quota group across domain subscriptions.** All of a
-customer's **domain ig subscriptions** (DOM-002) are members of the
+customer's **domain subscriptions** (DOM-002) are members of the
 customer's **centrally managed quota group**, per region × VM-family
 cell (QUA-004): one governed group per customer-scoped regional/family
 scope, with subscription-level draws. Replenishment is governed by
 configured thresholds: `GROUP_REPLENISH_THRESHOLD` (default 85%) at the
 group cell level and `SUB_REPLENISH_THRESHOLD` (default 85%) at the
 subscription level. TRANSFER mechanics, deploy-time checks, and the
-two-cap rule follow QUA-003/QUA-004/QUA-007 exactly. Domain ig
+two-cap rule follow QUA-003/QUA-004/QUA-007 exactly. Domain
 subscriptions never belong to another customer's group.
 
 ## 10. Combined Capacity & Quota Readiness
@@ -731,7 +734,7 @@ reads (PLC-015) and DPB resolution (PLC-014).
 
 Region selection binds a customer's environments to Azure regions.
 It is **customer-scoped** — one binding per customer × geography,
-shared by all domain groups (PLC-013). Instance groups and capacity
+shared by all domain groups (PLC-013). Capacity envelopes
 are **domain-group-scoped** (PLC-014). The pipeline resolves the
 Customer Region Vector first, then the Domain Placement Binding
 (PLC-015 ordering gate).
@@ -946,20 +949,37 @@ PLC-010/010a/010b) and the same Hard Constraints, then converge on
 the Domain Placement Binding step (PLC-014). See F.11 for the two
 formula sets.
 
-**PLC-014 — Domain Placement Binding (DPB): ig and capacity are
+**PLC-014 — Domain Placement Binding (DPB): capacity envelope is
 domain-scoped.** After the CRV is resolved (or reused), each
-**domain group** (DOM-001) binds its capacity per
+**domain group** (DOM-001) resolves its **capacity envelope** per
 (domain × environment × CRV region) via a **Domain Placement
-Binding** `DPB(D,E)`: (a) resolves the ig subscription (DOM-002,
-C-12 + shard registry); (b) ensures the **domain CRG set** per
-CAP-025 (Prod-dedicated, CVAL/DR shared, DR Foundation sets);
-(c) sizes CRs at `allocated + buffer` (CAP-003, F.1–F.3);
-(d) applies the per-domain zone distribution (PLC-016); and
-(e) draws quota from the customer's central quota group per
-region × VM-family cell (QUA-015). The DPB is deterministic — no
-region weighting at domain scope; the region always comes from the
-CRV. The domain token lives in the subscription name (C-12/OPS-006),
-never in the CRG registry identity.
+Binding** `DPB(D,E)`. The DPB outputs five items:
+
+-   **(a) Subscription** — resolves the domain subscription (DOM-002,
+    C-12 + shard registry). One subscription per (domain × environment);
+    shard registry handles scale-out.
+-   **(b) CRG set** — ensures the **domain CRG set** per CAP-025
+    (Prod-dedicated, CVAL/DR shared, DR Foundation sets). Creates the
+    set if it does not exist.
+-   **(c) CR sizing** — sizes capacity reservations at
+    `allocated + buffer` (CAP-003, F.1–F.3) per SKU × zone within the
+    CRG set.
+-   **(d) Zone targets** — applies the per-domain zone distribution
+    (PLC-016, F.9).
+-   **(e) Quota draw** — draws quota from the customer's central quota
+    group per region × VM-family cell (QUA-015).
+
+The DPB is deterministic — no region weighting at domain scope; the
+region always comes from the CRV. The domain token lives in the
+subscription name (C-12/OPS-006), never in the CRG registry identity.
+
+**Ownership boundary:** DPB does **not** determine Instance Group.
+Instance Group is an output of **service deployment**, determined by
+the **Service Owner / Product Automation** after receiving the DPB
+capacity envelope. Region placement is an input to service deployment;
+Instance Group is an output of service deployment, not an input to
+region placement. Service registration records the Service → Instance
+Group association in the global system of record.
 
 **PLC-015 — Two-phase resolution gate: CRV strictly precedes DPB.**
 Region selection (PLC-013) is resolved **once** and cached; every
@@ -985,33 +1005,39 @@ unchanged).
 
 *(Domain-group taxonomy for multi-domain customers. Customer X
 reference model: domains **TMS** and **WMS**; same region selection
-for both domain groups; different ig per domain; per-domain
-subscriptions; DR Foundation as separate base capacity extended by
+for both domain groups; different capacity envelopes per domain;
+per-domain subscriptions; DR Foundation as separate base capacity extended by
 CVAL sharing; centrally managed quota.)*
 
 **DOM-001 — Domain group definition & taxonomy.** A **domain group**
 is a workload-domain grouping of a customer's capacity (`wl-*`
 token, e.g. TMS, WMS; function-group `<fn>` per C-12). A customer
 may own multiple domain groups; all of them share the customer's
-seed record and CRV (PLC-013) but keep separate instance groups
+seed record and CRV (PLC-013) but keep separate capacity envelopes
 (DOM-002). The domain taxonomy (`wl-*` vs function-group tokens) is
 a configurable item (C-14), resolved per DEC-004.
 
-**DOM-002 — Instance-group (ig) binding & subscription ownership.**
-One **Instance Group (ig)** exists per (domain × environment ×
-region) on a subscription per (domain × environment) — e.g.
+**DOM-002 — Subscription ownership & capacity-envelope binding.**
+One **subscription** exists per (domain × environment) — e.g.
 `sub-jda-cld-cr-prod-wl-tms-wus2-01` vs `...-wl-wms-wus2-01`
-(C-12/OPS-006). igs never span domains; domains never share an ig.
-The ig owns the domain's CRG set (CAP-025), its CRs, and its quota
-draw (QUA-015). Scale-out beyond ig limits uses the shard registry
-(DOM-003).
+(C-12/OPS-006). Subscriptions never span domains; domains never
+share a subscription. The domain subscription owns the CRG set
+(CAP-025), its CRs, and its quota draw (QUA-015). Scale-out beyond
+subscription limits uses the shard registry (DOM-003).
+
+**Instance Group is service-deployment-scoped.** The Service Owner /
+Product Automation determines the appropriate Instance Group during
+service deployment, using the capacity envelope (subscription, CRG
+set, CR sizing, zone targets, quota draw) provided by DPB (PLC-014)
+as context. The Service → Instance Group association is registered in
+the global system of record as part of service registration.
 
 **DOM-003 — Cross-domain placement independence within bound
 regions.** All of a customer's domain groups deploy inside the
 customer's CRV regions (e.g. Prod WUS2 for both TMS and WMS); each
 domain resolves its own DPB (PLC-014) and may scale, fail over, or
-rebalance independently without affecting another domain's ig
-(PLC-016). A domain requesting a region outside the CRV requires an
+rebalance independently without affecting another domain's capacity
+envelope (PLC-016). A domain requesting a region outside the CRV requires an
 approved customer-level migration (PLC-005).
 
 **DOM-004 — Domain-bounded sharing.** Sharing (CAP-013) is granted
@@ -1343,11 +1369,13 @@ exception input); subscription; SKU + count; zone requirement;
 deployment priority; requested time; correlation ID.
 
 **INT-004 — Required output.** resolved prod/CVAL/DR placement
-(CRV, PLC-013); DPB reference (PLC-014) including ig subscription,
-domain CRG set (CAP-025), zone spread; readiness status; approved
-reservation/CRG reference; quota status and quota-draw route
-(QUA-015); available vs required quantities; blocking reasons;
-exception requirements; snapshot timestamp; trace/decision ID.
+(CRV, PLC-013); DPB capacity envelope (PLC-014) including domain
+subscription, CRG set (CAP-025), CR sizing, zone targets, and
+quota-draw route (QUA-015); readiness status; approved
+reservation/CRG reference; quota status; available vs required
+quantities; blocking reasons; exception requirements; snapshot
+timestamp; trace/decision ID. *Instance Group is not part of the
+DPB output — it is determined during service deployment.*
 
 **INT-005 — Deployment reservation association.** When policy
 requires it, associate the VM / VM scale-set instance configuration
@@ -1365,11 +1393,14 @@ compensate safely or raise a recoverable operational task.
 **INT-008 — Two-scope inputs & outputs.** AEP deployments carry a
 **domain group token** (DOM-001) in addition to customer/realm,
 product, environment, and region inputs (INT-003). The required
-output (INT-004) includes the resolved **CRV** (PLC-013) and **DPB**
-(PLC-014): ig subscription, domain CRG set (CAP-025), zone spread,
-quota-draw reference route (QUA-015). The pipeline enforces PLC-015
-ordering — CRV resolution precedes DPB resolution — and treats the
-CRV as cached input thereafter.
+output (INT-004) includes the resolved **CRV** (PLC-013) and **DPB
+capacity envelope** (PLC-014): domain subscription, CRG set
+(CAP-025), CR sizing, zone targets, and quota-draw reference route
+(QUA-015). The pipeline enforces PLC-015 ordering — CRV resolution
+precedes DPB resolution — and treats the CRV as cached input
+thereafter. *Instance Group is resolved downstream by the Service
+Owner / Product Automation during service deployment, not by the
+placement engine.*
 
 ---
 
@@ -1386,7 +1417,8 @@ relationships; allocated/associated VMs; quota pools + subscription
 assignments; buffers/policies; customer seed records; Customer Region
 Vector (CRV, PLC-013) per seed record; Domain Placement Binding
 (DPB, PLC-014) per (domain × environment × region); domain registry
-/ ig registry (DOM-001/002); per-domain CRG-set inventory mapped to
+/ domain registry (DOM-001/002); Service → Instance Group registry
+(maintained by service deployment); per-domain CRG-set inventory mapped to
 CAP-025 classes (prod / cvdr / drf); quota-group membership per
 QUA-015; **source→destination DR index (DR-018)**; DR distribution
 plans; deployment intents; reconciliation runs; alerts/exceptions;
@@ -1401,7 +1433,7 @@ readiness references the source observations used.
 **DAT-004 — Historic state.** Retain history sufficient to explain
 capacity growth, quota changes, reservation cost, failed placements,
 DR readiness, and policy changes. Forecasting extensions (FWD-001)
-require per-domain ig trend records keyed
+require per-domain capacity trend records keyed
 (domain × environment × region).
 
 **DAT-005 — Configuration versioning.** Scope files/policies are
@@ -1423,7 +1455,7 @@ available; reservation utilisation %; estimated unused reservation
 cost; reconciliation success/failure; Azure API throttling/latency;
 state age; deployment blocks; DR capacity coverage;
 **per-destination DR max-source coverage (DR-017)**;
-**per-domain ig utilisation and zone distribution (PLC-016)**.
+**per-domain subscription utilisation and zone distribution (PLC-016)**.
 
 **OBS-002 — Required alerts.** production buffer below target; DR
 bootstrap below target; quota below required/growth buffer;
@@ -1538,7 +1570,7 @@ blocked by missing reservation; DR declaration; CVAL
 shutdown/disassociation; quota allocation to DR; reservation sharing
 activation/revocation; reconciliation rollback/pause; manual
 emergency override; regional recovery and failback; **standby DR
-activation sequence (DR-019)**; **per-domain ig scaling events**.
+activation sequence (DR-019)**; **per-domain capacity scaling events**.
 
 **OPS-002 — Safe pause.** Operators can pause mutation while
 retaining inventory and alerting.
@@ -1591,7 +1623,7 @@ mapping is noted for traceability.
 
 These three formulas operate on a **(D, E)** operand — a single
 domain group in a single environment within a region. Each domain's
-ig (DOM-002) owns its own reservation and the reconciliation loop
+domain subscription (DOM-002) owns its own reservation and the reconciliation loop
 (CAP-005) runs them independently per domain.
 
 **F.1 — Reservation target** *(was A.1)*
@@ -1600,7 +1632,7 @@ ig (DOM-002) owns its own reservation and the reconciliation loop
       = Allocated VM Count(D,E) + Buffer Target(D,E)
 
 **Explanation.** The engine reserves enough capacity for every VM
-currently running in the domain's ig **plus** a configurable buffer
+currently running in the domain's subscription **plus** a configurable buffer
 (C-2) that covers deployment headroom, scale-out spikes, and
 Azure-side reservation lead time. The buffer is never a fixed global
 percentage — it is set per product/region/environment/SKU via the
@@ -1638,10 +1670,10 @@ by this formula.
       = Assigned Regional VM-Family Quota(D,E)
         − Current Regional VM-Family Usage(D,E)
 
-**Explanation.** Computed per ig subscription (DOM-002) against the
+**Explanation.** Computed per domain subscription (DOM-002) against the
 subscription's regional quota for the relevant VM family. Both the
 VM-family cap and the total regional vCPU cap must be checked
-(QUA-002). The ig draws quota from the customer's central quota
+(QUA-002). The domain subscription draws quota from the customer's central quota
 group (QUA-015) per region × VM-family cell.
 
 **F.5 — Deployment quota deficit** *(was A.5)*
@@ -1809,24 +1841,42 @@ PLC-015 gate.
 **F.12 — Domain Placement Binding formulas** *(was A.12)*
 
     For each (D, E) with R ≡ CRV(C,G).E pre-bound (PLC-015 gate):
-      ig(D,E)             = Lookup(C, D, E, R)
+
+      — Step ① Subscription —
+      Sub(D,E)            = Resolve(C, D, E, R)
                             # C-12 + shard registry; deterministic
+                            # one subscription per (domain × environment)
+
+      — Step ② CRG Set —
       CRG set(D,E)        = CAP-025 per-domain sets
                             (prod-dedicated | cvdr shared | drf)
+                            # created if absent; bound if exists
+
+      — Step ③ CR Sizing —
       TargetReserved(D,E) = AllocatedVMs(D,E) + Buffer(D,E)        # F.1
       Headroom(D,E)       = Reserved(D,E) − AllocatedVMs(D,E)      # F.2
       Deficit(D,E)        = max(0, TargetReserved − Reserved)       # F.3
+
+      — Step ④ Zone Targets —
       TargetVMs(D,E,z)    = round( VMs(D,E) / ZoneCount(R) )       # F.9
                             per-DOMAIN operand (PLC-016)
       RegionZoneLoad(R,E,z) = Σ_D VMs(D,E,R,z)
                             # region OBSERVER only — no action
+
+      — Step ⑤ Quota Draw —
       AvailableQuota(D,E) = min(VM-family cap, total regional cap)
-                            of ig(D,E)                              # F.4/QUA-002
+                            of Sub(D,E)                             # F.4/QUA-002
       QuotaDeficit(D,E)   = max(0, Requested(D,E) − AvailableQuota) # F.5
       Draw(D,E)           = central quota group (QUA-015),
                             region × family cell
       Replenish           = utilization ≥ GROUP_REPLENISH_THRESHOLD (85%)
                             or ≥ SUB_REPLENISH_THRESHOLD (85%)
+
+    — Ownership Boundary —
+    DPB outputs the capacity envelope: (Sub, CRG set, CR sizing,
+    zone targets, quota draw). Instance Group is NOT resolved here.
+    IG is determined by the Service Owner / Product Automation during
+    service deployment, downstream of DPB.
 
 **Explanation.** The DPB is deterministic — no region weighting
 occurs at domain scope; the region always comes from the CRV
@@ -1834,7 +1884,8 @@ occurs at domain scope; the region always comes from the CRV
 single-operand formulas (F.1–F.5, F.9) with the domain×environment
 scope `(D,E)`. The replenishment thresholds (85%) are configurable
 reference values from the system configuration; they trigger
-proactive quota replenishment before the ig runs dry.
+proactive quota replenishment before the domain subscription runs
+dry.
 
 ### 21.8 Reconciliation Note
 
@@ -1916,12 +1967,12 @@ The baseline is implementable when all are demonstrated:
     simulated single-region event and then demonstrates
     CVAL-extension scaling into the domain's CVAL/DR shared CRG
     (gated on POC-001/DEP-001).
-25. **Draws quota for every domain ig from the customer's central
+25. **Draws quota for every domain subscription from the customer's central
     quota group** (QUA-015) and triggers replenishment when
     `GROUP_REPLENISH_THRESHOLD`/`SUB_REPLENISH_THRESHOLD` (85%) are
     hit.
 26. **Runs the forward-item evaluation** (Section 28) as a dry-run:
-    capacity forecast at customer aggregate × domain ig and placement
+    capacity forecast at customer aggregate × domain subscription and placement
     optimization re-scored under the two-scope model.
 
 ---
@@ -1961,7 +2012,7 @@ capacity governance.
 
 ### Phase 5 — Multi-Domain Model & Two-Scope Binding
 
-Domain-group taxonomy registry (DOM-001, DEC-004) · per-domain ig
+Domain-group taxonomy registry (DOM-001, DEC-004) · per-domain subscription
 and subscription provisioning (DOM-002, C-12 extension) · per-domain
 CRG sets (CAP-025) · Customer Region Vector build/reuse with the two
 input paths (PLC-013) · Domain Placement Binding resolution
@@ -2012,7 +2063,7 @@ once, capacity per domain.
 | POC-010     | **Reconciliation interval**                      | Production interval after API + cost testing.                                                                                                                            |
 | POC-011     | **Max-not-sum overcommit safety**                | Validate that shared/overcommitted DR reservations (DR-017) behave correctly when a standby set activates, and quantify residual risk if two regions ever fail together. |
 | POC-012     | **Domain-scoped CRG sharing**                    | Validate same-domain CVAL/DR-shared CRG consumption (CAP-025, DOM-004): consumer-subscription quota, logical-zone mapping (CAP-016), and revocation within the 100-consumer scope; confirm cross-domain isolation. |
-| POC-013     | **Two-scope flow against a live multi-domain customer** | End-to-end PLC-013/PLC-014 on a TMS+WMS customer: exact-region and geography paths converge identically; DPB per domain isolates ig/CRG/quota; readiness gates hold per domain. |
+| POC-013     | **Two-scope flow against a live multi-domain customer** | End-to-end PLC-013/PLC-014 on a TMS+WMS customer: exact-region and geography paths converge identically; DPB per domain isolates subscription/CRG/quota as a capacity envelope; readiness gates hold per domain; Instance Group determination by Service Owner is downstream. |
 | **DEC-001** | **Middle East DR offering — RESOLVED**           | **Decided (11 Sep 2026):** DR is offered for Middle East cross-geo to Europe (DR-020, PLC-010b) — Prod+CVAL local, DR in a weighted-selected Europe Standard region. Per-country `DR_NOT_OFFERED` (DR-014) retained; data-residency clearance assumed (A-ME1). |
 | DEC-002     | **DR drill duration & failback**                 | Extended run vs earlier failback.                                                                                                                                        |
 | DEC-003     | **Geography exception approval**                 | Approver + binding customer acknowledgement for geography-only onboarding.                                                                                               |
@@ -2036,7 +2087,7 @@ once, capacity per domain.
 -   **Only one region in a geography fails at a time** — the basis
     for max-not-sum DR sizing (DR-001/DR-017).
 -   A customer's **region binding (CRV) is shared by all its domain
-    groups** (PLC-013); each domain's ig/capacity is isolated
+    groups** (PLC-013); each domain's capacity envelope is isolated
     (DOM-002/004). DR Foundation bootstrap is sized per
     ENV-005/DR-007 and does **not** depend on sharing availability
     (DR-021). Central quota group covers all domain subscriptions per
@@ -2074,9 +2125,9 @@ once, capacity per domain.
 | Preview-feature dependency               | Design lock delayed                         | Track DEP-001; design to work with and without sharing                                               |
 | **Middle East cross-geo DR residency** (A-ME1) | Some ME customers cannot legally DR to Europe | Per-country `DR_NOT_OFFERED` (DR-014); confirm Legal clearance per customer class                  |
 | **Europe absorbs Middle East DR load**   | Europe DR capacity/quota pressure            | Include ME protected portion in Europe HC-6/HC-7 floors; weighted destination selection; capacity forecasting |
-| **Domain-group proliferation**           | CRG/subscription/ig sprawl                  | Domain registry governance (DOM-002), deterministic naming (C-12), CAP-025 structure; POC-013        |
+| **Domain-group proliferation**           | CRG/subscription sprawl                  | Domain registry governance (DOM-002), deterministic naming (C-12), CAP-025 structure; POC-013        |
 | **Cross-domain sharing mis-grant**       | ENV-003 violation / isolation breach        | Domain-bounded grants only (DOM-004), audit with domain token, reconciliation (CAP-005)              |
-| **Two-scope drift**                      | Domain ig placed outside customer CRV       | PLC-015 gate + RDY-004 freshness on CRV reads; PLC-005 migration workflow                           |
+| **Two-scope drift**                      | Domain placed outside customer CRV       | PLC-015 gate + RDY-004 freshness on CRV reads; PLC-005 migration workflow                           |
 | **DR Foundation under-sized**            | Bootstrap insufficient for P0 waves         | Configurable sizing (C-16) with structured validation (POC-007); staged acquisition (DR-006)         |
 
 ---
@@ -2142,8 +2193,8 @@ roadmap items. Status labels follow Appendix C.)*
 **FWD-001 — Capacity forecasting (extends DAT-004).** The two-scope
 model changes the forecasting **grain**: forecasts are computed at
 **customer aggregate (CRV)** for region-level demand and at **domain
-ig (DPB)** for CRG/quota sizing. Forecasting therefore requires:
-per-domain ig trend records (allocated, buffer, utilisation) keyed
+subscription (DPB)** for CRG/quota sizing. Forecasting therefore requires:
+per-domain capacity trend records (allocated, buffer, utilisation) keyed
 (domain × environment × region); roll-up to customer and region
 aggregate; and feed into PLC-016 combined region-load observation and
 QUA-015 replenishment planning. Status: **Baseline-design change
@@ -2170,7 +2221,7 @@ region × family cell with domain-aware draws. Status: **Unchanged
 direction; grain updated**.
 
 **FWD-004 — Cost modelling (extends FIN-001/004/008).** Multi-domain
-ig splits cost attribution by domain while CRV binds regions once;
+subscription splits cost attribution by domain while CRV binds regions once;
 FinOps attribution keys become (customer, domain, environment,
 region). Shared CVAL/DR CRG cost is single-counted per domain; DR
 Foundation cost is attributed to the DR function per domain
@@ -2190,7 +2241,7 @@ to integration mechanism; payload shape updated with domain token.
 Status: **External dependency — payload contract change**.
 
 **FWD-007 — Capacity buffer calculation (extends CAP-003).** Buffer
-policy remains `allocated + buffer` per domain ig (CAP-025); region
+policy remains `allocated + buffer` per domain subscription (CAP-025); region
 aggregate buffers are **observed, not reserved** (PLC-016). Status:
 **Configurable — scoped to domain**.
 
