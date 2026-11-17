@@ -53,8 +53,12 @@ acrme-capacity-reservation/
 │   ├── testing/                       # Binary v2.0 POC workbook (.docx/.pdf)
 │   └── README_PHASE3.md / README_PHASE4.md
 ├── src/acrme/                         # Engine implementation skeleton (installable pkg)
+├── tools/                             # Local GitHub authentication recovery helper
 └── examples/
 ```
+
+For GitHub CLI sign-in recovery and repository access checks, see
+[`tools/README.md`](tools/README.md).
 
 > **Baseline authority:** [`Requirements/acrme_requirements_baseline_v4_0_2.md`](Requirements/acrme_requirements_baseline_v4_0_2.md)
 > is the single source of truth. The v2.4 and v3.0 baseline files are retained as historical
