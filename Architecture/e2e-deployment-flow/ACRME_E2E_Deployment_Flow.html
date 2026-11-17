@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACRME End-to-End Deployment Flow</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --border: #475569;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #22c55e;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #a855f7;
+    --accent-pink: #ec4899;
+    --accent-teal: #14b8a6;
+    --accent-orange: #f97316;
+    --accent-lime: #84cc16;
+    --phase0: #6366f1;
+    --phase1: #3b82f6;
+    --phase2: #06b6d4;
+    --phase3: #ef4444;
+    --phase4: #8b5cf6;
+    --phase5: #f59e0b;
+    --phase6: #f97316;
+    --phase7: #22c55e;
+    --phase8: #14b8a6;
+    --phase9: #ec4899;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; line-height: 1.5; }
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: var(--text-muted); font-size: 14px; max-width: 700px; margin: 0 auto; }
+  .header .meta { display: flex; gap: 24px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+  .header .meta span { font-size: 12px; color: var(--text-muted); background: var(--surface); padding: 4px 12px; border-radius: 999px; }
+
+  /* Ownership banner */
+  .ownership-banner {
+    max-width: 1100px; margin: 20px auto; padding: 16px 24px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(168,85,247,0.08));
+    border: 1px solid rgba(59,130,246,0.2); border-radius: 12px;
+  }
+  .ownership-banner h3 { font-size: 14px; color: var(--accent-blue); margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .ownership-banner .boundary { display: flex; gap: 12px; flex-wrap: wrap; }
+  .ownership-banner .boundary .item {
+    flex: 1; min-width: 200px; padding: 12px 16px;
+    background: var(--surface); border-radius: 8px; border-left: 3px solid;
+  }
+  .ownership-banner .boundary .item.input { border-left-color: var(--accent-blue); }
+  .ownership-banner .boundary .item.output { border-left-color: var(--accent-amber); }
+  .ownership-banner .boundary .item.register { border-left-color: var(--accent-green); }
+  .ownership-banner .boundary .item .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+  .ownership-banner .boundary .item .val { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .ownership-banner .boundary .item .owner { font-size: 12px; color: var(--text-muted); }
+
+  /* Flow container */
+  .flow { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+  /* Connector line between phases */
+  .connector { display: flex; justify-content: center; padding: 0; }
+  .connector .line { width: 3px; height: 32px; background: linear-gradient(to bottom, var(--border), transparent); }
+  .connector .arrow { width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid var(--border); }
+  .connector-wrap { display: flex; flex-direction: column; align-items: center; }
+
+  /* Phase card */
+  .phase {
+    background: var(--surface); border-radius: 16px; margin-bottom: 8px;
+    border: 1px solid var(--border); overflow: hidden;
+    transition: box-shadow 0.3s;
+  }
+  .phase:hover { box-shadow: 0 0 30px rgba(59,130,246,0.1); }
+  .phase-header {
+    display: flex; align-items: center; gap: 16px; padding: 16px 24px;
+    cursor: pointer; user-select: none;
+  }
+  .phase-header:hover { background: rgba(255,255,255,0.02); }
+  .phase-num {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px; color: #fff; flex-shrink: 0;
+  }
+  .phase-title { flex: 1; }
+  .phase-title h2 { font-size: 17px; font-weight: 700; }
+  .phase-title .scope { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .phase-owner {
+    font-size: 11px; padding: 4px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.06); color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .phase-toggle { font-size: 20px; color: var(--text-muted); transition: transform 0.3s; flex-shrink: 0; }
+  .phase.open .phase-toggle { transform: rotate(180deg); }
+  .phase-body { display: none; padding: 0 24px 20px; }
+  .phase.open .phase-body { display: block; }
+
+  /* Steps inside a phase */
+  .step { margin-top: 16px; }
+  .step-header {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 600; margin-bottom: 8px;
+  }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .step-label { font-size: 11px; color: var(--text-muted); padding: 2px 8px; background: var(--surface2); border-radius: 4px; margin-left: auto; }
+
+  /* Check rows */
+  .checks { display: flex; flex-direction: column; gap: 6px; }
+  .check-row {
+    display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px;
+    background: var(--bg); border-radius: 8px; font-size: 13px;
+  }
+  .check-row .icon { flex-shrink: 0; width: 20px; text-align: center; font-size: 14px; margin-top: 1px; }
+  .check-row .content { flex: 1; }
+  .check-row .content .name { font-weight: 600; }
+  .check-row .content .detail { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+  .check-row .req {
+    font-size: 10px; padding: 2px 6px; border-radius: 4px;
+    background: rgba(59,130,246,0.15); color: var(--accent-blue);
+    white-space: nowrap; flex-shrink: 0; font-weight: 600;
+    align-self: center;
+  }
+  .check-row.gate .icon { color: var(--accent-red); }
+  .check-row.action .icon { color: var(--accent-blue); }
+  .check-row.output .icon { color: var(--accent-green); }
+  .check-row.decision .icon { color: var(--accent-amber); }
+  .check-row.info .icon { color: var(--accent-purple); }
+
+  /* HC gate grid */
+  .hc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 8px; }
+  .hc-card {
+    background: var(--bg); border-radius: 8px; padding: 10px 12px;
+    border-left: 3px solid var(--accent-red);
+  }
+  .hc-card .hc-id { font-size: 11px; font-weight: 700; color: var(--accent-red); text-transform: uppercase; }
+  .hc-card .hc-name { font-size: 13px; font-weight: 600; margin: 2px 0; }
+  .hc-card .hc-desc { font-size: 11px; color: var(--text-muted); }
+  .hc-card.pre-filter { border-left-color: var(--accent-amber); }
+  .hc-card.pre-filter .hc-id { color: var(--accent-amber); }
+
+  /* Readiness states */
+  .state-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-top: 8px; }
+  .state-chip {
+    padding: 8px 12px; border-radius: 8px; font-size: 12px;
+    background: var(--bg); display: flex; align-items: center; gap: 8px;
+  }
+  .state-chip .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .state-chip .dot.green { background: var(--accent-green); }
+  .state-chip .dot.yellow { background: var(--accent-amber); }
+  .state-chip .dot.red { background: var(--accent-red); }
+  .state-chip .dot.gray { background: var(--border); }
+  .state-chip .dot.purple { background: var(--accent-purple); }
+  .state-chip .sname { font-weight: 600; font-size: 11px; }
+
+  /* DR stages */
+  .dr-stages { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; counter-reset: stage; }
+  .dr-stage {
+    display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px;
+    background: var(--bg); border-radius: 8px; font-size: 13px;
+    counter-increment: stage;
+  }
+  .dr-stage::before {
+    content: counter(stage); font-weight: 800; font-size: 12px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(236,72,153,0.15); color: var(--accent-pink);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .dr-stage .content { flex: 1; }
+  .dr-stage .content .name { font-weight: 600; }
+  .dr-stage .content .detail { font-size: 12px; color: var(--text-muted); }
+
+  /* Scoring table */
+  .score-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+  .score-table th { text-align: left; padding: 6px 10px; background: var(--bg); color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .score-table td { padding: 6px 10px; border-bottom: 1px solid rgba(71,85,105,0.3); }
+  .score-table tr:last-child td { border-bottom: none; }
+
+  /* DPB steps visual */
+  .dpb-pipeline { display: flex; gap: 4px; margin-top: 12px; flex-wrap: wrap; }
+  .dpb-step {
+    flex: 1; min-width: 140px; padding: 12px; border-radius: 10px;
+    background: var(--bg); text-align: center; position: relative;
+  }
+  .dpb-step .num { font-size: 20px; font-weight: 800; color: var(--accent-cyan); }
+  .dpb-step .sname { font-size: 12px; font-weight: 600; margin-top: 4px; }
+  .dpb-step .sdesc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .dpb-step .sreq { font-size: 10px; color: var(--accent-blue); margin-top: 4px; }
+  .dpb-arrow { display: flex; align-items: center; color: var(--border); font-size: 20px; }
+
+  /* Legend */
+  .legend { max-width: 1100px; margin: 20px auto; padding: 16px 24px; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .legend-item .li-icon { font-size: 14px; }
+
+  /* Footer */
+  .footer { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 12px; }
+
+  @media (max-width: 768px) {
+    .header h1 { font-size: 22px; }
+    .hc-grid { grid-template-columns: 1fr; }
+    .dpb-pipeline { flex-direction: column; }
+    .dpb-arrow { transform: rotate(90deg); justify-content: center; }
+    .ownership-banner .boundary { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ACRME End-to-End Deployment Flow</h1>
+  <p>Customer Onboarding → Placement → Service Deployment → Readiness → Steady State → DR</p>
+  <div class="meta">
+    <span>Baseline v4.0.2</span>
+    <span>HC-1…HC-11</span>
+    <span>17 Nov 2026</span>
+  </div>
+</div>
+
+<div class="ownership-banner">
+  <h3>Ownership Boundary (v4.0.1)</h3>
+  <div class="boundary">
+    <div class="item input">
+      <div class="label">Input to service deployment</div>
+      <div class="val">Region Placement (CRV)</div>
+      <div class="owner">Decided by: Placement Engine</div>
+    </div>
+    <div class="item input">
+      <div class="label">Input to service deployment</div>
+      <div class="val">Capacity Envelope (DPB)</div>
+      <div class="owner">Decided by: Placement Engine</div>
+    </div>
+    <div class="item output">
+      <div class="label">Output of service deployment</div>
+      <div class="val">Instance Group</div>
+      <div class="owner">Decided by: Service Owner</div>
+    </div>
+    <div class="item register">
+      <div class="label">Post-deployment registration</div>
+      <div class="val">Service ↔ IG Mapping</div>
+      <div class="owner">Registered in: Gravity</div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="li-icon">🛑</span> Hard-constraint gate (binary pass/fail)</div>
+  <div class="legend-item"><span class="li-icon">⚙️</span> Action / operation</div>
+  <div class="legend-item"><span class="li-icon">✔️</span> Output / result</div>
+  <div class="legend-item"><span class="li-icon">⚠️</span> Decision / branch</div>
+  <div class="legend-item"><span class="li-icon">📌</span> Reference / info</div>
+</div>
+
+<div class="flow" id="flow"></div>
+
+<div class="footer">
+  ACRME Capacity Reservation Management Engine &middot; Requirements Baseline v4.0.2 &middot; All checks cited to normative requirements
+</div>
+
+<script>
+const phases = [
+  {
+    id: 0, title: "Commercial / Customer Onboarding", color: "#6366f1",
+    scope: "Per customer — beginning of flow",
+    owner: "Onboarding / upstream workflow",
+    steps: [
+      {
+        name: "Customer Exists Check", label: "Step 0.1",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Query authoritative state store for existing seed record", req: "PLC-003, DAT-001" },
+          { type: "decision", icon: "⚠️", name: "Existing customer?", detail: "If seed exists → fetch cached CRV, skip to Phase 2 (DPB). If new → proceed to geography selection." },
+        ]
+      },
+      {
+        name: "Geography Selection", label: "Step 0.2",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Determine customer's geography from region catalogue", detail: "Business location, legal requirements, data residency", req: "REG-001" },
+          { type: "output", icon: "✔️", name: "Geography code → distribution model", detail: "US=three_region | EU/AU/APAC=two_region | ME=cross_geography_dr", req: "REG-003" },
+        ]
+      }
+    ]
+  },
+  {
+    id: 1, title: "CRV Resolution (Customer Region Vector)", color: "#3b82f6",
+    scope: "Customer × Geography — resolved ONCE, cached, reused by all domain groups",
+    owner: "Placement Engine",
+    steps: [
+      {
+        name: "Pre-Filtering (Candidate Set Formation)", label: "Step 1.1",
+        checks: [
+          { type: "gate", icon: "🛑", name: "HC-8: GEOGRAPHY_CONTAINMENT", detail: "Region must belong to customer's selected geography", req: "HC-8" },
+          { type: "gate", icon: "🛑", name: "HC-9: STANDARD_REGION_ONLY", detail: "Only Standard-class regions eligible; Restricted regions require approved exception", req: "HC-9" },
+          { type: "output", icon: "✔️", name: "Output: candidate set of Standard regions within geography" },
+        ]
+      },
+      {
+        name: "Hard Constraint Gate (Binary Pass/Fail)", label: "Step 1.2",
+        customHC: true
+      },
+      {
+        name: "Scoring (Weighted Capacity Placement Model)", label: "Step 1.3",
+        customScoring: true
+      },
+      {
+        name: "Region Assignment", label: "Step 1.4",
+        checks: [
+          { type: "action", icon: "⚙️", name: "3-region (US): Prod=argmax(PS_Prod), CVAL=argmax(PS_NonProd) over remaining, DR=argmax(PS_DR) over remaining", req: "REG-003" },
+          { type: "action", icon: "⚙️", name: "2-region (EU/AU/APAC): Prod=argmax(PS_Prod), CVAL+DR co-locate in remaining region deterministically", req: "PLC-010a" },
+          { type: "action", icon: "⚙️", name: "Cross-geo (ME): Prod+CVAL co-locate in ME, DR=argmax(PS_DR) over Europe Standard regions", req: "PLC-010b, DR-020" },
+        ]
+      },
+      {
+        name: "CRV Output & Persistence", label: "Step 1.5",
+        checks: [
+          { type: "output", icon: "✔️", name: "CRV = (geography, distribution_model, R_p, R_c, R_d)", req: "PLC-013" },
+          { type: "action", icon: "⚙️", name: "Write seed record to authoritative state store", detail: "Customer ID, realm, geography, CRV, domain groups, decision timestamp, policy version, capacity snapshot", req: "PLC-003, DAT-001" },
+          { type: "gate", icon: "🛑", name: "Freshness gate: seed record age ≤ configured max age", detail: "Stale reads trigger STALE_STATE", req: "RDY-004" },
+          { type: "info", icon: "📌", name: "CRV is immutable: change requires approved migration/exception workflow", req: "PLC-005" },
+        ]
+      },
+    ]
+  },
+  {
+    id: 2, title: "DPB Resolution (Domain Placement Binding)", color: "#06b6d4",
+    scope: "Per Domain Group (D) × Environment (E) × CRV Region (R)",
+    owner: "Platform Engineering",
+    steps: [
+      {
+        name: "Two-Phase Gate", label: "Gate",
+        checks: [
+          { type: "gate", icon: "🛑", name: "PLC-015: CRV resolution strictly precedes DPB", detail: "A domain group never re-runs region selection; CRV is cached input", req: "PLC-015, VR-14" },
+        ]
+      },
+      {
+        name: "DPB Five-Step Pipeline", label: "Steps 2.1–2.5",
+        customDPB: true
+      }
+    ]
+  },
+  {
+    id: 3, title: "Readiness Gate (Pre-Deploy)", color: "#ef4444",
+    scope: "Per deployment — all checks must pass before proceeding",
+    owner: "Capacity / Placement Engine",
+    steps: [
+      {
+        name: "12-Point Readiness Check (RDY-001)", label: "Gate",
+        checks: [
+          { type: "gate", icon: "🛑", name: "1. Target region approved", detail: "Region in approved catalogue; CRV valid", req: "RDY-001" },
+          { type: "gate", icon: "🛑", name: "2. Zone supported", detail: "Physical zone available; logical-to-physical mapping resolved", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "3. SKU supported", detail: "VM SKU in eligible scope file for region/zone", req: "RDY-001" },
+          { type: "gate", icon: "🛑", name: "4. Reservation policy known", detail: "Prod=mandatory (CAP-017); others=configurable (ENV-002)", req: "RDY-001" },
+          { type: "gate", icon: "🛑", name: "5. Reservation exists (if required)", detail: "CR present, SKU/region/zone match", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "6. Consumer subscription authorised (if shared)", detail: "≤100 subs, same tenant, domain-bounded (DOM-004)", req: "CAP-013, CAP-016" },
+          { type: "gate", icon: "🛑", name: "7. Sufficient reservation or approved over-allocation", req: "RDY-001" },
+          { type: "gate", icon: "🛑", name: "8. Sufficient quota (VM-family vCPU cap)", req: "QUA-002" },
+          { type: "gate", icon: "🛑", name: "9. Sufficient quota (total regional vCPU cap)", req: "QUA-002" },
+          { type: "gate", icon: "🛑", name: "10. Records fresh enough", detail: "Snapshot age ≤ max age; stale → STALE_STATE", req: "RDY-004" },
+          { type: "gate", icon: "🛑", name: "11. No blocking policy/exception", detail: "No DR_NOT_OFFERED, subscription freeze, etc.", req: "RDY-001" },
+          { type: "gate", icon: "🛑", name: "12. Capacity and quota balanced", detail: "Correlated by region, zone, SKU, subscription, environment, domain", req: "RDY-003" },
+        ]
+      },
+      {
+        name: "Reservation Integrity Validation (CAP-016)", label: "Pre-deploy",
+        checks: [
+          { type: "gate", icon: "🛑", name: "Reservation exists in target subscription", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "SKU match: VM SKU = reservation VM size", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "Region match", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "Zone match (physical): consumer logical zone → provider physical zone", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "Consumer authorised (if shared)", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "Quantity sufficient or approved over-allocation", req: "CAP-016" },
+          { type: "gate", icon: "🛑", name: "Quota available (both caps)", req: "CAP-016, QUA-002" },
+        ]
+      },
+      {
+        name: "Readiness States (RDY-002)", label: "Output",
+        customStates: true
+      }
+    ]
+  },
+  {
+    id: 4, title: "Platform Foundation (Regional Prep)", color: "#8b5cf6",
+    scope: "Per region — triggered when readiness = READY",
+    owner: "Platform Team",
+    steps: [
+      {
+        name: "Regional Preparation", label: "Steps 4.1–4.3",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Product cell provisioning", detail: "Region-specific infrastructure: networking, control plane, operators" },
+          { type: "action", icon: "⚙️", name: "Desired state application", detail: "Platform operators apply target configuration per DPB envelope" },
+          { type: "action", icon: "⚙️", name: "In-region HA setup", detail: "Zone redundancy per CAP-023", req: "CAP-023" },
+        ]
+      }
+    ]
+  },
+  {
+    id: 5, title: "Service Deployment", color: "#f59e0b",
+    scope: "Per service — Service Owner scope",
+    owner: "Service Owner / Product Automation",
+    steps: [
+      {
+        name: "Deployment Pipeline", label: "Steps 5.1–5.7",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Receive placement context", detail: "CRV + DPB capacity envelope provided to deployment pipeline", req: "INT-004, INT-008" },
+          { type: "decision", icon: "⚠️", name: "Instance Group definition", detail: "Service Owner defines which IG this service belongs to, based on domain, service type, operational requirements" },
+          { type: "action", icon: "⚙️", name: "Instance Group selection", detail: "Deployment automation selects the target IG" },
+          { type: "action", icon: "⚙️", name: "VM association with reservation", detail: "Associate VM/VMSS with validated reservation reference", req: "INT-005" },
+          { type: "gate", icon: "🛑", name: "Concurrent deployment control", detail: "Prevent two decisions consuming the same last unit", req: "INT-006" },
+          { type: "action", icon: "⚙️", name: "Partial-failure handling", detail: "If quota allocated but deploy fails → record partial state, compensate or raise task", req: "INT-007" },
+          { type: "output", icon: "✔️", name: "Service ↔ IG registration in Gravity", detail: "Global system of record" },
+        ]
+      },
+      {
+        name: "Integration Checks", label: "INT-001…008",
+        checks: [
+          { type: "gate", icon: "🛑", name: "Capacity API called before first deployment", req: "INT-001" },
+          { type: "gate", icon: "🛑", name: "Idempotent operations", detail: "Same correlation ID + desired state = no duplicate", req: "INT-002" },
+          { type: "gate", icon: "🛑", name: "Required input present", detail: "Customer, domain token, product, env, region, SKU+count, zone, priority, correlation ID", req: "INT-003, INT-008" },
+          { type: "gate", icon: "🛑", name: "Two-scope ordering enforced", detail: "CRV precedes DPB; CRV treated as cached input", req: "PLC-015" },
+        ]
+      }
+    ]
+  },
+  {
+    id: 6, title: "IG Provisioning / Scaling", color: "#f97316",
+    scope: "Service lifecycle (ongoing)",
+    owner: "Product / Service DevOps Pipeline",
+    steps: [
+      {
+        name: "Lifecycle Operations", label: "Steps 6.1–6.4",
+        checks: [
+          { type: "action", icon: "⚙️", name: "IG provisioning with DPB capacity envelope context" },
+          { type: "action", icon: "⚙️", name: "IG scaling via shard registry", detail: "Primary subscription at limits → next shard (-02, -03)", req: "ADR-007 §10, DOM-003" },
+          { type: "action", icon: "⚙️", name: "Reactive SKU/AZ discovery", detail: "New combinations reconciled with governance within SLA", req: "CAP-024, CAP-019" },
+          { type: "action", icon: "⚙️", name: "Seed reservation scaling", detail: "Count-0 seeds scale up when demand appears", req: "CAP-022" },
+        ]
+      }
+    ]
+  },
+  {
+    id: 7, title: "Production Readiness & Go-Live", color: "#22c55e",
+    scope: "Per realm — SRE / Operations",
+    owner: "SRE / Operations",
+    steps: [
+      {
+        name: "Go-Live Gate", label: "Steps 7.1–7.8",
+        checks: [
+          { type: "gate", icon: "🛑", name: "Health endpoint exposed and healthy" },
+          { type: "gate", icon: "🛑", name: "Dependency validation", detail: "All upstream/downstream dependencies reachable" },
+          { type: "gate", icon: "🛑", name: "Synthetic checks pass", detail: "Automated synthetic transactions verify e2e flow" },
+          { type: "gate", icon: "🛑", name: "Business checks pass" },
+          { type: "gate", icon: "🛑", name: "One-writer-per-realm", detail: "Partition safety" },
+          { type: "gate", icon: "🛑", name: "DR readiness certification", detail: "DR Foundation tests complete with recorded evidence", req: "ENV-005, DR-021" },
+          { type: "gate", icon: "🛑", name: "Failover capacity reserved", detail: "Warm replicas in failover PIN; onboarding rejected/delayed if not reserved" },
+          { type: "output", icon: "✔️", name: "Production-live gate passed → customer is LIVE" },
+        ]
+      }
+    ]
+  },
+  {
+    id: 8, title: "Steady State Operations", color: "#14b8a6",
+    scope: "Ongoing — continuous monitoring and reconciliation",
+    owner: "SRE + Capacity Platform",
+    steps: [
+      {
+        name: "Continuous Operations", label: "Ongoing",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Reconciliation", detail: "Periodic reconciliation of reservations, quota, scope file", req: "CAP-019, CAP-024" },
+          { type: "action", icon: "⚙️", name: "Buffer management", detail: "Configurable policy, never fixed %", req: "CAP-003, C-1" },
+          { type: "action", icon: "⚙️", name: "Quota monitoring", detail: "Group + subscription replenishment at 85% thresholds", req: "QUA-015" },
+          { type: "action", icon: "⚙️", name: "Zone rebalancing", detail: "Per-domain drift monitoring; rebalance when skew > tolerance", req: "PLC-016, C-13" },
+          { type: "action", icon: "⚙️", name: "Combined-load observation", detail: "Cross-domain regional load — alert only, never enforcement", req: "OBS-002, C-15" },
+          { type: "action", icon: "⚙️", name: "Idle cost measurement", detail: "Cost of unused reserved capacity tracked", req: "FIN-001" },
+          { type: "action", icon: "⚙️", name: "Audit trail", detail: "All capacity/quota operations logged", req: "QUA-014" },
+          { type: "action", icon: "⚙️", name: "DR drill rotation", detail: "Periodic drills without losing seed or audit trail", req: "DR-012" },
+        ]
+      }
+    ]
+  },
+  {
+    id: 9, title: "Disaster Recovery Activation", color: "#ec4899",
+    scope: "On authorised DR declaration — per customer across regions",
+    owner: "SRE / DR Operations",
+    steps: [
+      {
+        name: "Failure Detection & Declaration", label: "Step 9.1",
+        checks: [
+          { type: "gate", icon: "🛑", name: "Region unavailability confirmed", detail: "Single-region failure basis; multi-region outside default model", req: "DR-001" },
+          { type: "gate", icon: "🛑", name: "DR declaration authorised", detail: "Destructive/CVAL-impacting actions only after authorised declaration", req: "DR-010" },
+          { type: "gate", icon: "🛑", name: "Source region capacity excluded", detail: "Do not count reservations/quota from the unavailable source", req: "DR-011" },
+        ]
+      },
+      {
+        name: "DR Index Lookup", label: "Step 9.2",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Query source→destination DR index", detail: "Bidirectional mapping: destinations, quantities, SKUs, domain attribution", req: "DR-018" },
+          { type: "action", icon: "⚙️", name: "Identify affected customers/realms and standby instances", req: "DR-019" },
+        ]
+      },
+      {
+        name: "Staged Capacity Acquisition (DR-006)", label: "Step 9.3",
+        customDR: true
+      },
+      {
+        name: "Standby Activation & Recovery", label: "Step 9.4–9.5",
+        checks: [
+          { type: "action", icon: "⚙️", name: "Control plane first", detail: "Platform control planes before customer workload waves", req: "DR-008" },
+          { type: "action", icon: "⚙️", name: "Transition DR instances: standby → active", detail: "In business-priority order (P0/P-1 first)", req: "DR-019, DR-009" },
+          { type: "action", icon: "⚙️", name: "Per-domain activation", detail: "Each domain fails over independently; DR Foundation + CVAL extension", req: "DOM-003, DR-021" },
+          { type: "action", icon: "⚙️", name: "Routing & recovery", detail: "Stop routing to failed region, promote replicas, update APIM, deploy Service-0" },
+          { type: "output", icon: "✔️", name: "Activation state tracked per customer/domain", detail: "Auditable and reversible on failback", req: "DR-019" },
+        ]
+      },
+      {
+        name: "Failback", label: "Step 9.6",
+        checks: [
+          { type: "info", icon: "📌", name: "Failback policy is configurable", detail: "Extended DR run (~1 year preferred) or earlier failback (~30 days)", req: "DR-013, C-5" },
+          { type: "info", icon: "📌", name: "Business decision, not engine-automated", req: "DR-013" },
+          { type: "gate", icon: "🛑", name: "Seed/state/audit trail preserved through failback", req: "DR-012" },
+        ]
+      }
+    ]
+  }
+];
+
+const hcGates = [
+  { id: "HC-1", name: "REGION_SEPARATION", desc: "Prod ≠ DR; Prod ≠ CVAL; CVAL/DR co-location only under approved policy" },
+  { id: "HC-2", name: "CAPACITY_FLOOR", desc: "Sufficient reservable capacity for minimum demand + buffer" },
+  { id: "HC-3", name: "QUOTA_FLOOR", desc: "Sufficient quota headroom after protecting Prod floor and DR earmark" },
+  { id: "HC-4", name: "DR_SEPARATION_CLASS", desc: "DR region class ≥ Prod region class" },
+  { id: "HC-5", name: "ZONE_AVAILABILITY", desc: "Region must have ≥ 1 AZ; 0-AZ regions ineligible" },
+  { id: "HC-6", name: "DR_COVERAGE_FLOOR", desc: "Destination can absorb domain's protected Prod portion for DR" },
+  { id: "HC-7", name: "DR_FLOOR_INTEGRITY", desc: "DR floor within quota group not consumed by NonProd placement" },
+  { id: "HC-10", name: "CROSS_GEO_EXTENSION", desc: "Cross-geography DR has an approved extension path" },
+];
+
+const dpbSteps = [
+  { num: "①", name: "Subscription", desc: "One per D×E", req: "DOM-002, OPS-006" },
+  { num: "②", name: "CRG Set", desc: "pr / cvdr / drf", req: "CAP-025, ENV-003" },
+  { num: "③", name: "CR Sizing", desc: "allocated + buffer", req: "CAP-003, F.1\u2013F.3" },
+  { num: "④", name: "Zone Targets", desc: "even distribution", req: "PLC-016, F.9" },
+  { num: "⑤", name: "Quota Draw", desc: "central group", req: "QUA-015, F.4\u2013F.5" },
+];
+
+const drStages = [
+  { name: "Use approved bootstrap / pre-staged headroom", detail: "DR Foundation CRG set (crg-drf-*) — always present", req: "DR-021" },
+  { name: "Allocate available reservation + quota", detail: "Existing headroom in destination" },
+  { name: "Shut down / disassociate eligible CVAL workloads", detail: "CVAL-sacrifice releases capacity from crg-cvdr-*", req: "DR-005/006" },
+  { name: "Share or reassign reservations", detail: "Within region/zone boundaries, domain-bounded", req: "CAP-013, DOM-004" },
+  { name: "Allocate pooled quota to DR subscriptions", detail: "Central quota group draw", req: "QUA-015" },
+  { name: "Request additional Azure quota/capacity", detail: "Where stages 1–5 are insufficient" },
+  { name: "Report unrecoverable capacity gaps", detail: "Transparent gap reporting" },
+];
+
+const readinessStates = [
+  { name: "READY", dot: "green" },
+  { name: "READY_WITH_RISK", dot: "yellow" },
+  { name: "QUOTA_DEFICIT", dot: "red" },
+  { name: "RESERVATION_DEFICIT", dot: "red" },
+  { name: "CAPACITY_UNAVAILABLE", dot: "red" },
+  { name: "STALE_STATE", dot: "gray" },
+  { name: "POLICY_BLOCKED", dot: "purple" },
+  { name: "VALIDATION_REQUIRED", dot: "yellow" },
+];
+
+const scoringRows = [
+  { env: "PS_Prod", a: "0.30", b: "0.25", g: "0.20", d: "0.15", e: "0.10", z: "—" },
+  { env: "PS_NonProd", a: "0.15", b: "0.25", g: "0.20", d: "0.30", e: "0.10", z: "—" },
+  { env: "PS_DR", a: "0.30", b: "0.20", g: "0.15", d: "0.15", e: "0.10", z: "0.10" },
+];
+
+function renderChecks(checks) {
+  return checks.map(c => `
+    <div class="check-row ${c.type}">
+      <div class="icon">${c.icon}</div>
+      <div class="content">
+        <div class="name">${c.name}</div>
+        ${c.detail ? `<div class="detail">${c.detail}</div>` : ''}
+      </div>
+      ${c.req ? `<div class="req">${c.req}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderHCGrid() {
+  return `<div class="hc-grid">${hcGates.map(hc => `
+    <div class="hc-card">
+      <div class="hc-id">${hc.id}</div>
+      <div class="hc-name">${hc.name}</div>
+      <div class="hc-desc">${hc.desc}</div>
+    </div>
+  `).join('')}</div>
+  <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">Any region failing any HC is excluded entirely — never penalised with a lower score.</div>`;
+}
+
+function renderScoring() {
+  return `<table class="score-table">
+    <tr><th>Formula</th><th>α NP headroom</th><th>β Rsv util</th><th>γ Fairness</th><th>δ DR readiness</th><th>ε Zone density</th><th>ζ Overcommit</th></tr>
+    ${scoringRows.map(r => `<tr><td style="font-weight:600">${r.env}</td><td>${r.a}</td><td>${r.b}</td><td>${r.g}</td><td>${r.d}</td><td>${r.e}</td><td>${r.z}</td></tr>`).join('')}
+  </table>
+  <div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Scoring at customer-aggregate scope (PLC-007/008, F.11). Region = argmax(PS) per environment.</div>`;
+}
+
+function renderDPB() {
+  return `<div class="dpb-pipeline">
+    ${dpbSteps.map((s, i) => `
+      ${i > 0 ? '<div class="dpb-arrow">→</div>' : ''}
+      <div class="dpb-step">
+        <div class="num">${s.num}</div>
+        <div class="sname">${s.name}</div>
+        <div class="sdesc">${s.desc}</div>
+        <div class="sreq">${s.req}</div>
+      </div>
+    `).join('')}
+  </div>
+  <div style="margin-top:12px;padding:10px 14px;background:rgba(6,182,212,0.08);border-radius:8px;border:1px solid rgba(6,182,212,0.2);font-size:13px">
+    <strong>Output:</strong> Capacity envelope per (D, E, R) — subscription, CRG set IDs, CR sizing per SKU×zone, zone targets, quota draw. <br/>
+    <span style="color:var(--accent-amber)"><strong>DPB does NOT output Instance Group.</strong></span> IG is determined downstream by Service Owner.
+  </div>`;
+}
+
+function renderStates() {
+  return `<div class="state-grid">${readinessStates.map(s => `
+    <div class="state-chip"><div class="dot ${s.dot}"></div><div class="sname">${s.name}</div></div>
+  `).join('')}</div>`;
+}
+
+function renderDRStages() {
+  return `<div class="dr-stages">${drStages.map(s => `
+    <div class="dr-stage">
+      <div class="content">
+        <div class="name">${s.name}</div>
+        <div class="detail">${s.detail}${s.req ? ` <span style="color:var(--accent-blue);font-size:10px;font-weight:600">${s.req}</span>` : ''}</div>
+      </div>
+    </div>
+  `).join('')}</div>
+  <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">P0/P-1 customers start immediately from bootstrap (DR-008 control plane first, DR-009 prioritised waves) while rebalancing proceeds.</div>`;
+}
+
+const flow = document.getElementById('flow');
+phases.forEach((phase, idx) => {
+  // Connector
+  if (idx > 0) {
+    const conn = document.createElement('div');
+    conn.className = 'connector';
+    conn.innerHTML = '<div class="connector-wrap"><div class="line"></div><div class="arrow"></div></div>';
+    flow.appendChild(conn);
+  }
+
+  const div = document.createElement('div');
+  div.className = 'phase' + (idx < 3 ? ' open' : '');
+  
+  let stepsHTML = '';
+  phase.steps.forEach(step => {
+    let body = '';
+    if (step.customHC) body = renderHCGrid();
+    else if (step.customScoring) body = renderScoring();
+    else if (step.customDPB) body = renderDPB();
+    else if (step.customStates) body = renderStates();
+    else if (step.customDR) body = renderDRStages();
+    else body = `<div class="checks">${renderChecks(step.checks)}</div>`;
+    
+    stepsHTML += `
+      <div class="step">
+        <div class="step-header">
+          <div class="step-dot" style="background:${phase.color}"></div>
+          ${step.name}
+          ${step.label ? `<div class="step-label">${step.label}</div>` : ''}
+        </div>
+        ${body}
+      </div>
+    `;
+  });
+
+  div.innerHTML = `
+    <div class="phase-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="phase-num" style="background:${phase.color}">${phase.id}</div>
+      <div class="phase-title">
+        <h2>${phase.title}</h2>
+        <div class="scope">${phase.scope}</div>
+      </div>
+      <div class="phase-owner">${phase.owner}</div>
+      <div class="phase-toggle">▼</div>
+    </div>
+    <div class="phase-body">${stepsHTML}</div>
+  `;
+  flow.appendChild(div);
+});
+</script>
+</body>
+</html>
