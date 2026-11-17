@@ -42,7 +42,7 @@ source changes.
 |---|---|
 | [`adr/`](../Architecture/adr/) | Individual ADRs and rendered diagrams. Their v2.4 reconciliation notes are historical; see the ADR index for the v4.0 authority caveat. |
 | [`diagrams/`](../Architecture/diagrams/) | Source architecture diagrams (`.png`/`.svg`/`.mmd`), the `fdd/`+`tdd/` diagram sources, and the architecture diagrams deck (`.pptx`/`.pdf`). |
-| [`tools/`](../Architecture/tools/) | ADR/doc build-transform helper scripts. |
+| [`tools/`](../Architecture/tools/) | ADR/doc build-transform and Markdown-format helpers; see [`tools/README.md`](../Architecture/tools/README.md). |
 
 ### [`/POC-Test-Scripts`](../POC-Test-Scripts/) — executable suite + spec workbook
 

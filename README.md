@@ -28,7 +28,7 @@ acrme-capacity-reservation/
 ├── Architecture/                      # ADRs + all architecture diagrams
 │   ├── adr/                           # Standalone ADR-001..005 (+ diagrams/, README)
 │   ├── diagrams/                      # Core view PNG/SVG + fdd/ tdd/ + architecture deck
-│   └── tools/                         # ADR/doc-build helper scripts
+│   └── tools/                         # ADR, document-build, and Markdown-format helpers
 ├── POC-Test-Scripts/                  # Executable legacy POC suite and workbook
 │   ├── README.md                      # Full suite usage guide
 │   ├── requirements.txt
