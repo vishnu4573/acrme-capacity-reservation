@@ -1,6 +1,6 @@
 flowchart TB
     TITLE["ACRME Environment v2 Policy Overview<br/>Configuration intent, not runtime-enforcement evidence"]
-    STATUS["Source: environment_v2.yaml<br/>Effective date: 2026-10-23 | Baseline: v4.0<br/>environment.yaml differs by 84 lines; configuration authority unresolved"]
+    STATUS["Source: environment_v2.yaml<br/>Effective date: 2026-10-23 | Baseline: v4.0.2<br/>Owner-confirmed standard: 2026-11-17<br/>environment.yaml is the historical what-if model"]
     TITLE --> STATUS
 
     subgraph REGIONS["Geography and Region Policy"]
@@ -50,7 +50,7 @@ flowchart TB
         direction LR
         PROD_ISOLATION["Prod reservation capacity stays isolated<br/>No Prod capacity sharing"]
         SHARING["CVAL ↔ DR sharing<br/>Same domain group + region only<br/>Cross-subscription; explicit consumer list<br/>Preview feature"]
-        FOUNDATION["DR Foundation<br/>Dedicated DR compute subscription<br/>Always present, reserved bootstrap + pre-staged quota<br/>Independent of sharing"]
+        FOUNDATION["DR Foundation<br/>Dedicated DR compute subscription<br/>Always present, reserved bootstrap + pre-staged quota<br/>Independent of sharing; tested before readiness certification"]
         DR_TRIGGER["Approved DR declaration<br/>and CVAL capacity release"]
         SHARING --> DR_TRIGGER
         FOUNDATION --> DR_TRIGGER
@@ -102,7 +102,7 @@ flowchart TB
     end
     ALLOWLIST --> ALLOWLIST_GROUPS
 
-    OPEN["Open items remain open<br/>Jira workflow/approver roles · approval scope and change rules<br/>Exact VM-size-to-series mapping · Preview-series production policy<br/>Sharing provider ownership · POC-006 DR subscription topology"]
+    OPEN["Open items remain open<br/>Jira workflow/approver roles · approval scope and change rules<br/>Exact VM-size-to-series mapping · Preview-series production policy<br/>Sharing provider ownership · DR rollout-headroom conflict<br/>POC-006 alternate shared-production-subscription exception only"]
     NEW_CAPACITY --> OPEN
 
     classDef titleBox fill:#0078D4,stroke:#004578,stroke-width:2px,color:#FFFFFF

@@ -11,8 +11,8 @@ flowchart TB
 
         subgraph SEL["Region Selection Engine"]
             direction TB
-            EXACT{"Exact region<br/>provided?<br/>(PLC-013a)"}
-            EXACT -->|"Yes"| LOCK["Lock: R_p = provided<br/>Restricted regions allowed"]
+            EXACT{"Exact region<br/>provided?<br/>(PLC-001 default)"}
+            EXACT -->|"Yes"| LOCK["Lock: R_p = provided<br/>Restricted Prod requires approved exception"]
             EXACT -->|"No"| WEIGHT["Weighted selection<br/>from Standard regions<br/>(REG-002 · PLC-007/008)"]
             WEIGHT --> BIND
             LOCK --> BIND
@@ -52,6 +52,7 @@ flowchart TB
         C3["PLC-010a — 2-region: CVAL + DR<br/>co-locate, separate CRGs"]
         C4["DOM-004 — sharing isolation =<br/>domain boundary"]
         C5["PLC-015 — CRV gate: no DPB<br/>until CRV is resolved"]
+        C6["PLC-014 — DPB resolves subscription and capacity envelope;<br/>Service Owner / Product Automation selects IG downstream"]
     end
 
     DIST --> CONSTRAINTS
@@ -66,7 +67,7 @@ flowchart TB
         G6["<b>R_c</b> — CVAL region"]
         G7["<b>R_d</b> — DR region"]
         G8["<b>mod</b> — Distribution model"]
-        G9["<b>ig</b> — Instance Group"]
+        G9["<b>DPB</b> — domain compute subscription and capacity envelope"]
         G10["<b>CRG</b> — Capacity Reservation Group"]
         G11["<b>CR</b> — Capacity Reservation"]
         G12["<b>AEP</b> — Automation Entry Point"]

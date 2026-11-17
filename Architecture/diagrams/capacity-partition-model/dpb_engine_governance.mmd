@@ -7,7 +7,8 @@ flowchart TB
 
     DPB --> DPB_BIND
 
-    DPB_BIND["<b>DPB(D,E) resolves:</b><br/>───────────────────<br/>① ig — Instance Group subscription<br/>(DOM-002 · C-12 · shard registry)<br/>② CRG set — per CAP-025<br/>(Prod-dedicated | CVDR-shared)<br/>③ CR sizing — allocated + buffer<br/>(F.1 · F.2 · F.3)<br/>④ Zone distribution — per-domain<br/>(PLC-016 · F.9)<br/>⑤ Quota draw — central group<br/>(QUA-015 · region × VM-family)<br/>───────────────────<br/><b>PLC-014</b>"]
+    DPB_BIND["<b>DPB(D,E) resolves:</b><br/>───────────────────<br/>① Domain compute subscription/shard<br/>(DOM-002/003 · C-12)<br/>② CRG set — per CAP-025<br/>(Prod-dedicated | CVDR-shared | DRF)<br/>③ CR sizing — allocated + buffer<br/>(F.1 · F.2 · F.3)<br/>④ Zone distribution — per-domain<br/>(PLC-016 · F.9)<br/>⑤ Quota draw — central group<br/>(QUA-015 · region × VM-family)<br/>───────────────────<br/>DPB outputs the capacity envelope;<br/>it does not determine Instance Group.<br/><b>PLC-014</b>"]
+    SERVICE_IG["Downstream service deployment<br/>Service Owner / Product Automation selects<br/>and registers the Instance Group using DPB context"]
 
     DPB -->|"DPB(A,Prod)"| DGA
     DPB -->|"DPB(A,CVAL)"| DGA
@@ -25,9 +26,11 @@ flowchart TB
 
         A_NS["<b>CVAL Subscription</b><br/><code>sub-…-cval-wl-tms-…</code>"]
         A_DS["<b>DR Subscription</b><br/><code>sub-…-dr-wl-tms-…</code>"]
-        A_CC["🔗 CVAL/DR Shared CRG Set<br/><code>crg-cvdr-R-*</code><br/><i>Shared within THIS domain only</i><br/>ENV-003 · DOM-004 · CAP-025"]
-        A_NS --- A_CC
-        A_DS --- A_CC
+        A_CC["🔗 CVAL/DR Shared CRG Set<br/><code>crg-cvdr-R-*</code><br/><i>Same domain and region only · Preview</i><br/><i>Provider subscription pending decision</i><br/>ENV-003 · DOM-004 · CAP-025"]
+        A_NS -. "owner/consumer pending" .-> A_CC
+        A_DS -. "owner/consumer pending" .-> A_CC
+        A_DF["🛡️ DR Foundation CRG<br/><code>crg-drf-R-*</code><br/><i>Dedicated DR subscription · always present</i><br/><i>Pre-staged quota · independent of sharing</i><br/><i>Tested before readiness certification</i><br/>ENV-005 · DR-021"]
+        A_DS --- A_DF
     end
 
     subgraph DGB["Domain Group B — e.g. wl-wms"]
@@ -38,9 +41,11 @@ flowchart TB
 
         B_NS["<b>CVAL Subscription</b>"]
         B_DS["<b>DR Subscription</b>"]
-        B_CC["🔗 CVAL/DR Shared CRG Set<br/><i>Shared within THIS domain only</i>"]
-        B_NS --- B_CC
-        B_DS --- B_CC
+        B_CC["🔗 CVAL/DR Shared CRG Set<br/><i>Same domain and region only · Preview</i><br/><i>Provider subscription pending decision</i>"]
+        B_NS -. "owner/consumer pending" .-> B_CC
+        B_DS -. "owner/consumer pending" .-> B_CC
+        B_DF["🛡️ DR Foundation CRG<br/><i>Dedicated DR subscription · always present</i><br/><i>Pre-staged quota · independent of sharing</i><br/><i>Tested before readiness certification</i>"]
+        B_DS --- B_DF
     end
 
     subgraph DGN["Domain Group N"]
@@ -50,50 +55,31 @@ flowchart TB
         N_PS --- N_PC
         N_NS["<b>CVAL Subscription</b>"]
         N_DS["<b>DR Subscription</b>"]
-        N_CC["🔗 CVAL/DR Shared CRG Set"]
-        N_NS --- N_CC
-        N_DS --- N_CC
+        N_CC["🔗 CVAL/DR Shared CRG Set<br/><i>Same domain and region only · Preview</i><br/><i>Provider subscription pending decision</i>"]
+        N_NS -. "owner/consumer pending" .-> N_CC
+        N_DS -. "owner/consumer pending" .-> N_CC
+        N_DF["🛡️ DR Foundation CRG<br/><i>Dedicated DR subscription · always present</i><br/><i>Pre-staged quota · independent of sharing</i><br/><i>Tested before readiness certification</i>"]
+        N_DS --- N_DF
     end
 
-    subgraph DGF["Domain Group: Foundation Services — wl-fnd"]
-        direction TB
-        F_PS["<b>Prod Subscription</b>"]
-        F_PC["🔒 Prod CRG Set"]
-        F_PS --- F_PC
+    DPB_BIND --> SERVICE_IG
 
-        F_CVAL_INFO["<b>Standing CVAL Capacity</b><br/>IAM · APIM · Kafka · Control Plane<br/><i>Always running in DR region R_d</i><br/><i>Ready before DR declaration</i>"]
-        F_CS["<b>Foundation CVAL Subscription</b>"]
-        F_CVAL_CRG["🛡️ CVAL Foundation CRG Set<br/><code>crg-cvalf-R-*</code><br/><i>Dedicated bootstrap ·</i><br/><i>pre-staged quota</i><br/><i>Never shared with DR</i><br/>ENV-005 · DR-007 · DR-021 · QUA-015"]
-        F_CVAL_INFO --- F_CS
-        F_CS --- F_CVAL_CRG
-
-        F_DR_INFO["<b>Standing DR Capacity</b><br/>IAM · APIM · Kafka · Control Plane<br/><i>Always running in DR region R_d</i><br/><i>Ready before DR declaration</i>"]
-        F_DS["<b>Foundation DR Subscription</b>"]
-        F_DC["🛡️ DR Foundation CRG Set<br/><code>crg-drf-R-*</code><br/><i>Dedicated bootstrap ·</i><br/><i>pre-staged quota</i><br/><i>Never shared with CVAL</i><br/>ENV-005 · DR-007 · DR-021 · QUA-015"]
-        F_DR_INFO --- F_DS
-        F_DS --- F_DC
-    end
-
-    DPB -->|"DPB(FND,E)"| DGF
-
-    SUB_GOV["<b>DOM-002 — Subscription Boundary</b><br/>Each D × E deploys in a<br/>distinct subscription"]
+    SUB_GOV["<b>DOM-002 — Subscription Boundary</b><br/>Each D × E has dedicated compute and resource subscriptions;<br/>compute shard registry handles scale-out"]
     ISO["<b>ENV-003 + DOM-004 — Isolation</b><br/>CVAL/DR sharing is domain-bounded:<br/>a shared CRG never crosses<br/>domain group boundaries<br/>Prod never shares with anyone"]
 
     SUB_GOV -.->|"governs"| DGA
     SUB_GOV -.->|"governs"| DGB
     SUB_GOV -.->|"governs"| DGN
-    SUB_GOV -.->|"governs"| DGF
     ISO -.->|"enforces"| DGA
     ISO -.->|"enforces"| DGB
     ISO -.->|"enforces"| DGN
-    ISO -.->|"enforces"| DGF
 
     subgraph LEGEND["Legend"]
         direction LR
         L1["🔒 Red — Prod CRG<br/>Dedicated · never shared"]
         L2["🔗 Yellow — CVAL/DR Shared CRG<br/>Shared within one domain only"]
-        L3["🛡️ Purple — DR Foundation CRG<br/>Standing capacity · always present"]
-        L4["Blue box — Subscription<br/>One per domain × environment"]
+        L3["🛡️ Purple — per-domain DR Foundation CRG<br/>Dedicated DR subscription · always present"]
+        L4["Blue box — Compute subscription<br/>One per domain × environment"]
         L5["Dark container — Domain Group<br/>Workload-domain grouping"]
         L6["Green box — Governance rule<br/>Cross-cutting constraint"]
     end
@@ -107,8 +93,6 @@ flowchart TB
     style DGA fill:#37474f,color:#eceff1
     style DGB fill:#37474f,color:#eceff1
     style DGN fill:#37474f,color:#eceff1
-    style DGF fill:#1a237e,color:#e8eaf6
-
     style A_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
     style A_NS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
     style A_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
@@ -118,21 +102,15 @@ flowchart TB
     style N_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
     style N_NS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
     style N_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
-    style F_PS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
-    style F_CS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
-    style F_DS fill:#bbdefb,stroke:#1565c0,color:#0d47a1
-    style F_CVAL_INFO fill:#e8eaf6,stroke:#3f51b5,color:#1a237e
-    style F_DR_INFO fill:#e8eaf6,stroke:#3f51b5,color:#1a237e
-    style F_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
-
     style A_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
     style B_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
     style N_PC fill:#ffcdd2,stroke:#c62828,color:#b71c1c
     style A_CC fill:#fff9c4,stroke:#f9a825,color:#e65100
     style B_CC fill:#fff9c4,stroke:#f9a825,color:#e65100
     style N_CC fill:#fff9c4,stroke:#f9a825,color:#e65100
-    style F_CVAL_CRG fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
-    style F_DC fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+    style A_DF fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+    style B_DF fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
+    style N_DF fill:#e1bee7,stroke:#7b1fa2,color:#4a148c
 
     style LEGEND fill:#fafafa,stroke:#bdbdbd,color:#424242
     style L1 fill:#ffcdd2,stroke:#c62828,color:#b71c1c

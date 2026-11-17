@@ -24,14 +24,20 @@ classDiagram
         region
         shard
         crv_ref
-        ig_ref
+        compute_subscription_ref
         quota_route
     }
-    class InstanceGroup {
-        subscription_id
+    class DomainComputeSubscription {
+        compute_subscription_id
         domain_id
         environment
-        region
+        shard
+    }
+    class DomainResourceSubscription {
+        resource_subscription_id
+        domain_id
+        environment
+        resource_shard
     }
     class ReservationState {
         resource_id
@@ -53,7 +59,7 @@ classDiagram
         observed_transferable
     }
     class SubscriptionQuota {
-        subscription_id
+        compute_subscription_id
         region
         quota_name
         observed_limit
@@ -70,7 +76,8 @@ classDiagram
         assignment_id
         domain_id
         source_region
-        destination_ig
+        destination_region
+        destination_compute_subscription
         exact_sku
         physical_zone
     }
@@ -83,14 +90,16 @@ classDiagram
     }
     CustomerSeedRecord "1" --> "1" CustomerRegionVector : binds
     CustomerSeedRecord "1" --> "1..*" Domain : owns
+    Domain "1" --> "0..*" DomainResourceSubscription : provisions resources
     Domain "1" --> "0..*" DomainPlacementBinding : resolves
     DomainPlacementBinding --> CustomerRegionVector : reuses
-    DomainPlacementBinding --> InstanceGroup : binds
-    InstanceGroup "1" --> "0..*" ReservationState : owns sets
+    DomainPlacementBinding --> DomainComputeSubscription : resolves capacity envelope
+    DomainComputeSubscription "1" --> "0..*" ReservationState : owns sets
     QuotaGroup "1" --> "0..*" QuotaCell : accounts
-    QuotaGroup "1" --> "1..*" InstanceGroup : subscription membership
-    InstanceGroup "1" --> "0..*" SubscriptionQuota : observed caps
+    QuotaGroup "1" --> "1..*" DomainComputeSubscription : subscription membership
+    DomainComputeSubscription "1" --> "0..*" SubscriptionQuota : observed caps
     DeploymentIntent --> ReservationState : capacity claims
     DeploymentIntent --> SubscriptionQuota : shared cap claims
     DRAssignment --> DomainPlacementBinding : destination
     DRAssignment "1" --> "0..*" ActivationRecord : activates
+    note for DomainPlacementBinding "DPB outputs the capacity envelope. Service Owner / Product Automation selects the Instance Group downstream during service deployment; IG is not DPB-owned."
