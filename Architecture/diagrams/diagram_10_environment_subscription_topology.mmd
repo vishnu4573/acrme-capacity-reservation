@@ -1,5 +1,7 @@
 flowchart TB
-    TITLE["ACRME Environment and Subscription Topology"]
+    TITLE["Historical what-if: ACRME Environment and Subscription Topology"]
+    HISTORICAL["Represents the earlier environment.yaml process model, not the deployment standard.<br/>Current standard: environment_v2.yaml; see diagram_11_environment_v2_subscription_topology.mmd."]
+    TITLE --> HISTORICAL
 
     subgraph GEO["Geographies and approved Azure regions"]
         direction LR
@@ -28,7 +30,7 @@ flowchart TB
     CPOLICY --> CLUSTERS["Blue-green version and hotfix rollout<br/>Blue: normal active clusters, up to 8<br/>Green: replacement headroom, not extra steady-state capacity"]
     CLUSTERS --> ROLLOUT["Keep current clusters serving<br/>Deploy and validate replacements before traffic cutover<br/>Check slots, VM capacity and quota for overlap"]
     ROLLOUT --> CUTOVER["Switch traffic to validated replacement<br/>Post-cutover color naming and rollback retention: pending decisions"]
-    CPOLICY --> DRCLUSTERS["DR clusters provisioned only during DR<br/>Use blue or green slots within the same 16-slot total<br/>DR versus rollout-headroom policy: pending decision"]
+    CPOLICY --> DRCLUSTERS["Historical what-if: DR clusters provisioned only during DR<br/>Superseded by v2: provision before DR at reduced steady-state capacity<br/>Rollout-headroom conflict policy remains pending"]
     CLUSTERS --> CLIMIT{"Active limit reached or insufficient<br/>headroom for required rollout?"}
     CLIMIT -->|"No"| CCONTINUE["Admit new workload only within active limit<br/>and with replacement headroom preserved"]
     CLIMIT -->|"Yes"| CNEW["Provision another compute subscription<br/>Apply the same compute policy"]
@@ -48,6 +50,7 @@ flowchart TB
     classDef scaleBox fill:#FCE4EC,stroke:#C2185B,stroke-width:1px,color:#111
 
     class TITLE titleBox
+    class HISTORICAL policyBox
     class US,EU,AU,APAC,ME,MEDR geographyBox
     class CPOLICY,RPOLICY policyBox
     class COMPUTE,RESOURCE,CLUSTERS,ROLLOUT,CUTOVER,DRCLUSTERS,DOMAINS,PROFILE,PROD,CVAL,REGION resourceBox

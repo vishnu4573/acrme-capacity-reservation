@@ -2,18 +2,18 @@
 
 | Field | Value |
 |---|---|
-| Version | 2.0 reconciliation draft |
-| Date | 16 October 2026 |
-| Status | v4.0 reconciliation draft - pending Architect decisions and POC validation; not ratified |
-| Baseline | [Requirements baseline v4.0](../Requirements/acrme_requirements_baseline_v4_0.md) |
+| Version | 2.1 reconciliation draft |
+| Date | 17 November 2026 |
+| Status | v4.0.2 reconciliation draft - pending Architect decisions and applicable POC validation; not ratified |
+| Baseline | [Requirements baseline v4.0.2](../Requirements/acrme_requirements_baseline_v4_0_2.md) |
 | Owner | Principal Cloud Architect |
 | Audience | Business, architecture, product platforms, AEP, operations, audit, FinOps |
 | Companion | [Technical Design Document](acrme_technical_design_document.md) |
-| Change history | 1.0: historical v2.4 design. 2.0: two scopes, domains, Foundation, readiness and quota corrections; current traceability. Historical versions remain in Git. |
+| Change history | 1.0: historical v2.4 design. 2.0: two scopes, domains, Foundation, readiness and quota corrections. 2.1: reconcile DPB/Instance Group ownership and DR subscription/Foundation readiness to v4.0.2 and `environment_v2.yaml`. Historical versions remain in Git. |
 
 **Type:** Design Note. **Phases touched:** P1 visibility/protection, P2 quota, P3 placement, P4 DR, P5 multi-domain binding.
 
-This document states **what** ACRME must do. The TDD owns components, detailed contracts, algorithms and implementation choices. Requirements govern over this draft. Historical ADRs are contextual, not current authority where they conflict with baseline v4.0.
+This document states **what** ACRME must do. The TDD owns components, detailed contracts, algorithms and implementation choices. Requirements govern over this draft. Historical ADRs are contextual, not current authority where they conflict with baseline v4.0.2.
 
 **Evidence:** `[Documented]` identifies baseline requirements or official platform behavior; `[Decided]` identifies a baseline programme decision; `[Derived]` identifies design consequences; `[Assumed]` identifies a proposal requiring approval. No live POC completion is implied by this reconciliation.
 
@@ -25,12 +25,12 @@ This document states **what** ACRME must do. The TDD owns components, detailed c
 |---|---|
 | Customer Region Vector (CRV) | One customer/geography binding of distribution model, Prod, CVAL and DR regions; reused by every domain (PLC-013). |
 | Domain group | Customer-owned workload grouping such as TMS/WMS, with separate capacity ownership (DOM-001). Taxonomy is configurable C-14; DEC-004 remains open. |
-| Instance group (ig) | Domain/environment/region subscription-bound capacity set; no ig spans domains (DOM-002). |
-| Domain Placement Binding (DPB) | Deterministic lookup/binding of ig, subscription, CRG sets, sizing, zones and quota inside an already bound CRV region (PLC-014). |
+| Instance Group (IG) | Service-deployment grouping selected by the Service Owner / Product Automation using the DPB capacity envelope; it is not the subscription or capacity envelope resolved by DPB (DOM-002). |
+| Domain Placement Binding (DPB) | Deterministic resolution of the domain compute subscription/shard, CRG set, CR sizing, zone targets and quota draw inside an already bound CRV region; DPB outputs the capacity envelope and does not determine IG (PLC-014). |
 | CRG / reservation | Regional group with reservations for exact VM sizes and zones. Family identity alone cannot select a reservation (CAP-016/023). |
 | Seed record / seed reservation | Seed record persists customer placement/CRV and DPB references. A seed reservation is a retained count-0 resource, not a placement decision (PLC-003/CAP-022). |
-| Customer quota group | Governed membership of the customer's domain ig subscriptions; regional/family cells are accounting and operation scopes, not separate memberships (QUA-004/015). |
-| DR Foundation | Always-present, domain-specific bootstrap set with pre-staged quota; independent of sharing (DR-021). |
+| Customer quota group | Governed membership of the customer's domain compute subscriptions; regional/family cells are accounting and operation scopes, not separate memberships (QUA-004/015). |
+| DR Foundation | Always-present, domain-specific bootstrap set in the dedicated DR compute subscription, with pre-staged quota and readiness testing before certification; independent of sharing (DR-021). |
 
 **In scope:** REG, ENV, CAP, QUA, RDY, PLC, DOM, DR, FIN, INT, DAT, OBS, GOV, NFR and OPS requirements. Forward forecasting/optimization remains phased, not an implicit commitment to runtime automation (baseline section 28).
 
@@ -46,7 +46,7 @@ The ordered control path is:
 4. Evaluate exact deployment readiness and acquire a concurrency-safe intent.
 5. AEP associates/deploys against validated references; ACRME confirms or compensates the outcome.
 
-[Decided] PLC-015 ordering is mandatory. Adding WMS to an existing TMS customer reuses the CRV but creates a separate DPB/ig, never another region-selection run.
+[Decided] PLC-015 ordering is mandatory. Adding WMS to an existing TMS customer reuses the CRV but creates a separate DPB and capacity envelope; the Service Owner / Product Automation determines any Instance Group during downstream service deployment. No domain reruns region selection.
 
 | Actor | Responsibility |
 |---|---|
@@ -75,6 +75,8 @@ Canonical flow: [two-scope pipeline](diagrams/acrme_v4_pipeline.mmd). It replace
 
 [Assumed] A-ME1 residency clearance is not established by this design. Legal approval and HC-10 remain required for applicable customers. Japan East is pending catalogue confirmation, not automatically eligible.
 
+[Decided] [`environment_v2.yaml`](../environment_v2.yaml) (effective date: 2026-10-23; owner-confirmed as the deployment standard on 2026-11-17) is the configuration baseline; [`environment.yaml`](../environment.yaml) is the earlier what-if model. `environment_profiles.standard.subscription_model` is `dedicated_per_environment_and_domain_group`; each domain/environment has separate compute and resource subscriptions. DR Foundation policy is recorded at `capacity_reservation_policies.standard.dr_foundation.subscription`, `capacity_reservation_policies.standard.dr_foundation.capacity`, `capacity_reservation_policies.standard.dr_foundation.always_present`, `capacity_reservation_policies.standard.dr_foundation.quota` and `capacity_reservation_policies.standard.dr_foundation.depends_on_sharing`. DR cluster lifecycle and its open rollout-headroom rule are recorded at `compute_subscription_policies.standard.dr_clusters.provision`, `compute_subscription_policies.standard.dr_clusters.steady_state`, `compute_subscription_policies.standard.dr_clusters.scale_out` and `compute_subscription_policies.standard.dr_clusters.rollout_headroom_conflict_policy`. DR setup, testing, certification and evidence are recorded at `environment_profiles.standard.environments.DR.readiness.setup`, `environment_profiles.standard.environments.DR.readiness.testing`, `environment_profiles.standard.environments.DR.readiness.certification` and `environment_profiles.standard.environments.DR.readiness.evidence`. These values document intended policy, not runtime enforcement. CVAL/DR provider ownership remains open; POC-006 is an alternate shared-production-subscription exception only and does not gate the standard.
+
 ## 4. Functional capabilities
 
 ### 4.1 Capacity and topology (CAP-001 through CAP-025, ENV-001 through ENV-007)
@@ -93,7 +95,7 @@ Canonical flow: [two-scope pipeline](diagrams/acrme_v4_pipeline.mmd). It replace
 |---|---|
 | `prod` / `crg-pr-*` | [Decided] Domain-specific Prod capacity only; never shared with CVAL/DR or another domain (CAP-025). |
 | `cvdr` / `crg-cvdr-*` | Same-domain CVAL/DR extension; no cross-domain sharing. Release is declaration-gated. |
-| `drf` / `crg-drf-*` | Domain DR Foundation; always present and quota-prestaged, separate from live CVAL. |
+| `drf` / `crg-drf-*` | Domain DR Foundation in the dedicated DR compute subscription; always present with pre-staged quota, separate from live CVAL and independent of sharing. |
 
 [Documented] CAP-023 defaults to one zonal CRG per applicable domain/set/subscription/region, with zones declared at creation and one reservation per exact VM size per zone. Optional per-zone groups are distinct from the default; no-zone `reg` is an exception pinned to one Azure-selected zone, not a region-wide pool. CAP-025 permits the explicit same-domain cvdr exception to general environment separation.
 
@@ -105,7 +107,7 @@ Topology: [domain sets and quota ownership](diagrams/acrme_v4_topology.mmd).
 
 [Documented] Quota and reserved capacity are independent. A subscription belongs to one Quota Group; that object spans multiple regional/family cells. Actual deployment checks the subscription's quota, not the group's transferable balance (QUA-003/004).
 
-- Customer domain ig subscriptions use the customer's central group; never another customer's group. Cell accounting covers Prod/CVAL/DR with protected logical earmarks, not separate per-family group memberships.
+- Customer domain compute subscriptions use the customer's central group; never another customer's group. Cell accounting covers Prod/CVAL/DR with protected logical earmarks, not separate per-family group memberships.
 - Inventory both **VM-family** and **total-regional vCPU** assigned/used/remaining values. Available quota is their lesser remaining value (QUA-007); deallocated usage is not assumed free.
 - Keep observed approved group balance, subscription assignments, engine commitments, protected floors and desired increase requests distinct.
 - Allocation/reclamation is justified and audited. Do not allocate merely because a group has spare quota; never reclaim below usage, committed demand, Prod growth buffer or approved DR need.
@@ -137,7 +139,7 @@ Topology: [domain sets and quota ownership](diagrams/acrme_v4_topology.mmd).
 
 1. Resolve/reuse `CRV(customer,geography)` using the distribution rules in section 3.
 2. Score only customer-aggregate candidates using current capacity, quota, buffers, expected DR, zone support, freshness and fairness (PLC-007/008, F.10/F.11).
-3. Bind each domain's DPB in CRV regions; resolve ig/shard and sets, F.1 sizing, F.9 zone spread and quota draw (F.12). Domain shortage blocks/remediates the DPB, not customer region re-selection.
+3. Bind each domain's DPB in CRV regions; resolve the domain compute subscription/shard and capacity envelope (sets, F.1 sizing, F.9 zone spread and quota draw) (F.12). The Service Owner / Product Automation selects the Instance Group downstream during service deployment. Domain shortage blocks/remediates the DPB, not customer region re-selection.
 4. Check readiness and hold commitments before deployment (PLC-015/INT-006).
 
 [Decided] Fairness counts distinct customers per geography with at least one provisioned/deploying environment; the same live denominator is shared by all scores. F.10 fairness is 1 at zero customers (PLC-012), never a fixed forecast.
@@ -148,7 +150,8 @@ Topology: [domain sets and quota ownership](diagrams/acrme_v4_topology.mmd).
 
 [Decided] DR planning protects workload **portions** attributed to domain, source and destination, not a complete copy at every destination. For a defined isolated capacity partition, aggregate all demand from one failed source, then take **MAX across non-concurrent source regions** (DR-017/F.6). C-11 is an explicit approved conservative override. Do not net capacity across domains, SKUs or physical zones.
 
-- **Foundation:** dedicated `drf` bootstrap sized by approved product/domain/region/zone/family policy, always present with pre-staged quota. Control planes then business-priority P0/P-1 waves start independently of Preview sharing (DR-007/008/021, C-16).
+- **Foundation:** dedicated `drf` bootstrap in the dedicated DR compute subscription for each domain/environment, sized by approved product/domain/region/zone/family policy and always present with pre-staged quota. DR setup and tests must complete successfully with recorded evidence before readiness certification. Control planes then business-priority P0/P-1 waves start independently of Preview sharing (ENV-005, DR-007/008/021, C-16).
+- **DR clusters:** provision before DR at configurable reduced steady-state capacity; scale existing clusters only after an approved DR declaration and capacity plus both-quota validation. The configured rollout-headroom conflict policy remains pending.
 - **Extension:** same-domain `cvdr` capacity is released only after authorized declaration/exercise and required action approval. Do not count active CVAL simultaneously as immediately free DR capacity.
 - **Cross-geo:** ME customers use dedicated Europe DR capacity; local CVAL is not sacrificed for European recovery. Country Legal overrides remain effective. Cross-geography concurrent-failure coverage is unresolved B3, not proven by a single-source MAX.
 - [Decided] **Staging (DR-006):** (1) approved bootstrap; (2) already available destination reservation and quota; (3) approved CVAL shutdown/disassociation; (4) supported sharing/reassignment; (5) confirmed pooled quota allocation; (6) Azure quota/capacity requests; (7) report unrecoverable gaps. Earlier stages still require readiness; no zero-latency API guarantee.
@@ -159,13 +162,13 @@ Topology: [domain sets and quota ownership](diagrams/acrme_v4_topology.mmd).
 
 [Decided] FIN-001 through FIN-008 require measured idle cost, justification before expansion and customer/domain/environment/region attribution. Single-count shared cvdr cost and per-domain drf cost. Cost-only optimization cannot breach production or bootstrap protection.
 
-[Decided] OBS-001 through OBS-005 include per-domain ig utilization/zone distribution, quota cells, Foundation coverage, max-source coverage, activation, snapshot age, API throttling and combined region-load alerting. Alerts include domain/subscription/SKU/zone, desired/actual, owner, correlation and remediation.
+[Decided] OBS-001 through OBS-005 include per-domain subscription utilization/zone distribution, quota cells, Foundation coverage, max-source coverage, activation, snapshot age, API throttling and combined region-load alerting. Alerts include domain/subscription/SKU/zone, desired/actual, owner, correlation and remediation.
 
 [Decided] GOV-001 through GOV-009 require managed/workload identity, least privilege, separate approval/execution/review, classified customer metadata, time-bound exceptions/overrides and audited break-glass. No secrets in config/logs. OPS-001 through OPS-006 require pause retaining inventory/alerts, maintenance awareness, expiring override protection, ownership/escalation and deterministic config-driven naming. Domain token belongs in subscription identity, not a cross-domain CRG registry key.
 
 ### 4.7 AEP contract (INT-001 through INT-008)
 
-[Decided] Input includes customer/realm, domain, product, environment, exact Prod region or approved geography exception, subscription, exact SKU/count, zone requirement, priority, requested time and correlation ID. Output includes CRV and DPB references, ig subscription, domain sets, zone spread, quota-draw route/status, available/required quantities, reasons, exceptions, snapshot timestamp and decision ID.
+[Decided] Input includes customer/realm, domain, product, environment, exact Prod region or approved geography exception, subscription, exact SKU/count, zone requirement, priority, requested time and correlation ID. Output includes CRV and DPB references, resolved domain compute subscription/shard, domain sets, zone spread, quota-draw route/status, available/required quantities, reasons, exceptions, snapshot timestamp and decision ID. Instance Group selection remains a downstream service-deployment responsibility.
 
 Idempotency is based on correlation/key plus desired state; a changed payload must not reuse a prior approval. AEP polls tracked operations, associates only validated references and returns deployment outcomes. On partial failure, record and compensate safely or raise a recoverable task (INT-007). Provider quota is never proof of consumer deployability.
 
@@ -186,7 +189,7 @@ Five engine modes remain `STEADY_STATE`, `DR_DECLARATION_PENDING`, `DR_EVENT_ACT
 
 [Assumed] The [guarded mode diagram](diagrams/acrme_v4_engine_modes.mmd) proposes retaining interrupted mode/incident identity and returning from hold only through explicit authorized resumption. Freshness restoration alone cannot complete failback or clear DR. Exact resumption approval remains Architect-pending; inventory/alerts continue while blocked.
 
-[Decided] DAT-001 through DAT-006 require durable authoritative state separate from transient responses: customer seed/CRV, domain and ig registries, DPBs, per-domain sets, exact reservations, sharing/zone mappings, quota membership/cells/subscription assignments, DR index/earmarks, deployment intents, activation/operation records, config versions, audit and history. Every decision references its observations and policy. API/schema transitions are versioned with an approved compatibility period, not implicit reinterpretation of legacy records.
+[Decided] DAT-001 through DAT-006 require durable authoritative state separate from transient responses: customer seed/CRV, domain and subscription/shard registries, DPBs, per-domain sets, exact reservations, sharing/zone mappings, quota membership/cells/subscription assignments, DR index/earmarks, deployment intents, activation/operation records, config versions, audit and history. The Service Owner / Product Automation records Service-to-Instance-Group association in the global service system of record. Every ACRME decision references its observations and policy. API/schema transitions are versioned with an approved compatibility period, not implicit reinterpretation of legacy records.
 
 ## 7. Acceptance mapping
 
@@ -215,7 +218,7 @@ These are required demonstrations, **not executed test results**. Numbers match 
 | 19 | Default zonal structure, exact-size/zone uniqueness, names | 4.1 |
 | 20 | Per-domain under-represented zone preference/skew action | 4.4 |
 | 21 | Right-size versus intentional retirement workflow | 4.1/5 |
-| 22 | Exact/geography CRV paths with TMS/WMS separate DPBs | 2/4.4 |
+| 22 | Exact/geography CRV paths with TMS/WMS separate DPBs and capacity envelopes; downstream IG selection remains service-owned | 2/4.4 |
 | 23 | Domain prod/cvdr/drf sets and isolation | 4.1 |
 | 24 | Foundation-only bootstrap, then gated extension | 4.5 |
 | 25 | Central customer quota draws/85% replenishment | 4.2 |
@@ -233,7 +236,8 @@ These are required demonstrations, **not executed test results**. Numbers match 
 | Formula policy gaps | TDD sections 8/9 define required rounding, normalization, replenishment and quota-charge evidence; unresolved terms return VALIDATION_REQUIRED. |
 | POC-001 | Consumer quota documented; selected API-version confirmation remains. |
 | POC-002/003/004/005 | Sharing order, physical zones, throttle behavior and VM-state semantics remain open. |
-| POC-006/007/008/009/010 | DR topology, bootstrap, quota/reservation buffers and production cadence remain open. |
+| POC-006 | Alternate shared-production-subscription topology only; secondary/approved exception, not a production-standard gate. |
+| POC-007/008/009/010 | Product bootstrap sizing, quota/reservation buffers and production cadence remain open. |
 | POC-011/012/013 | Overcommit safety, domain-bounded sharing and live two-scope multi-domain flow remain open. |
 | DEC-002/003/004 | Failback duration, geography-exception approver and domain taxonomy pending. |
 | DEP-001 / A-ME1 | Reservation Sharing Preview maturity and Legal residency approval; neither is quota-group maturity. |
@@ -253,5 +257,17 @@ These are required demonstrations, **not executed test results**. Numbers match 
 | GOV-001 through GOV-009; OPS-001 through OPS-006 | 4.6/5 |
 | NFR-001 through NFR-010 | 4.3/4.7/5/6; technical details in TDD section 14 |
 | C-1 through C-16; POC-001 through POC-013; DEC-001 through DEC-004; DEP-001 | 3/4/5/8 |
+
+### Deployment-standard compliance
+
+**Status: ALIGNED** with [`environment_v2.yaml`](../environment_v2.yaml) (effective date: 2026-10-23; owner-confirmed 2026-11-17). The 87-line difference from [`environment.yaml`](../environment.yaml) is historical what-if drift, not an authority conflict. Configuration records intended policy and does not prove runtime deployment, enforcement, testing or certification.
+
+| YAML key / decision | Standard setting | FDD treatment | Status |
+|---|---|---|---|
+| `environment_profiles.standard.subscription_model` | `dedicated_per_environment_and_domain_group` | Dedicated compute and resource subscriptions per domain/environment; DPB resolves the compute capacity context | ALIGNED |
+| `capacity_reservation_policies.standard.dr_foundation.subscription`, `capacity_reservation_policies.standard.dr_foundation.capacity`, `capacity_reservation_policies.standard.dr_foundation.always_present`, `capacity_reservation_policies.standard.dr_foundation.quota`, `capacity_reservation_policies.standard.dr_foundation.depends_on_sharing` | Dedicated DR compute subscription; dedicated reserved bootstrap; always present; quota pre-staged; independent of sharing | Foundation is domain-scoped and independent of the CVAL/DR extension | ALIGNED |
+| `environment_profiles.standard.environments.DR.readiness.setup`, `environment_profiles.standard.environments.DR.readiness.testing`, `environment_profiles.standard.environments.DR.readiness.certification`, `environment_profiles.standard.environments.DR.readiness.evidence` | Setup before DR; successful testing before readiness certification; certification before declaring DR ready; test results and certification record | Readiness certification is gated on successful tests and recorded evidence | ALIGNED |
+| `compute_subscription_policies.standard.dr_clusters.provision`, `compute_subscription_policies.standard.dr_clusters.steady_state`, `compute_subscription_policies.standard.dr_clusters.scale_out` | Provision before DR; reduced steady-state capacity; scale existing clusters on approved declaration with capacity and quota validation | Preserved; `compute_subscription_policies.standard.dr_clusters.rollout_headroom_conflict_policy` remains pending | ALIGNED / OPEN |
+| `capacity_reservation_policies.standard.sharing.provider_subscription`; `capacity_reservation_policies.standard.pending_decisions` POC-006 alternate exception | Provider ownership pending; POC-006 validates shared-production-subscription topology only as secondary/approved exception | Neither uncertainty changes or gates the dedicated-subscription baseline | OPEN (exception/extension only) |
 
 [Derived] **Document consistency is not production ratification.** The TDD section 17 contains per-HC, formula, DR and WAF gates and counterexamples. Baseline clarifications, design approvals and POCs remain release blockers for affected guarantees. No baseline amendment or runtime behavior is approved by this document.

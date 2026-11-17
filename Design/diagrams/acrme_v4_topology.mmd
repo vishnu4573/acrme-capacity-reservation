@@ -1,14 +1,15 @@
 flowchart TB
     C["Customer CRV - regions reused by all domains"] --> T["TMS DPBs"]
     C --> W["WMS DPBs"]
-    Q["One customer Quota Group - multiple region/family cells"] --> QT["Confirmed draws to TMS ig subscriptions"]
-    Q --> QW["Confirmed draws to WMS ig subscriptions"]
-    T --> TP["TMS Prod ig: local pr set"]
-    T --> TC["TMS CVAL/DR: cvdr extension set"]
-    T --> TD["TMS DR ig: always-present drf Foundation"]
-    W --> WP["WMS Prod ig: local pr set"]
-    W --> WC["WMS CVAL/DR: cvdr extension set"]
-    W --> WD["WMS DR ig: always-present drf Foundation"]
+    Q["One customer Quota Group - multiple region/family cells"] --> QT["Confirmed draws to TMS compute subscriptions"]
+    Q --> QW["Confirmed draws to WMS compute subscriptions"]
+    SUBS["Dedicated compute and resource subscriptions per domain × environment\nCompute shard registry handles scale-out"]
+    T --> TP["TMS Prod compute subscription: local pr set"]
+    T --> TC["TMS CVAL/DR compute subscriptions: same-domain cvdr extension\nprovider subscription pending; Preview"]
+    T --> TD["TMS dedicated DR compute subscription:\nreduced DR clusters + always-present drf Foundation\nwith pre-staged quota"]
+    W --> WP["WMS Prod compute subscription: local pr set"]
+    W --> WC["WMS CVAL/DR compute subscriptions: same-domain cvdr extension\nprovider subscription pending; Preview"]
+    W --> WD["WMS dedicated DR compute subscription:\nreduced DR clusters + always-present drf Foundation\nwith pre-staged quota"]
     QT -.-> TP
     QT -.-> TC
     QT -.-> TD
@@ -17,10 +18,17 @@ flowchart TB
     QW -.-> WD
     TD --> B["Bootstrap from confirmed reservation and subscription quota - no sharing dependency"]
     WD --> B
+    B --> TEST["Complete DR setup and tests; record evidence"]
+    TEST --> CERT["Certify DR readiness only after successful tests"]
     TC --> E["Extension only after approved declaration, release and Preview validation"]
     WC --> E
     R["Default group: zonal; exact VM size per zone children. Optional per-zone/no-zone exceptions."]
     P["No cross-domain capacity sharing. Prod never shares with CVAL or DR."]
+    IG["Service Owner / Product Automation selects Instance Group downstream;\nDPB supplies capacity context, not an Instance Group binding."]
+    SUBS -.-> T
+    SUBS -.-> W
+    T -. "after DPB" .-> IG
+    W -. "after DPB" .-> IG
     R -.-> T
     R -.-> W
     P -.-> E

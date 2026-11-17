@@ -1,4 +1,6 @@
 flowchart TB
+    STATUS["Standard: environment_v2.yaml (effective 2026-10-23; owner-confirmed 2026-11-17) · baseline v4.0.2<br/>environment.yaml is historical what-if only"]
+
     subgraph Profile["Standard environment profile: dedicated subscriptions per environment and domain group"]
         direction LR
         subgraph TMS["Domain group: TMS"]
@@ -25,7 +27,7 @@ flowchart TB
     subgraph DRReady["DR readiness: completed before a disaster"]
         Setup["Provision dedicated DR subscriptions and clusters"] --> RunReduced["Run at configurable reduced capacity"]
         RunReduced --> Test["Test DR environment"]
-        Test --> Cert["Certify readiness and record evidence"]
+        Test --> Cert["Certify readiness after successful tests\nRetain test results and certification record"]
         Cert --> Ready["DR ready"]
         Ready -->|"Approved DR declaration"| Scale["Scale existing DR clusters to approved recovery requirement"]
         Scale --> Validate["Validate capacity and both quota caps"]
@@ -68,11 +70,16 @@ flowchart TB
         ResourceLimit["Any resource subscription-level limit"] --> NewResource["Provision another standard resource subscription"]
     end
 
+    STATUS --> TMSProd
+    STATUS --> Setup
+
     classDef prod fill:#dceef8,stroke:#24617b,color:#142f3a
     classDef cval fill:#e8f4dc,stroke:#547c32,color:#24371b
     classDef dr fill:#fff0cc,stroke:#9b6a00,color:#3e2c00
     classDef control fill:#f3f3f3,stroke:#666,color:#222
+    classDef status fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#111
     class TMSProd,WMSProd,OtherProd prod
     class TMSCVAL,WMSCVAL,OtherCVAL cval
     class TMSDR,WMSDR,OtherDR,Foundation,Shared,MEDR dr
     class Setup,RunReduced,Test,Cert,Ready,Scale,Validate,Gate,Count,Fallback,Limits,Rollout,DRCost,Headroom,ComputeLimit,NewCompute,ResourceLimit,NewResource control
+    class STATUS status

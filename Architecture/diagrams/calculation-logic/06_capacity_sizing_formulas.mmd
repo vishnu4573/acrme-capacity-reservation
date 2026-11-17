@@ -4,7 +4,7 @@ title: "Capacity Sizing Formulas (F.1–F.3) — Per Domain × Environment"
 flowchart LR
     subgraph INPUTS["Inputs"]
         direction TB
-        I1["Allocated VM Count(D,E)\nVMs currently running\nin the domain's ig"]
+        I1["Allocated VM Count(D,E)\nVMs currently running\nin the domain's subscription"]
         I2["Buffer Target(D,E)\nConfigurable per\nproduct/region/env/SKU\n(C-2, scope file)"]
         I3["Reserved Quantity(D,E)\nCurrent reservation\nin the domain's CRG"]
     end

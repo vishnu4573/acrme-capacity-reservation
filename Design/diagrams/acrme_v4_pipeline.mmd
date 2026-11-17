@@ -8,11 +8,12 @@ flowchart TD
     F --> G
     C --> H["Resolve domain DPB in bound CRV regions"]
     G --> H
-    H --> I["Bind ig, subscription, prod/cvdr/drf sets, exact SKU and zone plan, quota route"]
+    H --> I["Resolve domain compute subscription/shard and capacity envelope:\nprod/cvdr/drf sets, exact SKU, zone plan and quota route"]
     I --> J{"Fresh readiness and all required HC/policy gates pass?"}
     J -->|No| K["Return blocking reasons or tracked remediation; no deployment approval"]
     J -->|Yes| L["Commit capacity, family and shared regional quota intents without double-spend"]
     L --> M{"Versions and all claims committed?"}
     M -->|Conflict| I
-    M -->|Yes| N["AEP associates and deploys validated resources"]
-    N --> O["Confirm actual outcome; settle claims once or reconcile partial failure"]
+    M -->|Yes| N["Service Owner / Product Automation selects Instance Group\nfrom DPB capacity context"]
+    N --> O["AEP associates and deploys validated resources"]
+    O --> P["Confirm actual outcome; settle claims once or reconcile partial failure"]
