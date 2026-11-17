@@ -62,7 +62,7 @@ This document defines the **skill inventory** — the reusable, structured proce
 | Input | Description |
 |---|---|
 | Proposed change | The design decision, recommendation, or document update being proposed |
-| Baseline file | `Requirements/acrme_requirements_baseline_v4_0.md` (authoritative v4.0 baseline) |
+| Baseline file | `Requirements/acrme_requirements_baseline_v4_0_2.md` (authoritative v4.0.2 baseline) |
 | Relevant FR codes | The functional requirement codes relevant to the proposed change (e.g., CAP-003, DR-017, PLC-013, DOM-001) |
 
 **Process**
@@ -918,7 +918,7 @@ Step 5 — Return document for revision if any check is SUMMARISED or MISSING
 
 **Research and fact-checking tools:** Use Microsoft Learn MCP to search and fetch official documentation, and relevant Azure MCP documentation/best-practice/service guidance to cross-check platform claims. Discover available tools and schemas first; follow Step 3 of the executable skill for the full procedure. Cite official URLs, access dates, API versions, and Preview/GA status; disclose missing MCP capabilities and any official-documentation fallback. MCP retrieval is not POC evidence and does not authorize live environment access or changes.
 
-**Deployment-standard checks:** For deployment policy/configuration/readiness, inspect `environment_v2.yaml`, its effective date, and linked decision/proposal files; cite exact YAML keys. Separate request eligibility/approval from technical readiness and runtime enforcement. Compare `environment.yaml`; until the owner resolves their divergence, report the authority issue without silently selecting or merging settings. An open/conflicting setting that affects readiness blocks a readiness claim.
+**Deployment-standard checks:** For deployment policy/configuration/readiness, inspect `environment_v2.yaml`, its effective date, and linked decision/proposal files; cite exact YAML keys. Separate request eligibility/approval from technical readiness and runtime enforcement. The owner confirmed `environment_v2.yaml` as the deployment standard and `environment.yaml` as an earlier what-if model on 17 November 2026; report their differences as historical drift, not unresolved authority. An open/conflicting v2 setting that affects readiness blocks a readiness claim.
 
 **Implementation (executable — the procedure lives there, not here):**
 

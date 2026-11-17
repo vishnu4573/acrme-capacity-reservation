@@ -12,25 +12,27 @@
 
 | Candidate | Path |
 |---|---|
-| Repo baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` — authoritative |
-| Legacy repo baseline (v2.5, filename historical) | `Requirements/acrme_requirements_baseline_v2_4.md` — superseded by v4.0 |
-| Historical baseline (v3.0) | `Requirements/acrme_requirements_baseline_v3_0.md` — superseded by v4.0 |
+| Repo baseline (v4.0.2) | `Requirements/acrme_requirements_baseline_v4_0_2.md` — authoritative |
+| Prior baseline (v4.0.1) | `Requirements/acrme_requirements_baseline_v4_0.md` — superseded by v4.0.2 |
+| Legacy repo baseline (v2.5, filename historical) | `Requirements/acrme_requirements_baseline_v2_4.md` — superseded by v4.0.2 |
+| Historical baseline (v3.0) | `Requirements/acrme_requirements_baseline_v3_0.md` — superseded by v4.0.2 |
 | Optional external/uploaded copy | Supply its path with `check_grounding.py --uploaded-baseline <path>` or `ACRME_UPLOADED_BASELINE`; no host-specific path is assumed |
 | Expanded reference | `Requirements/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
 | Code glossary | `Reference-Material/reference/acrme_requirements_code_glossary.md` (one-line definitions + links) |
 | Consistency audit | `Requirements/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |
-| Deployment standard under review | `environment_v2.yaml` — deployment configuration, effective 2026-10-23; not a substitute for the baseline or proof of runtime enforcement |
+| Deployment standard | `environment_v2.yaml` — owner-confirmed deployment-standard configuration, effective 2026-10-23; not proof of runtime enforcement |
 | Related deployment-policy proposal | `Requirements/acrme_sku_financial_approval_baseline_change.md` — user-confirmed series/approval policy; baseline incorporation and runtime implementation pending |
-| Other environment configuration | `environment.yaml` — differs from `environment_v2.yaml`; report the discrepancy and do not silently select or merge values |
+| DR topology baseline-change record | `Requirements/acrme_baseline_v4_0_2_change_proposal.md` — approved and incorporated in v4.0.2 |
+| Historical what-if configuration | `environment.yaml` — earlier process model retained for what-if analysis; not the deployment standard |
 
-Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the v4.0 baseline; re-check them if the version changed.
+Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the current baseline; re-check them if the version changed.
 
-The user may identify `environment_v2.yaml` as the deployment standard to review. Use it as the configuration being evaluated, cite its exact key and effective date, and check linked decisions/proposals. It is not normative over baseline requirements, and a YAML setting does not establish that the policy is approved, deployed, or enforced. Until the owner resolves differences with `environment.yaml`, flag the authority/status conflict rather than asserting one repository-wide canonical environment file.
+The owner confirmed on 17 November 2026 that `environment_v2.yaml` is the deployment standard and `environment.yaml` is an earlier what-if model. Use v2 as the configuration being evaluated, cite its exact key and effective date, and check linked decisions/proposals. The baseline remains the normative requirements source; a YAML setting does not establish runtime implementation or enforcement. Do not treat differences from the historical what-if file as an unresolved configuration-authority conflict.
 
 The FDD, TDD, POC workbook/suite, glossary, calculation reference, and several mockups/reference
 documents still contain earlier-baseline material. Unless an artefact explicitly records a
-v4.0 reconciliation, treat it as historical or provisional; do not cite it as current normative
-authority over the v4.0 baseline.
+current-baseline reconciliation, treat it as historical or provisional; do not cite it as current
+normative authority over the requirements baseline.
 
 ## Topic → baseline section → codes → repo artefact
 

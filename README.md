@@ -2,8 +2,8 @@
 
 This repository contains the requirements and design artefacts for the **ACRME Capacity
 Reservation** initiative, together with an implementation skeleton and POC tooling. The
-authoritative requirements baseline is **v4.0**. Several older design, reference, mockup,
-and POC artefacts have not yet been reconciled to v4.0; their status is called out below.
+authoritative requirements baseline is **v4.0.2**. Several older design, reference, mockup,
+and POC artefacts have not yet been reconciled to v4.0.2; their status is called out below.
 
 ---
 
@@ -17,10 +17,10 @@ provided as `.md` (source), `.docx` (editable), and `.pdf` (print-ready) unless 
 acrme-capacity-reservation/
 ├── README.md                          # This file
 ├── docs/README.md                     # Navigation index → top-level areas
-├── Requirements/                      # WHAT the system must do (v4.0, current)
-│   ├── acrme_requirements_baseline_v4_0.md    # single source of truth (v4.0)
+├── Requirements/                      # WHAT the system must do (v4.0.2, current)
+│   ├── acrme_requirements_baseline_v4_0_2.md # single source of truth (v4.0.2)
 │   └── acrme_complete_requirements_reference.*
-├── Design/                            # Historical designs; v4.0 reconciliation pending
+├── Design/                            # Historical designs; v4.0.2 reconciliation pending
 │   ├── acrme_functional_design_document.*
 │   ├── acrme_technical_design_document.*
 │   ├── acrme_uml_class_diagrams_summary.*
@@ -56,10 +56,10 @@ acrme-capacity-reservation/
 └── examples/
 ```
 
-> **Baseline authority:** [`Requirements/acrme_requirements_baseline_v4_0.md`](Requirements/acrme_requirements_baseline_v4_0.md)
+> **Baseline authority:** [`Requirements/acrme_requirements_baseline_v4_0_2.md`](Requirements/acrme_requirements_baseline_v4_0_2.md)
 > is the single source of truth. The v2.4 and v3.0 baseline files are retained as historical
 > snapshots. A v2.x/v3.0 reference in another artefact records its historical basis unless
-> that artefact explicitly states it has been reconciled to v4.0.
+> that artefact explicitly states it has been reconciled to v4.0.2.
 
 > **Restructured (Phase 4).** Archived and current documents are no longer interleaved. All
 > moves used `git mv`, so `git log --follow <path>` shows full history across the restructure.
@@ -70,8 +70,8 @@ acrme-capacity-reservation/
 
 | Artifact | Description |
 |---|---|
-| **Requirements Baseline v4.0** ([`Requirements/acrme_requirements_baseline_v4_0.md`](Requirements/acrme_requirements_baseline_v4_0.md)) | Authoritative source of truth. v4.0 is the unified clean-slate baseline; older baseline files are historical only. |
-| **Complete Requirements Reference** ([`Requirements/acrme_complete_requirements_reference.md`](Requirements/acrme_complete_requirements_reference.md)) | Legacy explanatory compilation; not reconciled to v4.0 and not normative. Use the v4.0 baseline for requirements. |
+| **Requirements Baseline v4.0.2** ([`Requirements/acrme_requirements_baseline_v4_0_2.md`](Requirements/acrme_requirements_baseline_v4_0_2.md)) | Authoritative source of truth; supersedes v4.0.1 with the approved DR topology clarification. Older baseline files are historical only. |
+| **Complete Requirements Reference** ([`Requirements/acrme_complete_requirements_reference.md`](Requirements/acrme_complete_requirements_reference.md)) | Legacy explanatory compilation; not reconciled to v4.0.2 and not normative. Use the current baseline for requirements. |
 
 ---
 
@@ -121,11 +121,11 @@ Full-resolution source images for each of the six core views, in raster (`.png`)
 ## POC test scripts & workbook (`POC-Test-Scripts/`)
 
 The home for the executable POC suite and its historical workbook. These artefacts were
-prepared against v2.4 and have not been reconciled to v4.0; do not treat them as the v4.0
+prepared against v2.4 and have not been reconciled to v4.0.2; do not treat them as the current
 acceptance suite without review.
 
-- **Historical v2.4 POC workbook** ([`POC-Test-Scripts/acrme_poc_workbook_v2_4.md`](POC-Test-Scripts/acrme_poc_workbook_v2_4.md)) — 49 cases across groups G1–G12. It is not established as aligned with baseline v4.0.
-- **Executable suite** — runnable POC tooling; its case coverage and expected results require reconciliation against v4.0.
+- **Historical v2.4 POC workbook** ([`POC-Test-Scripts/acrme_poc_workbook_v2_4.md`](POC-Test-Scripts/acrme_poc_workbook_v2_4.md)) — 49 cases across groups G1–G12. It is not established as aligned with baseline v4.0.2.
+- **Executable suite** — runnable POC tooling; its case coverage and expected results require reconciliation against v4.0.2.
 
 ### Key design decisions
 - **Azure CLI only** — all commands execute via `az` and `az rest`; no Azure Python SDK.
@@ -174,7 +174,7 @@ Generated execution evidence is collected under [`Test-Results/`](Test-Results/)
 
 #### Product backlog (`Reference-Material/backlog/`)
 
-The Agile backlog is a historical planning artefact derived from earlier design material; it has not been reconciled to v4.0. See [`Reference-Material/backlog/`](Reference-Material/backlog/).
+The Agile backlog is a historical planning artefact derived from earlier design material; it has not been reconciled to v4.0.2. See [`Reference-Material/backlog/`](Reference-Material/backlog/).
 
 | Backlog file | Description |
 |---|---|
@@ -201,7 +201,7 @@ Superseded / historical documents, retained (not deleted) and isolated from curr
 
 ## Historical POC suite behavior (last described against v2.4)
 
-The following describes the legacy suite behavior, not a v4.0 validation result.
+The following describes the legacy suite behavior, not a v4.0.2 validation result.
 
 1. **Geography-aware region placement (PLC-010a).** Production, the non-Production region, and DR
    must be placed per the geography's `distribution_model`: three distinct regions for

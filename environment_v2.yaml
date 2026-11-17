@@ -1,4 +1,5 @@
-# Baseline v4.0; SKU/approval extension recorded in Requirements/acrme_sku_financial_approval_baseline_change.md.
+# Requirements baseline v4.0.2; owner-confirmed deployment standard as of 2026-11-17.
+# environment.yaml is retained as an earlier what-if model.
 capacity_request_policy:
   effective_date: "2026-10-23"
   deployment_scope:
@@ -156,7 +157,7 @@ capacity_reservation_policies:
       source_region_cval_capacity_shared: false
     pending_decisions:
       - shared_crg_provider_ownership_per_domain_group_and_region
-      - dedicated_dr_subscription_topology_validation_POC-006
+      - alternate_shared_production_subscription_exception_validation_POC-006
 
 environment_profiles:
   standard:

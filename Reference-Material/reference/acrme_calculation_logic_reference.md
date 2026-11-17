@@ -1,9 +1,9 @@
 # ACRME Calculation Logic Reference — All Scenarios (v2.4)
 
-> **Historical calculation reference — not reconciled to v4.0.** Baseline
-> [`Requirements/acrme_requirements_baseline_v4_0.md`](../../Requirements/acrme_requirements_baseline_v4_0.md)
+> **Historical calculation reference — not reconciled to v4.0.2.** Baseline
+> [`Requirements/acrme_requirements_baseline_v4_0_2.md`](../../Requirements/acrme_requirements_baseline_v4_0_2.md)
 > is normative for all formulas and calculation semantics. Do not use this document's older
-> formulas, scenario numbers, or references as current where they differ from v4.0.
+> formulas, scenario numbers, or references as current where they differ from v4.0.2.
 
 ## Scoped v4.0 formula reconciliation
 

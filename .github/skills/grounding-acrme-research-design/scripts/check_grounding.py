@@ -34,7 +34,7 @@ TAG_RE = re.compile(
 VERSION_ROW_RE = re.compile(
     r"\|\s*\*\*Version\*\*\s*\|\s*(?:\*\*)?([0-9]+(?:\.[0-9]+)*)(?:\*\*)?"
 )
-BASELINE_CITE_RE = re.compile(r"[Bb]aseline[\s*:]*v?(\d+\.\d+)")
+BASELINE_CITE_RE = re.compile(r"[Bb]aseline[\s*:]*v?(\d+(?:\.\d+)+)")
 AZURE_CLAIM_RE = re.compile(
     r"\b(Azure|ARM|CRG|capacity reservation|quota group|Quota Group|sharing|"
     r"availability zone|logical zone)\b.*\b(supports?|does not|cannot|can't|must|"
@@ -99,6 +99,7 @@ DEPLOYMENT_CONFIG_PATHS = (
     "capacity_reservation_policies.standard.sharing.production_dependency_allowed",
     "capacity_reservation_policies.standard.sharing.fallback",
     "capacity_reservation_policies.standard.sharing.provider_subscription",
+    "capacity_reservation_policies.standard.dr_foundation.subscription",
     "capacity_reservation_policies.standard.dr_foundation.depends_on_sharing",
     "capacity_reservation_policies.standard.pending_decisions",
     "environment_profiles.standard.subscription_model",
@@ -123,6 +124,7 @@ DEPLOYMENT_EXPECTED_VALUES = {
     "capacity_reservation_policies.standard.sharing.feature_maturity": "preview",
     "capacity_reservation_policies.standard.sharing.production_dependency_allowed": "false",
     "capacity_reservation_policies.standard.sharing.fallback": "reservation_in_deploying_subscription",
+    "capacity_reservation_policies.standard.dr_foundation.subscription": "dedicated_dr_compute_subscription",
     "capacity_reservation_policies.standard.dr_foundation.depends_on_sharing": "false",
 }
 def parse_simple_yaml_paths(path):
@@ -209,7 +211,7 @@ def deployment_standard_status(repo):
             changed = sum(1 for line in delta if line.startswith(("+", "-")) and not line.startswith(("+++", "---")))
             warns.append(
                 f"environment.yaml and environment_v2.yaml differ ({changed} changed lines); "
-                "configuration authority is unresolved (ENV-V2-001), not auto-selected"
+                "environment.yaml is the historical what-if model; environment_v2.yaml is the owner-confirmed standard (17 Nov 2026)"
             )
     return errors, warns
 
@@ -306,6 +308,7 @@ def lint(path, repo, current_version, codes, deployment_drift=False):
     errors, warns = [], []
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
+    is_baseline_source = Path(path).name.startswith("acrme_requirements_baseline_v")
 
     for code in sorted(set(CODE_RE.findall(text)) - codes):
         ctx = [ln for ln in text.splitlines() if code in ln]
@@ -316,6 +319,10 @@ def lint(path, repo, current_version, codes, deployment_drift=False):
     for n in sorted({int(x) for x in HC_RE.findall(text)}):
         if not 1 <= n <= 11:
             errors.append(f"HC-{n} does not exist (HC-1..HC-11)")
+
+    # A baseline is the normative input source, not a research/design output.
+    if is_baseline_source:
+        return errors, warns
 
     cited = {v for v in BASELINE_CITE_RE.findall(text)}
     if current_version and cited and current_version not in cited:

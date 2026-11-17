@@ -1,8 +1,9 @@
 # ACRME Hard Constraints Reference
 
-> **Current baseline:** v4.0. The v4.0 baseline states that HC-1..HC-11 are unchanged from
-> v3.0. This reference retains earlier reconciliation notes and has not had every section,
-> code reference, and cross-link revalidated against v4.0. Use the v4.0 baseline as normative
+> **Current baseline:** v4.0.2. The v4.0 baseline states that HC-1..HC-11 are unchanged from
+> v3.0; v4.0.2 leaves them unchanged. This reference retains earlier reconciliation notes
+> and has not had every section, code reference, and cross-link revalidated against v4.0.2.
+> Use the v4.0.2 baseline as normative
 > authority if this reference conflicts with it.
 
 **Classification:** Principal Cloud Architect — Placement Engine Design  

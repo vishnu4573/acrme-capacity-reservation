@@ -17,7 +17,7 @@
 **Related requirements:** QUA-001, QUA-002, QUA-005, QUA-006, QUA-007, QUA-013, CAP-003, CAP-016, CAP-017, ENV-002  
 **Related constraints:** Design Principle 2 (quota and capacity are separate resources)
 
-> **Baseline status:** Baseline v4.0 is authoritative. This ADR was authored against v2.4 and has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
+> **Baseline status:** Baseline v4.0.2 is authoritative. This ADR was authored against v2.4 and has not been comprehensively reviewed against v4.0.2. Revalidate before treating it as current.
 
 ## Scoped v4.0 reconciliation - fail-fast readiness (draft)
 
