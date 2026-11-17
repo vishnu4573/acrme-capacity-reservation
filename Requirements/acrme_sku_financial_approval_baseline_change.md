@@ -1,10 +1,10 @@
 # Allowed VM Series and Financial Approval - Baseline-Change Proposal
 
 **Type:** Design Note / baseline-change proposal
-**Baseline:** v4.0 (14 October 2026), resolved on 23 October 2026
+**Baseline:** v4.0.2 (17 November 2026); series/approval policy input confirmed 23 October 2026
 **Phases touched:** P1 visibility/protection, P2 quota, P3 placement, P4 DR, P5 domain binding
 **Codes in scope:** CAP-001, CAP-016, CAP-017, CAP-019, CAP-022, CAP-024, QUA-002, FIN-003, GOV-002, GOV-003, GOV-006
-**Status:** User-confirmed policy input; baseline incorporation and runtime implementation pending.
+**Status:** User-confirmed policy input; `environment_v2.yaml` is the deployment standard; baseline incorporation and runtime implementation pending.
 
 ## 1. Decision and authority
 
@@ -14,13 +14,13 @@
 - The policy covers VMs and VM Scale Sets (VMSS) used by AKS clusters. The same series allowlist and Jira business/finance approval requirements apply to both.
 - Jira business and finance approval applies to new capacity requests.
 - Existing protective reconciliation remains unchanged.
-- Record the policy in [environment.yaml](../environment.yaml) and this proposal without editing the [v4.0 baseline](acrme_requirements_baseline_v4_0.md).
+- Record the policy in [environment_v2.yaml](../environment_v2.yaml) and this proposal without editing the controlled requirements baseline directly. The owner confirmed on 17 November 2026 that [environment.yaml](../environment.yaml) is an earlier what-if model, not the deployment standard.
 
 [Decided] The submitted list contained 32 entries and 31 unique series. `Standard_Lasv4` appeared twice and is recorded once. Names are preserved as supplied; this is a programme series catalogue, not an Azure quota-family identifier list or a list of exact deployable VM sizes.
 
 ## 2. Allowed series
 
-[Decided] The machine-readable source is `capacity_request_policy.allowed_vm_series` in [environment.yaml](../environment.yaml), effective 23 October 2026.
+[Decided] The machine-readable source is `capacity_request_policy.allowed_vm_series` in [environment_v2.yaml](../environment_v2.yaml), effective 23 October 2026.
 
 | Group | Allowed series labels |
 |---|---|

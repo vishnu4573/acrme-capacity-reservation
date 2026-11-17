@@ -5,7 +5,7 @@
 **Status:** Accepted - supersedes ADR-001 v2.2 region-selection content; reconciled to Baseline v2.4  
 **Part of:** ACRME Architecture Decision Records - last recorded alignment to Capacity & Quota Management Requirements Baseline v2.4.
 
-> **Baseline status:** Baseline v4.0 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0. Revalidate before treating it as current.
+> **Baseline status:** Baseline v4.0.2 is authoritative. This ADR's v2.4 reconciliation is its last recorded reconciliation; it has not been comprehensively reviewed against v4.0.2. Revalidate before treating it as current.
 
 ## Scoped v4.0 reconciliation - placement boundary (draft)
 

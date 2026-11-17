@@ -9,8 +9,8 @@ reservation-model coverage (CAP-020…024, PLC-010a, PLC-011, OPS-006, CAP-001a)
 whose deterministic rule logic is validated **offline**.
 
 > **Baseline status:** this suite and its v2.4 workbook have not been reconciled to
-> the authoritative [v4.0 baseline](../Requirements/acrme_requirements_baseline_v4_0.md).
-> The 49 cases and their expected outcomes are historical and are not a v4.0 acceptance
+> the authoritative [v4.0.2 baseline](../Requirements/acrme_requirements_baseline_v4_0_2.md).
+> The 49 cases and their expected outcomes are historical and are not a v4.0.2 acceptance
 > suite until reviewed and updated.
 
 ---

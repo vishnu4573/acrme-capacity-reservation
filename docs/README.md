@@ -9,12 +9,12 @@ Markdown is the source of truth for repository documentation. Some documents als
 `.docx`/`.pdf` exports; those derived copies may lag the Markdown and must be regenerated after
 source changes.
 
-> **Single source of truth:** [`acrme_requirements_baseline_v4_0.md`](../Requirements/acrme_requirements_baseline_v4_0.md)
+> **Single source of truth:** [`acrme_requirements_baseline_v4_0_2.md`](../Requirements/acrme_requirements_baseline_v4_0_2.md)
 > is the authoritative requirements baseline. The v2.4 and v3.0 baseline files are historical
 > snapshots. The FDD/TDD are v4.0 reconciliation drafts, pending decisions and POC evidence.
 > The POC workbook/suite, glossary, calculation reference, and several
 > mockups/reference documents still contain older-baseline content and are **not verified as
-> reconciled to v4.0**. On conflict, v4.0 wins.
+> reconciled to v4.0.2**. On conflict, v4.0.2 wins.
 
 ---
 
@@ -24,9 +24,9 @@ source changes.
 
 | Document | Purpose |
 |---|---|
-| [`acrme_requirements_baseline_v4_0`](../Requirements/acrme_requirements_baseline_v4_0.md) | **Authoritative** consolidated requirements baseline (v4.0). Single source of truth. |
+| [`acrme_requirements_baseline_v4_0_2`](../Requirements/acrme_requirements_baseline_v4_0_2.md) | **Authoritative** consolidated requirements baseline (v4.0.2). Single source of truth. |
 | [`acrme_requirements_baseline_v2_4`](../Requirements/acrme_requirements_baseline_v2_4.md) and [`acrme_requirements_baseline_v3_0`](../Requirements/acrme_requirements_baseline_v3_0.md) | Superseded historical snapshots; not current sources. |
-| [`acrme_complete_requirements_reference`](../Requirements/acrme_complete_requirements_reference.md) | Legacy explanatory compilation; not reconciled to v4.0 and not normative. |
+| [`acrme_complete_requirements_reference`](../Requirements/acrme_complete_requirements_reference.md) | Legacy explanatory compilation; not reconciled to v4.0.2 and not normative. |
 
 ### [`/Design`](../Design/) — design artefacts (older baseline; reconciliation pending)
 

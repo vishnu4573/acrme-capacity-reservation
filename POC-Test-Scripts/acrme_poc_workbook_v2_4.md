@@ -5,15 +5,15 @@
 | Field | Value |
 |---|---|
 | **Version** | 2.4 |
-| **Status** | Historical — last aligned to Requirements Baseline v2.4; not reconciled to v4.0 |
+| **Status** | Historical — last aligned to Requirements Baseline v2.4; not reconciled to v4.0.2 |
 | **Supersedes** | `acrme_poc_workbook_v2.docx` / `.pdf` (v2.0, 21 Aug 2026 — archived, binary-only) |
-| **Current authoritative source** | [`Requirements/acrme_requirements_baseline_v4_0.md`](../Requirements/acrme_requirements_baseline_v4_0.md) |
+| **Current authoritative source** | [`Requirements/acrme_requirements_baseline_v4_0_2.md`](../Requirements/acrme_requirements_baseline_v4_0_2.md) |
 | **Executable implementation** | `POC-Test-Scripts/` (groups G1–G12; run `python runner.py` and `python test_v24_reservation_model.py`) |
 | **Classification** | Internal — Engineering Validation |
 | **Owner** | [Test Lead Name] |
 | **Environment** | [Subscription ID / Tenant ID — fill on start] |
 
-> **Baseline status.** This workbook and its executable suite have not been reconciled to baseline v4.0. The historical v2.4 cases and expected results are not a v4.0 acceptance specification; review them against the current baseline before relying on them. Expected results remain hypotheses until executed with retained evidence.
+> **Baseline status.** This workbook and its executable suite have not been reconciled to baseline v4.0.2. The historical v2.4 cases and expected results are not a v4.0.2 acceptance specification; review them against the current baseline before relying on them. Expected results remain hypotheses until executed with retained evidence.
 >
 > **What this document is.** This is the v2.4 workbook, retained for historical reference and as context for the current executable tooling. It consolidates the manual runbook/tracker content previously held only in the binary `acrme_poc_workbook_v2.docx`/`.pdf` (574 paragraphs, 140 tables).
 >

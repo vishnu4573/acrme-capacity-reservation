@@ -1,7 +1,7 @@
 # Azure Capacity & Quota Management — Consolidated Requirements Baseline
 
 > **Historical baseline — superseded by v4.0.** This file is retained for version history and
-> is not the current source of truth. Use [`acrme_requirements_baseline_v4_0.md`](acrme_requirements_baseline_v4_0.md)
+> is not the current source of truth. Use [`acrme_requirements_baseline_v4_0_2.md`](acrme_requirements_baseline_v4_0_2.md)
 > for current requirements.
 
 > **Working document — coauthored baseline for the SaaS Design Services

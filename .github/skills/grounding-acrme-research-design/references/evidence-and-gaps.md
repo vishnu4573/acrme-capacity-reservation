@@ -37,7 +37,7 @@ One tag per claim. The set unifies `Agents.md` (Documented/Tested/Decided/Derive
 
 ## Azure facts locked by the baseline
 
-Current as of baseline v4.0 (14 Oct 2026). Re-read the baseline if its version moved.
+Current as of baseline v4.0.2 (17 Nov 2026). Re-read the baseline if its version moved.
 
 | Fact | Code | Tag |
 |---|---|---|
@@ -73,7 +73,7 @@ The following are statements about the contents of `environment_v2.yaml` (effect
 | Standard compute subscriptions use blue/green rollout slots and require current/replacement capacity overlap validation before traffic cutover | `compute_subscription_policies.standard.cluster_capacity`, `.deployment` | Post-cutover color, rollback retention, and DR/rollout-headroom conflict handling are pending. |
 | Compute and resource subscriptions scale out only when subscription-level limits are reached; DR clusters are provisioned before DR, run reduced steady-state capacity, and scale on approved declaration with capacity/quota validation | `compute_subscription_policies.standard`, `resource_subscription_policies.standard` | Do not assume unused rollout slots are available to DR or that scaling is authorized while conflict policy is pending. |
 | CVAL/DR sharing is configured across subscriptions only within the same domain group and region; production capacity is excluded; sharing is Preview, not a production dependency, and the fallback is a reservation in the deploying subscription | `capacity_reservation_policies.standard.sharing` | Provider ownership is pending; POC-001/003/012 and DEP-001 gates remain relevant. Require physical-zone alignment and provider/consumer quota checks; do not infer sharing order or availability. |
-| DR Foundation uses dedicated reserved bootstrap capacity and pre-staged quota independent of sharing; cross-geography DR uses dedicated destination-region capacity | `capacity_reservation_policies.standard.dr_foundation`, `.cross_geography_dr` | Keep consistent with DR-021 and the baseline. POC-006 subscription topology remains open; configuration does not close it. |
+| DR Foundation uses a dedicated DR compute subscription with always-present reserved bootstrap capacity and pre-staged quota, independent of sharing; cross-geography DR uses dedicated destination-region capacity | `capacity_reservation_policies.standard.dr_foundation`, `.cross_geography_dr` | Owner-confirmed production standard (17 Nov 2026). Require testing before readiness certification. POC-006 is for an alternate/exception topology only; see the baseline-change proposal. |
 | Standard environment profiles are dedicated per environment and domain group; region eligibility is driven by geography entries and standard/restricted classifications | `environment_profiles.standard`, `geographies` | Region exceptions and pending catalogue decisions remain subject to baseline policy and approval; do not treat a configured region as live SKU/zone availability. |
 
 ## Open-items register
@@ -87,7 +87,7 @@ Any output touching these must flag them, not resolve them silently.
 | POC-003 | Logical↔physical zone mapping for consumer into provider zonal reservation | Open | Zone alignment must be validated per subscription pair |
 | POC-004 | Reconciliation under throttling | Open | Retry/backoff design is `[Assumed]` until tested |
 | POC-005 | Guarantee behaviour across VM states | Open | State-machine edges involving stop/deallocate are `[Assumed]` |
-| POC-006 | DR subscription topology | Open | Keep both topologies viable |
+| POC-006 | Alternate DR subscription topology | Open — alternate/exception validation only | Dedicated DR compute subscription remains the production standard; POC results do not change it without a separate approved decision |
 | POC-007 | Bootstrap sizing per product | Open | Bootstrap numbers are placeholders |
 | POC-008 / 009 | Production quota / reservation buffers | Open | Buffers stay configurable inputs |
 | POC-010 | Production reconciliation interval | Open | 6 min is reference only |
@@ -97,8 +97,7 @@ Any output touching these must flag them, not resolve them silently.
 | DEC-002 | DR drill duration & failback | Open | Support both extended run and early failback |
 | DEC-003 | Geography-exception approver | Open | Model the approval as a pluggable step |
 | DEP-001 | Sharing Preview → GA | External | Design must work with and without sharing |
-| ENV-V2-001 | Environment configuration authority | Open | `environment.yaml` and `environment_v2.yaml` differ (including DR provisioning; v2 adds sharing and standard subscription/environment policy). The SKU/approval proposal points to `environment.yaml`. Owner must identify canonical version/scope; until then report the mismatch and do not silently choose, merge, or claim runtime enforcement. |
-| ENV-V2-002 | Deployment-standard pending decisions | Open | Keep provider ownership, dedicated DR subscription topology (POC-006), blue/green cutover/rollback conventions, rollout-headroom conflict handling, and listed `capacity_request_policy.pending_decisions` unresolved until authoritative closure evidence exists. |
+| ENV-V2-002 | Deployment-standard pending decisions | Open | Keep sharing provider ownership, blue/green cutover/rollback conventions, rollout-headroom conflict handling, and listed `capacity_request_policy.pending_decisions` unresolved until authoritative closure evidence exists. POC-006 does not block the dedicated DR production standard. |
 | ENV-V2-003 | Series/approval policy incorporation | Open | The linked proposal is user-confirmed policy input, but baseline incorporation and runtime implementation are pending; Jira workflow/scope, exact size-to-series mapping, and Preview eligibility are spec gaps in that proposal. |
 | GAP-γ | `total_customers` in γ | **Closed 7 Oct 2026** — decided as PLC-012 / A.10 | Cite PLC-012; see the locked-facts table above |
 | GAP-JPE | Japan East in-scope status | Pending confirmation | Treat as configurable catalogue entry |
@@ -111,9 +110,9 @@ Check these before citing; fix through the owning doc, not in your output.
 | Where | Issue | Authoritative |
 |---|---|---|
 | Uploaded baseline vs repo baseline | Uploaded copy can lag the repo (seen 17 Sep and again at v2.5) | Highest Document Control version |
-| Older design/reference/POC artefacts | Some still identify v2.4/v2.5/v3.0 as their normative basis and have not been reconciled to v4.0; see the current repository index for affected artefact groups | Current baseline (v4.0) |
-| `Skills.md` / `Agents.md` | Programme instructions identify v4.0 as the current baseline | Current baseline |
-| `environment.yaml` / `environment_v2.yaml` | Files differ; proposal references `environment.yaml` while user requests review against v2 | Neither file is silently promoted to unique authority; compare the named standard and escalate discrepancy |
+| Older design/reference/POC artefacts | Some still identify v2.4/v2.5/v3.0/v4.0/v4.0.1 as their normative basis and have not been reconciled to v4.0.2; see the current repository index for affected artefact groups | Current baseline (v4.0.2) |
+| `Skills.md` / `Agents.md` | Programme instructions identify v4.0.2 as the current baseline | Current baseline |
+| `environment.yaml` / `environment_v2.yaml` | Files differ because `environment.yaml` represents an earlier what-if process model | Owner confirmed `environment_v2.yaml` as the deployment standard on 17 Nov 2026; `environment.yaml` remains historical what-if input |
 
 ## Escalation
 

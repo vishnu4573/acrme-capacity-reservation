@@ -21,7 +21,7 @@ The script reads the Document Control `Version` row of every repository baseline
 
 Then read, from the current baseline: Version History (top rows since the last version you knew), §2 Strategic Drivers, §3 Design Principles, §25 Pending Decisions & POCs, and every section mapped to your topic in `references/source-map.md`. Read §23 for delivery-phase scope when applicable.
 
-For deployment-policy questions, also read `environment_v2.yaml` and the relevant decision/proposal documents. The repository currently also contains `environment.yaml`, which differs in DR provisioning and omits the reservation-sharing/environment-profile policies present in v2. Treat `environment_v2.yaml` as the requested comparison target when the user names it, but do not claim it is the uniquely approved or implemented standard until the owning team resolves the discrepancy. Report material differences; do not silently select or merge values.
+For deployment-policy questions, also read `environment_v2.yaml` and the relevant decision/proposal documents. The owner confirmed on 17 November 2026 that `environment_v2.yaml` is the deployment standard and `environment.yaml` is an earlier what-if model. Report material differences as historical configuration drift; do not treat them as an unresolved authority conflict or silently merge values. A configured value still does not prove runtime implementation or enforcement.
 
 ### Step 1 — Classify the ask
 Pick one: **Research** (what does Azure/the baseline say?), **Design** (new or changed mechanism), **Formula** (scoring, sizing, headroom), **Review** (check an existing doc). Name the delivery phase(s) touched (baseline §23: P1 Visibility & Prod Protection, P2 Quota Pool, P3 Placement & Seed, P4 Distributed DR, P5 Multi-Domain Model & Two-Scope Binding) and note downstream phase impact — a Phase 1 change can break Phase 4 DR assumptions.
@@ -35,7 +35,7 @@ Use `references/source-map.md` to find the exact files and sections. Apply autho
 - Design docs, walkthroughs, mockups, and POC workbooks are supporting or historical evidence unless explicitly accepted/reconciled.
 - Prior conversation context or memory is never sufficient on its own.
 
-Do not silently resolve conflicts between sources. A baseline conflict blocks alignment; an environment-file mismatch or unresolved decision is reported as a configuration-authority issue and blocks any dependent deployment-readiness claim until the owner resolves it.
+Do not silently resolve conflicts between sources. A conflict between the requirements baseline and the owner-confirmed `environment_v2.yaml` blocks alignment. Differences from the historical `environment.yaml` are reported as historical drift, not an authority conflict. An unresolved v2 setting blocks only the dependent deployment-readiness claim until its owner closes it.
 
 ### Step 3 — Research and tag every claim
 Apply the tag rules and check the open-items register in `references/evidence-and-gaps.md`. Hard rules:

@@ -91,7 +91,7 @@ config items with defaults marked Configurable. No summaries in place of rules.>
 | YAML key / decision | Standard setting | This design or claim | Status (ALIGNED / CONFLICT / OPEN / N/A) | Evidence / owner action |
 |---|---|---|---|---|
 
-Use `environment_v2.yaml` as the requested configuration when named; cite the exact key and effective date. Compare `environment.yaml` and linked decisions/proposals. A YAML entry documents configured intent, not approval, deployment, or enforcement. Mark unresolved settings OPEN. Any CONFLICT or OPEN item affecting a deployment-readiness claim blocks that claim; use N/A only when deployment-standard policy is not relevant.
+Use `environment_v2.yaml` as the deployment standard; cite the exact key and effective date. Compare linked decisions/proposals, and report differences from the historical `environment.yaml` as drift, not unresolved authority. A YAML entry documents configured intent, not runtime deployment or enforcement. Mark unresolved v2 settings OPEN. Any CONFLICT or OPEN item affecting a deployment-readiness claim blocks that claim; use N/A only when deployment-standard policy is not relevant.
 
 **Hard constraints (HC reference Part 2):** COMPLIANT | BLOCKED
 | HC | Name | Affected | PASS/FAIL/N/A | Evidence |

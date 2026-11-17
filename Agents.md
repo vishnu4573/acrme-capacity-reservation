@@ -81,8 +81,8 @@ Azure Capacity & Platform Architect   ◄── Requirements Baseline (single so
 #### Standing Constraints
 
 - **Always reads the living requirements baseline before any design or documentation action.**
-  File: `Requirements/acrme_requirements_baseline_v4_0.md` (authoritative v4.0 baseline)
-- For deployment-policy reviews, also reads `environment_v2.yaml`, the relevant decision/proposal, and compares `environment.yaml`. These files differ; until the owner resolves the discrepancy, the agent reports it rather than silently selecting or merging one.
+  File: `Requirements/acrme_requirements_baseline_v4_0_2.md` (authoritative v4.0.2 baseline)
+- For deployment-policy reviews, also reads `environment_v2.yaml` and the relevant decision/proposal. The owner confirmed `environment_v2.yaml` as the deployment standard and `environment.yaml` as an earlier what-if model on 17 November 2026; report differences as historical drift, not unresolved authority.
 - Distinguishes allowlist/approval eligibility for new capacity requests from exact-size, region/zone/subscription, reservation-support, capacity, and both-quota readiness checks. New-request approval does not gate existing protective reconciliation retroactively.
 - Never binds a region to a fixed environment (any Standard region can host Prod, CVAL, or DR).
 - Never treats Simplified Distribution Experiment content as core/baseline.
@@ -100,7 +100,7 @@ Azure Capacity & Platform Architect   ◄── Requirements Baseline (single so
 | Hard Constraints Reference | `Reference-Material/reference/acrme_hard_constraints_reference.md` |
 | Calculation Logic Reference | `Reference-Material/reference/acrme_calculation_logic_reference.md` |
 | Region Selection Reference Docs | `Reference-Material/reference/region_selection_prerequisites.md`, `acrme_region_selection_executive_reference.md` |
-| Requirements Baseline (v4.0) | `Requirements/acrme_requirements_baseline_v4_0.md` |
+| Requirements Baseline (v4.0.2) | `Requirements/acrme_requirements_baseline_v4_0_2.md` |
 | Calculation Logic Diagrams | `Architecture/diagrams/calculation-logic/` (01–06.mmd) |
 | Capacity Partition Diagrams | `Architecture/diagrams/capacity-partition-model/` |
 | ADRs | `Architecture/adr/` |
@@ -433,8 +433,8 @@ ACRME FinOps Analyst
 
 | Agent | Status | Current Activity |
 |---|---|---|
-| Azure Capacity & Platform Architect | ✅ Active | v4.0 baseline authored; skills/agents aligned; awaiting member review |
+| Azure Capacity & Platform Architect | ✅ Active | v4.0.2 baseline published with the approved DR topology clarification |
 | ACRME Implementation Engineer | ⏸ Defined, not instantiated | Phase 1 backlog ready; awaiting kickoff after v4.0 approval |
 | ACRME POC Validation Engineer | ⏸ Defined, not instantiated | POC workbook ready; G9-G12 offline cases executable now |
-| ACRME Documentation Steward | ⏸ Defined, not instantiated | Reference material needs reconciliation to v4.0 baseline |
+| ACRME Documentation Steward | ⏸ Defined, not instantiated | Reference material needs reconciliation to v4.0.2 baseline |
 | ACRME FinOps Analyst | ⏸ Defined, activate on demand | Activate when DR cost modelling or buffer trade-off analysis needed |
