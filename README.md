@@ -7,6 +7,30 @@ and POC artefacts have not yet been reconciled to v4.0.2; their status is called
 
 ---
 
+## Local documentation site
+
+Use [Zensical](https://zensical.org/) to search and browse a curated set of
+requirements and design documents. From the repository root, with Python 3.11+:
+
+```bash
+python3 -m venv .venv-docs
+.venv-docs/bin/python -m pip install -r requirements-docs.txt
+.venv-docs/bin/python tools/docs_site.py serve
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). To generate static HTML in
+`site/`, run `.venv-docs/bin/python tools/docs_site.py build`. Restart the
+preview after editing the source Markdown; each run takes a fresh snapshot of
+the files listed in [`tools/docs_site.py`](tools/docs_site.py).
+
+See [Manage pages in Zensical](docs/zensical-page-management.md) to add, remove,
+rename, or reorder pages.
+
+The site is local only. It does not publish to GitHub Pages or include the
+v4.0.3 working draft, archives, POC evidence, or deployment YAML.
+
+---
+
 ## Repository layout
 
 The repository is organised into purpose-named top-level areas. Every narrative document is
