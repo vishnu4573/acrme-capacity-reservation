@@ -23,8 +23,10 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000). To generate static HTML in
 preview after editing the source Markdown; each run takes a fresh snapshot of
 the files listed in [`tools/docs_site.py`](tools/docs_site.py).
 
-See [Manage pages in Zensical](docs/zensical-page-management.md) to add, remove,
-rename, or reorder pages.
+See [Zensical local setup, preview, and maintenance](docs/zensical-local-setup.md)
+for a reusable guide for any repository, or
+[Manage pages in Zensical](docs/zensical-page-management.md) to add, remove,
+rename, or reorder pages in the ACRME site.
 
 The site is local only. It does not publish to GitHub Pages or include the
 v4.0.3 working draft, archives, POC evidence, or deployment YAML.
