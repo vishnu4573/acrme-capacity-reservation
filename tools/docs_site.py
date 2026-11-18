@@ -17,9 +17,22 @@ SOURCES = (
     "Design/diagrams/acrme_v4_topology.mmd",
     "Design/diagrams/acrme_v4_domain_model.mmd",
     "Design/diagrams/acrme_v4_engine_modes.mmd",
-    "Architecture/e2e-deployment-flow/ACRME_E2E_Deployment_Flow_Diagrams_v2_1.md"
+    "Architecture/e2e-deployment-flow/ACRME_E2E_Deployment_Flow_Diagrams_v2_1.md",
 )
 REPO_FILES = "https://github.com/vishnu4573/acrme-capacity-reservation/blob/master"
+REPO_LINKS = {
+    "../environment.yaml": "environment.yaml",
+    "../environment_v2.yaml": "environment_v2.yaml",
+    "../Requirements/acrme_requirements_baseline_v4_0_2.md": (
+        "Requirements/acrme_requirements_baseline_v4_0_2.md"
+    ),
+    "./ACRME_End_to_End_Deployment_Flow_v2.md": (
+        "Architecture/e2e-deployment-flow/ACRME_End_to_End_Deployment_Flow_v2.md"
+    ),
+    "./ACRME_E2E_Deployment_Flow_Diagrams_Proposed_Changes.md": (
+        "Architecture/e2e-deployment-flow/ACRME_E2E_Deployment_Flow_Diagrams_Proposed_Changes.md"
+    ),
+}
 
 
 def main() -> int:
@@ -45,8 +58,8 @@ def main() -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             if target.suffix == ".md":
                 text = (ROOT / path).read_text(encoding="utf-8")
-                for name in ("environment.yaml", "environment_v2.yaml"):
-                    text = text.replace(f"](../{name})", f"]({REPO_FILES}/{name})")
+                for link, repo_path in REPO_LINKS.items():
+                    text = text.replace(f"]({link})", f"]({REPO_FILES}/{repo_path})")
                 target.write_text(text, encoding="utf-8")
             else:
                 shutil.copyfile(ROOT / path, target)

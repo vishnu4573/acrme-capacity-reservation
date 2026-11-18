@@ -11,6 +11,7 @@ nav = [
     { "Functional design" = "Design/acrme_functional_design_document.md" },
     { "Technical design" = "Design/acrme_technical_design_document.md" },
   ] },
+  { "End-to-End Deployment Flow" = "Architecture/e2e-deployment-flow/ACRME_E2E_Deployment_Flow_Diagrams_v2_1.md" },
 ]
 
 [project.theme]
