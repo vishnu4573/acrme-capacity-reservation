@@ -10,13 +10,14 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = (
-    "Requirements/acrme_requirements_baseline_v4_0_2.md",
+    "Requirements/acrme_requirements_baseline_v4_0_3.md",
     "Design/acrme_functional_design_document.md",
     "Design/acrme_technical_design_document.md",
     "Design/diagrams/acrme_v4_pipeline.mmd",
     "Design/diagrams/acrme_v4_topology.mmd",
     "Design/diagrams/acrme_v4_domain_model.mmd",
     "Design/diagrams/acrme_v4_engine_modes.mmd",
+    "Architecture/e2e-deployment-flow/ACRME_E2E_Deployment_Flow_Diagrams_v2_1.md"
 )
 REPO_FILES = "https://github.com/vishnu4573/acrme-capacity-reservation/blob/master"
 
