@@ -6,10 +6,10 @@ site_dir = "site"
 dev_addr = "127.0.0.1:8000"
 nav = [
   { Home = "index.md" },
-  { Requirements = "Requirements/acrme_requirements_baseline_v4_0_2.md" },
+  { Requirements = "Requirements/acrme_requirements_baseline_v4_0_3.md" },
   { Design = [
-    { "Functional design (draft)" = "Design/acrme_functional_design_document.md" },
-    { "Technical design (draft)" = "Design/acrme_technical_design_document.md" },
+    { "Functional design" = "Design/acrme_functional_design_document.md" },
+    { "Technical design" = "Design/acrme_technical_design_document.md" },
   ] },
 ]
 
