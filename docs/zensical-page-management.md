@@ -37,8 +37,11 @@ reading the repository; neither is included in the generated site.
 4. Review the page's relative links and images. Add any approved local assets
    the page needs to `SOURCES`, using their exact paths; assets do not need
    `nav` entries. For a document that should remain outside the site, link to
-   its repository URL instead. Add a link to [`docs/index.md`](index.md) only
-   if the page should be featured on the home page.
+   its repository URL. To keep a relative link in the source Markdown, add
+   it to `REPO_LINKS` in [`tools/docs_site.py`](../tools/docs_site.py) so the
+   wrapper rewrites it in the staged copy. Add a link to
+   [`docs/index.md`](index.md) only if the page should be featured on the home
+   page.
 5. Build and preview using the checks below.
 
 ## Remove or rename a page
