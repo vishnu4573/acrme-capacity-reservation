@@ -1,6 +1,7 @@
 """Build or preview a curated snapshot of the repository documentation."""
 
 import argparse
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,8 +24,8 @@ REPO_FILES = "https://github.com/vishnu4573/acrme-capacity-reservation/blob/mast
 REPO_LINKS = {
     "../environment.yaml": "environment.yaml",
     "../environment_v2.yaml": "environment_v2.yaml",
-    "../Requirements/acrme_requirements_baseline_v4_0_2.md": (
-        "Requirements/acrme_requirements_baseline_v4_0_2.md"
+    "../Archive/requirements/baselines/acrme_requirements_baseline_v4_0_2.md": (
+        "Archive/requirements/baselines/acrme_requirements_baseline_v4_0_2.md"
     ),
     "./ACRME_End_to_End_Deployment_Flow_v2.md": (
         "Architecture/e2e-deployment-flow/ACRME_End_to_End_Deployment_Flow_v2.md"
@@ -65,9 +66,19 @@ def main() -> int:
                 shutil.copyfile(ROOT / path, target)
 
         flags = ["--strict"] if args.command == "build" else []
+        env = os.environ.copy()
+        docs_venv = ROOT / ".venv-docs"
+        python = sys.executable
+        if (docs_venv / "pyvenv.cfg").is_file():
+            env["VIRTUAL_ENV"] = str(docs_venv)
+            env["PATH"] = f"{docs_venv / 'bin'}{os.pathsep}{env['PATH']}"
+            python = str(docs_venv / "bin" / "python")
+
         try:
             result = subprocess.run(
-                [sys.executable, "-m", "zensical", args.command, *flags], cwd=project
+                [python, "-m", "zensical", args.command, *flags],
+                cwd=project,
+                env=env,
             )
         except KeyboardInterrupt:
             return 130

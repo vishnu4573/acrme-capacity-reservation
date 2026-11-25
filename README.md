@@ -2,8 +2,8 @@
 
 This repository contains the requirements and design artefacts for the **ACRME Capacity
 Reservation** initiative, together with an implementation skeleton and POC tooling. The
-authoritative requirements baseline is **v4.0.2**. Several older design, reference, mockup,
-and POC artefacts have not yet been reconciled to v4.0.2; their status is called out below.
+authoritative requirements baseline is **v4.0.3**. Several older design, reference, mockup,
+and POC artefacts have not yet been reconciled to v4.0.3; their status is called out below.
 
 ---
 
@@ -29,7 +29,7 @@ for a reusable guide for any repository, or
 rename, or reorder pages in the ACRME site.
 
 The site is local only. It does not publish to GitHub Pages or include the
-v4.0.3 working draft, archives, POC evidence, or deployment YAML.
+archives, POC evidence, or deployment YAML.
 
 ---
 
@@ -43,10 +43,10 @@ provided as `.md` (source), `.docx` (editable), and `.pdf` (print-ready) unless 
 acrme-capacity-reservation/
 ├── README.md                          # This file
 ├── docs/README.md                     # Navigation index → top-level areas
-├── Requirements/                      # WHAT the system must do (v4.0.2, current)
-│   ├── acrme_requirements_baseline_v4_0_2.md # single source of truth (v4.0.2)
-│   └── acrme_complete_requirements_reference.*
-├── Design/                            # Historical designs; v4.0.2 reconciliation pending
+├── Requirements/                      # Current requirements and open proposals
+│   ├── acrme_requirements_baseline_v4_0_3.md # authoritative working baseline
+│   └── acrme_sku_financial_approval_baseline_change.md
+├── Design/                            # Historical designs; v4.0.3 reconciliation pending
 │   ├── acrme_functional_design_document.*
 │   ├── acrme_technical_design_document.*
 │   ├── acrme_uml_class_diagrams_summary.*
@@ -74,7 +74,8 @@ acrme-capacity-reservation/
 ├── Archive/                           # Superseded / historical (do not delete)
 │   ├── design/                        # Exec DD, PRR, FDD/TDD plan (superseded)
 │   ├── adr/                           # Consolidated ADR (superseded by split ADRs)
-│   ├── requirements/                  # Requirements v2.1 + deviation analysis
+│   ├── requirements/                  # Baselines, audits, proposals, legacy references
+│   ├── architecture/                  # Superseded architecture flow documents
 │   ├── research/                      # Pre-baseline research inputs + research workbook
 │   ├── testing/                       # Binary v2.0 POC workbook (.docx/.pdf)
 │   └── README_PHASE3.md / README_PHASE4.md
@@ -86,10 +87,10 @@ acrme-capacity-reservation/
 For GitHub CLI sign-in recovery and repository access checks, see
 [`tools/README.md`](tools/README.md).
 
-> **Baseline authority:** [`Requirements/acrme_requirements_baseline_v4_0_2.md`](Requirements/acrme_requirements_baseline_v4_0_2.md)
+> **Baseline authority:** [`Requirements/acrme_requirements_baseline_v4_0_3.md`](Requirements/acrme_requirements_baseline_v4_0_3.md)
 > is the single source of truth. The v2.4 and v3.0 baseline files are retained as historical
 > snapshots. A v2.x/v3.0 reference in another artefact records its historical basis unless
-> that artefact explicitly states it has been reconciled to v4.0.2.
+> that artefact explicitly states it has been reconciled to v4.0.3.
 
 > **Restructured (Phase 4).** Archived and current documents are no longer interleaved. All
 > moves used `git mv`, so `git log --follow <path>` shows full history across the restructure.
@@ -100,8 +101,9 @@ For GitHub CLI sign-in recovery and repository access checks, see
 
 | Artifact | Description |
 |---|---|
-| **Requirements Baseline v4.0.2** ([`Requirements/acrme_requirements_baseline_v4_0_2.md`](Requirements/acrme_requirements_baseline_v4_0_2.md)) | Authoritative source of truth; supersedes v4.0.1 with the approved DR topology clarification. Older baseline files are historical only. |
-| **Complete Requirements Reference** ([`Requirements/acrme_complete_requirements_reference.md`](Requirements/acrme_complete_requirements_reference.md)) | Legacy explanatory compilation; not reconciled to v4.0.2 and not normative. Use the current baseline for requirements. |
+| **Requirements Baseline v4.0.3** ([`Requirements/acrme_requirements_baseline_v4_0_3.md`](Requirements/acrme_requirements_baseline_v4_0_3.md)) | Authoritative working baseline and current single source of truth. |
+| **Requirements index** ([`Requirements/README.md`](Requirements/README.md)) | Distinguishes the current baseline, pending proposals, and archived history. |
+| **Historical requirements index** ([`Archive/requirements/README.md`](Archive/requirements/README.md)) | Superseded baselines, audits, incorporated proposals, and the legacy expanded reference. |
 
 ---
 
@@ -151,11 +153,11 @@ Full-resolution source images for each of the six core views, in raster (`.png`)
 ## POC test scripts & workbook (`POC-Test-Scripts/`)
 
 The home for the executable POC suite and its historical workbook. These artefacts were
-prepared against v2.4 and have not been reconciled to v4.0.2; do not treat them as the current
+prepared against v2.4 and have not been reconciled to v4.0.3; do not treat them as the current
 acceptance suite without review.
 
-- **Historical v2.4 POC workbook** ([`POC-Test-Scripts/acrme_poc_workbook_v2_4.md`](POC-Test-Scripts/acrme_poc_workbook_v2_4.md)) — 49 cases across groups G1–G12. It is not established as aligned with baseline v4.0.2.
-- **Executable suite** — runnable POC tooling; its case coverage and expected results require reconciliation against v4.0.2.
+- **Historical v2.4 POC workbook** ([`POC-Test-Scripts/acrme_poc_workbook_v2_4.md`](POC-Test-Scripts/acrme_poc_workbook_v2_4.md)) — 49 cases across groups G1–G12. It is not established as aligned with baseline v4.0.3.
+- **Executable suite** — runnable POC tooling; its case coverage and expected results require reconciliation against v4.0.3.
 
 ### Key design decisions
 - **Azure CLI only** — all commands execute via `az` and `az rest`; no Azure Python SDK.
@@ -204,7 +206,7 @@ Generated execution evidence is collected under [`Test-Results/`](Test-Results/)
 
 #### Product backlog (`Reference-Material/backlog/`)
 
-The Agile backlog is a historical planning artefact derived from earlier design material; it has not been reconciled to v4.0.2. See [`Reference-Material/backlog/`](Reference-Material/backlog/).
+The Agile backlog is a historical planning artefact derived from earlier design material; it has not been reconciled to v4.0.3. See [`Reference-Material/backlog/`](Reference-Material/backlog/).
 
 | Backlog file | Description |
 |---|---|
@@ -231,7 +233,7 @@ Superseded / historical documents, retained (not deleted) and isolated from curr
 
 ## Historical POC suite behavior (last described against v2.4)
 
-The following describes the legacy suite behavior, not a v4.0.2 validation result.
+The following describes the legacy suite behavior, not a v4.0.3 validation result.
 
 1. **Geography-aware region placement (PLC-010a).** Production, the non-Production region, and DR
    must be placed per the geography's `distribution_model`: three distinct regions for

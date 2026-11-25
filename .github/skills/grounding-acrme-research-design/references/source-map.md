@@ -12,17 +12,18 @@
 
 | Candidate | Path |
 |---|---|
-| Repo baseline (v4.0.2) | `Requirements/acrme_requirements_baseline_v4_0_2.md` — authoritative |
-| Prior baseline (v4.0.1) | `Requirements/acrme_requirements_baseline_v4_0.md` — superseded by v4.0.2 |
-| Legacy repo baseline (v2.5, filename historical) | `Requirements/acrme_requirements_baseline_v2_4.md` — superseded by v4.0.2 |
-| Historical baseline (v3.0) | `Requirements/acrme_requirements_baseline_v3_0.md` — superseded by v4.0.2 |
+| Repo baseline (v4.0.3) | `Requirements/acrme_requirements_baseline_v4_0_3.md` — authoritative working baseline |
+| Prior baseline (v4.0.2) | `Archive/requirements/baselines/acrme_requirements_baseline_v4_0_2.md` — superseded |
+| Prior baseline (v4.0.1) | `Archive/requirements/baselines/acrme_requirements_baseline_v4_0.md` — superseded |
+| Legacy repo baseline (v2.5, filename historical) | `Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md` — superseded |
+| Historical baseline (v3.0) | `Archive/requirements/baselines/acrme_requirements_baseline_v3_0.md` — superseded |
 | Optional external/uploaded copy | Supply its path with `check_grounding.py --uploaded-baseline <path>` or `ACRME_UPLOADED_BASELINE`; no host-specific path is assumed |
-| Expanded reference | `Requirements/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
+| Expanded reference | `Archive/requirements/reference/acrme_complete_requirements_reference.md` (rank 5 — explanatory, not normative) |
 | Code glossary | `Reference-Material/reference/acrme_requirements_code_glossary.md` (one-line definitions + links) |
-| Consistency audit | `Requirements/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |
+| Consistency audit | `Archive/requirements/audits/acrme_consistency_audit_2026-09-17.md` (precedent: uploaded copy drifted behind repo) |
 | Deployment standard | `environment_v2.yaml` — owner-confirmed deployment-standard configuration, effective 2026-10-23; not proof of runtime enforcement |
 | Related deployment-policy proposal | `Requirements/acrme_sku_financial_approval_baseline_change.md` — user-confirmed series/approval policy; baseline incorporation and runtime implementation pending |
-| DR topology baseline-change record | `Requirements/acrme_baseline_v4_0_2_change_proposal.md` — approved and incorporated in v4.0.2 |
+| DR topology baseline-change record | `Archive/requirements/change-proposals/acrme_baseline_v4_0_2_change_proposal.md` — approved and incorporated in v4.0.2 |
 | Historical what-if configuration | `environment.yaml` — earlier process model retained for what-if analysis; not the deployment standard |
 
 Rule: the highest Document Control version wins. `scripts/check_grounding.py --baseline-only` resolves it. Section numbers below are from the current baseline; re-check them if the version changed.
@@ -46,7 +47,7 @@ normative authority over the requirements baseline.
 | Environment policy (Prod / CVAL / DR isolation, core sub) | §7 | ENV-001..007 | ADR-001, ADR-007 |
 | Deployment configuration & readiness policy (new-request series/approvals, subscription limits, blue/green rollout, DR foundation, reservation sharing, geography profiles) | §7–§10, §13, §15, §18, §23, §25 | ENV-001..007, CAP-001..025, QUA-001..015, DR-001..021, GOV-001..009 | `environment_v2.yaml`; `Requirements/acrme_sku_financial_approval_baseline_change.md` |
 | Capacity reservation mgmt (target, reconcile, zero-not-delete, sharing, zonal CRG, seed matrix) | §8 | CAP-001..025, CAP-001a | ADR-002, ADR-007, `Reference-Material/reference/acrme_cr_crg_deployment_layout.md`, `acrme_crg_cr_foundation_provisioning_plan.md` |
-| Quota (two caps, Quota Groups, earmarks, consumer quota) | §9 | QUA-001..015 | ADR-002, ADR-006 (`adrme_adr_006_quota_reservation_enforcement_boundary.md`) |
+| Quota (two caps, Quota Groups, earmarks, consumer quota) | §9 | QUA-001..015 | ADR-002, ADR-006 (`acrme_adr_006_quota_reservation_enforcement_boundary.md`) |
 | Combined readiness | §10 | RDY-001..004 | `Mockups/acrme_sku_placement_whatif_user_guide.md` (6-state readiness) |
 | Region selection & customer placement (CRV customer-scoped) | §11 | PLC-001..005, PLC-007..016 (PLC-006 retired) | ADR-001, `Design/acrme_region_selection_mockup_plan.md` |
 | Domain group model (domain-scoped partitioning, DPB) | §12 | DOM-001..004 | — |

@@ -5,7 +5,7 @@
 | Version | 2.1 reconciliation draft |
 | Date | 17 November 2026 |
 | Status | v4.0.2 reconciliation draft - pending Architect decisions and applicable POC validation; not ratified |
-| Baseline | [Requirements baseline v4.0.2](../Requirements/acrme_requirements_baseline_v4_0_2.md) |
+| Baseline | [Requirements baseline v4.0.2](../Archive/requirements/baselines/acrme_requirements_baseline_v4_0_2.md) |
 | Owner | Principal Cloud Architect |
 | Audience | Business, architecture, product platforms, AEP, operations, audit, FinOps |
 | Companion | [Technical Design Document](acrme_technical_design_document.md) |

@@ -3,13 +3,13 @@
 > **Historical prompt — not authoritative.** This prompt was written against baseline v2.5
 > and has not been reconciled to v4.0. Its remaining project context, decisions, and guidance
 > may be stale. The current source of truth is
-> [`../../Requirements/acrme_requirements_baseline_v4_0_2.md`](../../Requirements/acrme_requirements_baseline_v4_0_2.md);
+> [`../../Requirements/acrme_requirements_baseline_v4_0_3.md`](../../Requirements/acrme_requirements_baseline_v4_0_3.md);
 > follow the current research-and-design procedure in
 > [`../../.github/skills/grounding-acrme-research-design/SKILL.md`](../../.github/skills/grounding-acrme-research-design/SKILL.md).
 
 **Document Type:** Master Research & Design Prompt\
 **Intended For:** AI assistants, new architects, platform engineers, and technical researchers picking up this project cold\
-**Current baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v4.0.2\
+**Current baseline:** Azure Capacity & Quota Management Consolidated Requirements Baseline v4.0.3\
 **Historical context in this prompt:** v2.5 (amended 7 Oct 2026)\
 **Repo:** `vishnu4573/acrme-capacity-reservation` (branch: `master`)\
 **Last updated:** 6 October 2026
@@ -361,7 +361,7 @@ All documents are under `vishnu4573/acrme-capacity-reservation` (branch: `master
 
 | Path | What It Is |
 | --- | --- |
-| `Requirements/acrme_requirements_baseline_v2_4.md` | Living requirements baseline — **read before any design change** |
+| `Requirements/acrme_requirements_baseline_v4_0_3.md` | Living requirements baseline — **read before any design change** |
 | `Reference-Material/reference/acrme_calculation_logic_reference.md` | Every formula, tagged `[Documented/Decided/Derived/Assumed]` |
 | `Reference-Material/reference/acrme_plain_english_walkthrough.md` | Plain-English companion to the formula reference |
 | `Reference-Material/reference/ps_prod_nonprod_headroom_design_rationale.md` | Design rationale for why PS_Prod α uses NonProd headroom |

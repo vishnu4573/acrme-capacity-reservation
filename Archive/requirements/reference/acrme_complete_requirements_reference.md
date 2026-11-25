@@ -2,7 +2,7 @@
 
 > **Legacy, non-normative compilation.** This document predates baseline v4.0 and has not been
 > reconciled to it. It may contain stale requirement coverage, classifications, and maturity
-> claims. Use [`acrme_requirements_baseline_v4_0_2.md`](acrme_requirements_baseline_v4_0_2.md) as
+> claims. Use [`../../../Requirements/acrme_requirements_baseline_v4_0_3.md`](../../../Requirements/acrme_requirements_baseline_v4_0_3.md) as
 > the sole source of current requirements; do not rely on this compilation for implementation
 > or acceptance decisions until it is reviewed and updated.
 

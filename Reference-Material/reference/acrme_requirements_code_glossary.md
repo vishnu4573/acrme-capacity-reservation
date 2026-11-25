@@ -59,7 +59,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## REG — Region Strategy Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §6 Region Strategy & Classification](../../Requirements/acrme_requirements_baseline_v2_4.md#6-region-strategy--classification)
+**Primary source:** [Requirements Baseline v2.4 — §6 Region Strategy & Classification](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#6-region-strategy--classification)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -72,7 +72,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## DEC — Strategic Decisions
 
-**Primary source:** [Requirements Baseline v2.4 — §23 Pending Decisions & Mandatory POCs](../../Requirements/acrme_requirements_baseline_v2_4.md#23-pending-decisions--mandatory-pocs)
+**Primary source:** [Requirements Baseline v2.4 — §23 Pending Decisions & Mandatory POCs](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#23-pending-decisions--mandatory-pocs)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -84,7 +84,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## ENV — Environment Policy Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §7 Environment Policy Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#7-environment-policy-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §7 Environment Policy Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#7-environment-policy-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -100,7 +100,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## CAP — Capacity Reservation Management Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §8 Capacity Reservation Management Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#8-capacity-reservation-management-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §8 Capacity Reservation Management Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#8-capacity-reservation-management-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -134,7 +134,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## QUA — Quota Management Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §9 Quota Management Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#9-quota-management-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §9 Quota Management Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#9-quota-management-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -157,7 +157,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## RDY — Combined Capacity & Quota Readiness
 
-**Primary source:** [Requirements Baseline v2.4 — §10 Combined Capacity & Quota Readiness](../../Requirements/acrme_requirements_baseline_v2_4.md#10-combined-capacity--quota-readiness)
+**Primary source:** [Requirements Baseline v2.4 — §10 Combined Capacity & Quota Readiness](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#10-combined-capacity--quota-readiness)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -170,7 +170,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## PLC — Region Selection & Customer Placement Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §11 Region Selection & Customer Placement](../../Requirements/acrme_requirements_baseline_v2_4.md#11-region-selection--customer-placement)
+**Primary source:** [Requirements Baseline v2.4 — §11 Region Selection & Customer Placement](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#11-region-selection--customer-placement)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -192,7 +192,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## DR — Disaster Recovery Capacity Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §12 Disaster Recovery Capacity Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#12-disaster-recovery-capacity-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §12 Disaster Recovery Capacity Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#12-disaster-recovery-capacity-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -221,7 +221,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## FIN — Cost Economics & FinOps Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §13 Cost Economics & FinOps Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#13-cost-economics--finops-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §13 Cost Economics & FinOps Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#13-cost-economics--finops-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -238,7 +238,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## INT — Provisioning & AEP Integration Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §14 Provisioning & AEP Integration](../../Requirements/acrme_requirements_baseline_v2_4.md#14-provisioning--aep-integration)
+**Primary source:** [Requirements Baseline v2.4 — §14 Provisioning & AEP Integration](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#14-provisioning--aep-integration)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -254,7 +254,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## DAT — State & Data Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §15 State & Data Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#15-state--data-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §15 State & Data Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#15-state--data-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -269,7 +269,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## OBS — Observability & Alerting Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §16 Observability & Alerting](../../Requirements/acrme_requirements_baseline_v2_4.md#16-observability--alerting)
+**Primary source:** [Requirements Baseline v2.4 — §16 Observability & Alerting](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#16-observability--alerting)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -283,7 +283,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## GOV — Governance, Security & Compliance Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §17 Governance, Security & Compliance](../../Requirements/acrme_requirements_baseline_v2_4.md#17-governance-security--compliance)
+**Primary source:** [Requirements Baseline v2.4 — §17 Governance, Security & Compliance](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#17-governance-security--compliance)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -301,7 +301,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## NFR — Reliability & Non-Functional Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §18 Reliability & Non-Functional Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#18-reliability--non-functional-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §18 Reliability & Non-Functional Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#18-reliability--non-functional-requirements)
 
 > Note: The complete requirements reference uses `NFR-1..NFR-7` for the top-level functional NFR areas and `NFR-001..NFR-010` for the baseline detailed items. Both refer to the same concepts at different granularities.
 
@@ -322,7 +322,7 @@ It does not reproduce the full specification — it tells you exactly where to f
 
 ## OPS — Operational Requirements
 
-**Primary source:** [Requirements Baseline v2.4 — §19 Operational Requirements](../../Requirements/acrme_requirements_baseline_v2_4.md#19-operational-requirements)
+**Primary source:** [Requirements Baseline v2.4 — §19 Operational Requirements](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#19-operational-requirements)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -382,7 +382,7 @@ Validation rules are named enforcement checks that implement hard constraints in
 
 ## A. — Core Formulas (Appendix A)
 
-**Primary source:** [Requirements Baseline v2.4 — Appendix A — Core Formulas](../../Requirements/acrme_requirements_baseline_v2_4.md#appendix-a--core-formulas)
+**Primary source:** [Requirements Baseline v2.4 — Appendix A — Core Formulas](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#appendix-a--core-formulas)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -400,7 +400,7 @@ Validation rules are named enforcement checks that implement hard constraints in
 
 ## C — Configurable Items Register (Appendix C)
 
-**Primary source:** [Requirements Baseline v2.4 — §22 Configurable Items Register](../../Requirements/acrme_requirements_baseline_v2_4.md#22-configurable-items-register)
+**Primary source:** [Requirements Baseline v2.4 — §22 Configurable Items Register](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#22-configurable-items-register)
 
 These are items where the *capability* is required but the *specific value or policy* is not fixed in the baseline — they are driven by `PlacementPolicy` configuration.
 
@@ -424,7 +424,7 @@ These are items where the *capability* is required but the *specific value or po
 
 ## POC / DEP — Pending Decisions & Mandatory POCs
 
-**Primary source:** [Requirements Baseline v2.4 — §23 Pending Decisions & Mandatory POCs](../../Requirements/acrme_requirements_baseline_v2_4.md#23-pending-decisions--mandatory-pocs)
+**Primary source:** [Requirements Baseline v2.4 — §23 Pending Decisions & Mandatory POCs](../../Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md#23-pending-decisions--mandatory-pocs)
 
 POC items are Azure behaviours that **must be validated** before a production dependency can be declared. DEP items are external dependencies gating design decisions.
 
@@ -447,7 +447,7 @@ POC items are Azure behaviours that **must be validated** before a production de
 
 ## FR — Functional Requirements
 
-**Primary source:** [Complete Requirements Reference — Part 1](../../Requirements/acrme_complete_requirements_reference.md#part-1--functional-requirements-fr-1-through-fr-8)
+**Primary source:** [Complete Requirements Reference — Part 1](../../Archive/requirements/reference/acrme_complete_requirements_reference.md#part-1--functional-requirements-fr-1-through-fr-8)
 
 FR codes are the eight top-level functional capability areas; each expands to sub-requirements (FR-N.M).
 
@@ -466,7 +466,7 @@ FR codes are the eight top-level functional capability areas; each expands to su
 
 ## NFR-R — Placement Non-Functional Requirements
 
-**Primary source:** [Complete Requirements Reference — Part 3](../../Requirements/acrme_complete_requirements_reference.md#placement-non-functional-requirements-nfr-r1nfr-r3)
+**Primary source:** [Complete Requirements Reference — Part 3](../../Archive/requirements/reference/acrme_complete_requirements_reference.md#placement-non-functional-requirements-nfr-r1nfr-r3)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|
@@ -478,7 +478,7 @@ FR codes are the eight top-level functional capability areas; each expands to su
 
 ## R — Regional Placement Requirements
 
-**Primary source:** [Complete Requirements Reference — Part 3, Regional Placement Requirements](../../Requirements/acrme_complete_requirements_reference.md#regional-placement-requirements-r1r8)
+**Primary source:** [Complete Requirements Reference — Part 3, Regional Placement Requirements](../../Archive/requirements/reference/acrme_complete_requirements_reference.md#regional-placement-requirements-r1r8)
 
 | Code | Name | One-line definition |
 |------|------|---------------------|

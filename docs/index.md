@@ -4,8 +4,7 @@ Browse and search this local edition of the Azure Capacity Reservation &
 Management Enablement documentation.
 
 - [Requirements baseline v4.0.3](Requirements/acrme_requirements_baseline_v4_0_3.md)
-  is the authoritative baseline for this edition. The v4.0.3 working draft is
-  not included.
+  is the authoritative working baseline for this local edition.
 - [Functional design](Design/acrme_functional_design_document.md) and
   [technical design](Design/acrme_technical_design_document.md) are reconciliation
   drafts, not ratified specifications or evidence of runtime readiness.

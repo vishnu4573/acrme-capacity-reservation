@@ -271,7 +271,7 @@ def resolve_baseline(repo, uploaded_baseline=None):
 def known_codes(repo, baseline_text):
     corpus = [baseline_text]
     for rel in ("Reference-Material/reference/acrme_requirements_code_glossary.md",
-                "Requirements/acrme_complete_requirements_reference.md"):
+                "Archive/requirements/reference/acrme_complete_requirements_reference.md"):
         p = os.path.join(repo, rel)
         if os.path.exists(p):
             with open(p, encoding="utf-8") as fh:

@@ -5,7 +5,7 @@
 | Version | 2.1 reconciliation draft |
 | Date | 17 November 2026 |
 | Status | v4.0.2 reconciliation draft - Architect decisions and applicable POC validation pending; not ratified |
-| Baseline | [Requirements baseline v4.0.2](../Requirements/acrme_requirements_baseline_v4_0_2.md) |
+| Baseline | [Requirements baseline v4.0.2](../Archive/requirements/baselines/acrme_requirements_baseline_v4_0_2.md) |
 | Owner | Principal Cloud Architect |
 | Companion | [Functional Design Document](acrme_functional_design_document.md) |
 | Change history | 1.0: historical v2.4 design. 2.0: two-scope architecture, partitioned contracts, readiness/quota corrections, Foundation, guarded recovery and validation gates. 2.1: reconcile DPB/Instance Group ownership and DR subscription/Foundation readiness to v4.0.2 and `environment_v2.yaml`. Historical text remains in Git. |

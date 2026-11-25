@@ -32,7 +32,7 @@ Governance may accept preview risk for a bounded pilot, but it must not represen
 
 ## 2. Review Scope and Evidence Standard
 
-This review reconciles the [original engine design](./research/azure_cr_management_engine_design.md), the [final multi-region placement design](./research/multi_region_placement_design.md), the [change summary](./research/design_change_summary.md), the [requirements traceability review](./research/acrme_requirements_traceability_review.md), and the [POC workbook](./research/azure_cr_poc_test_workbook.md). [Derived] All five source documents are published under [`docs/research/`](./research/) (see the Sources section). [Derived]
+This review reconciles the [original engine design](../research/azure_cr_management_engine_design.md), the [final multi-region placement design](../research/multi_region_placement_design.md), the [change summary](../research/design_change_summary.md), the [requirements traceability review](../research/acrme_requirements_traceability_review.md), and the [POC workbook](../research/azure_cr_poc_test_workbook.md). [Derived] All five source documents are published under [`Archive/research/`](../research/) (see the Sources section). [Derived]
 
 The original design defines 49 functional sub-requirements, 29 non-functional sub-requirements, a microservice architecture, 99 initial backlog stories, and operational patterns for CR lifecycle, sharing, quota, placement, DR, forecasting, and cost optimization. [Derived]
 
@@ -1087,7 +1087,7 @@ The engine must emit a capacity-constraint warning to the caller on exception ap
 
 ### Hard constraints (HC-1 through HC-10)
 
-HC-1 through HC-8 are defined in the [Multi-Region Placement Design](./research/multi_region_placement_design.md) (`docs/research/multi_region_placement_design.md`). HC-9 and HC-10 are added by this section.
+HC-1 through HC-8 are defined in the [Multi-Region Placement Design](../research/multi_region_placement_design.md) (`Archive/research/multi_region_placement_design.md`). HC-9 and HC-10 are added by this section.
 
 **HC-9  STANDARD_REGION_ONLY:** Automated placement, scoring, recommendation, and all environment assignments (Prod, CVAL, DR) must use Standard Capacity Regions only. Restricted Capacity Regions are excluded before the scoring pipeline runs; their exclusion is enforced at Stage 1 of the eligibility decision tree, not as a scoring penalty. Exception deployments proceed via the Scenario 1 exception path only. [Undocumented — architectural judgement]
 
@@ -1908,10 +1908,10 @@ The board should authorize only a conditional pilot for non-destructive, validat
 
 ## Sources
 
-The source research documents that this Production Readiness Review reconciles are published in this repository under [`docs/research/`](./research/):
+The source research documents that this Production Readiness Review reconciles are published in this repository under [`Archive/research/`](../research/):
 
-1. [Multi-Region Placement Design](./research/multi_region_placement_design.md) — `docs/research/multi_region_placement_design.md`
-2. [Design Change Summary](./research/design_change_summary.md) — `docs/research/design_change_summary.md`
-3. [Requirements Traceability Review](./research/acrme_requirements_traceability_review.md) — `docs/research/acrme_requirements_traceability_review.md`
-4. [Azure CR Management Engine Design](./research/azure_cr_management_engine_design.md) — `docs/research/azure_cr_management_engine_design.md`
-5. [Azure CR POC Test Workbook](./research/azure_cr_poc_test_workbook.md) — `docs/research/azure_cr_poc_test_workbook.md`
+1. [Multi-Region Placement Design](../research/multi_region_placement_design.md) — `Archive/research/multi_region_placement_design.md`
+2. [Design Change Summary](../research/design_change_summary.md) — `Archive/research/design_change_summary.md`
+3. [Requirements Traceability Review](../research/acrme_requirements_traceability_review.md) — `Archive/research/acrme_requirements_traceability_review.md`
+4. [Azure CR Management Engine Design](../research/azure_cr_management_engine_design.md) — `Archive/research/azure_cr_management_engine_design.md`
+5. [Azure CR POC Test Workbook](../research/azure_cr_poc_test_workbook.md) — `Archive/research/azure_cr_poc_test_workbook.md`

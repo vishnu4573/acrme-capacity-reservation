@@ -6,9 +6,9 @@
 
 **Related flow:** [ACRME End-to-End Deployment Flow v2.0](./ACRME_End_to_End_Deployment_Flow_v2.md)
 
-**Diagram document reviewed:** [ACRME E2E Deployment Flow Diagrams v1.0](./ACRME_E2E_Deployment_Flow_Diagrams.md)
+**Diagram document reviewed:** [ACRME E2E Deployment Flow Diagrams v1.0](./archive/ACRME_E2E_Deployment_Flow_Diagrams.md)
 
-**Status:** Implemented in [diagram document v2.0](./ACRME_E2E_Deployment_Flow_Diagrams_v2.md); v1.0 remains preserved
+**Status:** Implemented in [diagram document v2.0](./archive/ACRME_E2E_Deployment_Flow_Diagrams_v2.md); v1.0 remains preserved
 
 **Phases touched:** P1 Visibility & Prod Protection; P3 Placement & Seed; P4 Distributed DR; P5 Multi-Domain Model & Two-Scope Binding
 
@@ -99,7 +99,7 @@ Differences between `environment.yaml` and `environment_v2.yaml` are historical 
 
 ## Source References
 
-- [Requirements baseline v4.0.2](../../Requirements/acrme_requirements_baseline_v4_0_2.md)
+- [Requirements baseline v4.0.2](../../Archive/requirements/baselines/acrme_requirements_baseline_v4_0_2.md)
 - [Deployment flow v2.0](./ACRME_End_to_End_Deployment_Flow_v2.md)
 - [Deployment-standard configuration](../../environment_v2.yaml)
 - [Series and financial-approval proposal](../../Requirements/acrme_sku_financial_approval_baseline_change.md)

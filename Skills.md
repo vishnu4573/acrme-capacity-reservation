@@ -62,7 +62,7 @@ This document defines the **skill inventory** — the reusable, structured proce
 | Input | Description |
 |---|---|
 | Proposed change | The design decision, recommendation, or document update being proposed |
-| Baseline file | `Requirements/acrme_requirements_baseline_v4_0_2.md` (authoritative v4.0.2 baseline) |
+| Baseline file | `Requirements/acrme_requirements_baseline_v4_0_3.md` (authoritative v4.0.3 baseline) |
 | Relevant FR codes | The functional requirement codes relevant to the proposed change (e.g., CAP-003, DR-017, PLC-013, DOM-001) |
 
 **Process**
