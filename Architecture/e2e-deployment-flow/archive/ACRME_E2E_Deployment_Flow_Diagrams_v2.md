@@ -9,8 +9,8 @@
 | **Baseline** | v4.0.2 |
 | **HC reference** | v1.1 (HC-1..HC-11) |
 
-**Companion deployment flow:** [ACRME End-to-End Deployment Flow v2.0](./ACRME_End_to_End_Deployment_Flow_v2.md)
-**Change record:** [Proposed changes and rationale](./ACRME_E2E_Deployment_Flow_Diagrams_Proposed_Changes.md)
+**Companion deployment flow:** [ACRME End-to-End Deployment Flow v2.0](../ACRME_End_to_End_Deployment_Flow_v2.md)
+**Change record:** [Proposed changes and rationale](../ACRME_E2E_Deployment_Flow_Diagrams_Proposed_Changes.md)
 
 > **Reading guide:** Five connected phase diagrams cover the full pipeline; a sixth diagram lists cross-cutting checks. Terminal nodes in one diagram are entry nodes in the next. Baseline gates cite their requirement IDs; deployment-standard settings are identified separately and do not prove runtime enforcement.
 

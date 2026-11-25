@@ -1,6 +1,6 @@
 # Research Documents
 
-These are the **source research documents** that the [Production Readiness Review & Architecture](../acrme_production_readiness_review_and_architecture.md) reconciles into a single authoritative synthesis.
+These are the **source research documents** that the [Production Readiness Review & Architecture](../design/acrme_production_readiness_review_and_architecture.md) reconciles into a single authoritative synthesis.
 
 They are the raw design and test inputs. Where a research document and the PRR disagree, **the PRR is authoritative** — it represents the finalized, production-ready decisions derived after reviewing all of these inputs.
 

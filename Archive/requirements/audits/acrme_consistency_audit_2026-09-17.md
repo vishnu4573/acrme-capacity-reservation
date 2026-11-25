@@ -7,7 +7,7 @@
 **Scope.** Full sweep of the ACRME documentation set (`Requirements/`, `Architecture/adr/`, `Design/`, `Reference-Material/`, `POC-Test-Scripts/`) checked against (a) the requirements baseline and (b) the canonical calculation formulas & constants. `Archive/` excluded (historical). Auto-generated `.docx`/`.pdf` twins excluded (they regenerate from their `.md`).
 
 **Authority sources used for the audit**
-- Requirements: `Requirements/acrme_requirements_baseline_v2_4.md` — **v2.4 (amended), 11 September 2026** (the newest baseline in the repo).
+- Requirements: `Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md` — **v2.4 (amended), 11 September 2026** (the newest baseline in the repo).
 - Formulas & constants: `Reference-Material/reference/acrme_calculation_logic_reference.md`.
 
 **Bottom line.** The repo is internally consistent. The audit found **two** issues, both now **RESOLVED**: (1) the uploaded "source of truth" baseline was stale vs. the repo baseline — now synchronized to the amended 11-Sep version; (2) one internal typo (5-min vs. 6-min reconciliation interval) — corrected. All documents now reconcile to the authoritative baseline v2.4 (amended), 11 September 2026.
@@ -20,14 +20,14 @@ The standing instruction points at the uploaded file as the single source of tru
 
 | | Uploaded file | Repo baseline |
 |---|---|---|
-| Path | `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` | `Requirements/acrme_requirements_baseline_v2_4.md` |
+| Path | `/home/ubuntu/Uploads/Azure Capacity & Quota Management- Consolidated Requirements Baseline.md` | `Archive/requirements/baselines/acrme_requirements_baseline_v2_4.md` |
 | Version / date | v2.4, **7 September 2026** | **v2.4 (amended), 11 September 2026** |
 | Middle East DR | **`DR_NOT_OFFERED`** ("DR is unlikely to be offered there") | **Cross-geo DR to Europe** (Prod+CVAL co-located in a weighted-selected ME region; DR weighted-selected in a Europe Standard region) |
 | DEC-001 | Pending / open | **RESOLVED** |
 | Extra normative IDs | — | Adds **DR-020, PLC-010b, A-ME1** |
 
 **Impact.** All downstream docs — ADRs, FDD, TDD, calc-logic reference, POC workbook, epics/stories, complete requirements reference — already implement the **amended (11-Sep)** Middle East cross-geo position with DEC-001 RESOLVED. Examples:
-- `Requirements/acrme_complete_requirements_reference.md:103,302` — cross-geo DR into Europe (DR-020, PLC-010b, DEC-001 RESOLVED).
+- `Archive/requirements/reference/acrme_complete_requirements_reference.md:103,302` — cross-geo DR into Europe (DR-020, PLC-010b, DEC-001 RESOLVED).
 - `POC-Test-Scripts/acrme_poc_workbook_v2_4.md:19,144,2167` — POC-PLC-010b positive cross-geo case; supersedes `DR_NOT_OFFERED`.
 - `Reference-Material/backlog/acrme_epics_stories_tasks.md:593,697` — ACRME-S0706 Middle East cross-geo DR (DEC-001 RESOLVED).
 
@@ -56,7 +56,7 @@ While the Calculation Logic Reference already sized DR with **max-not-sum** (A.6
 - `Reference-Material/reference/acrme_hard_constraints_reference.md` — HC-6 (per-customer DR demand → `dr_bootstrap_qty`, DR-007), HC-7 DR floor (`DR_Floor_vCPU(R) = Destination_DR_Requirement(R) × vCPU`, `Destination_DR_Requirement(R) = MAX(source portions)`), POC example reframed, policy JSON + constants table (`dr_ratio_*` marked ❌ Retired).
 - `Reference-Material/reference/acrme_calculation_logic_reference.md` — fixed internal inconsistency in `coverage_ratio` denominator (was `Σ potential_dr_demand`, now `Destination_DR_Requirement = MAX(...)`, matching line ~465); Scenario 15 reframed **Retired (historical rationale only)**; clarified the C-11 SUM override sums actual source portions and does **not** reintroduce `dr_ratio`; summary/disambiguation tables → Retired.
 - `Architecture/adr/acrme_adr_007_crg_deployment_model.md` — Appendix B HC-6/HC-7 formulas converted to bootstrap + max-not-sum.
-- `Requirements/acrme_complete_requirements_reference.md` — FR-5.6 traceability note updated to max-not-sum floor + configurable bootstrap.
+- `Archive/requirements/reference/acrme_complete_requirements_reference.md` — FR-5.6 traceability note updated to max-not-sum floor + configurable bootstrap.
 - `Design/acrme_technical_design_document.md`, `Reference-Material/reference/ACRME_Scoring_Weights_Explained.md`, `Reference-Material/reference/acrme_plain_english_walkthrough.md`, and calc ref PS_DR — the scoring δ term's normalization constant renamed `dr_ratio_target` → `dr_coverage_target` and annotated as a **scoring-only** reference (its `coverage_ratio` uses the max-not-sum denominator), NOT the retired sizing ratio.
 - `POC-Test-Scripts/acrme_poc_workbook_v2_4.md` — assumption A-09 ("30–40% baseline is sufficient") marked **RETIRED**.
 

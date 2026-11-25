@@ -16,7 +16,7 @@
 
 | Version | Date | Change |
 |---|---|---|
-| 1.0 | 17 November 2026 | Historical diagram set, preserved in `ACRME_E2E_Deployment_Flow_Diagrams.md`. |
+| 1.0 | 17 November 2026 | Historical diagram set, preserved in `archive/ACRME_E2E_Deployment_Flow_Diagrams.md`. |
 | 2.0 | 17 November 2026 | Aligns paths and gate scopes with flow v2.0 and baseline v4.0.2; corrects Instance Group timing, deployment-standard checks, reconciliation safeguards, and DR/failback. |
 | 2.1 DRAFT | 18 November 2026 | Adds integration ownership, brownfield retrofit, common cached-CRV freshness, network/IPAM scale-out gates, early atomic capacity commitment, combined quota triggers, Gravity authority, incremental state refresh, and DR-orchestrator callbacks. Confirms the dedicated DR compute subscription per domain group and DR environment as an approved architecture decision; POC-006 is implementation validation only. |
 

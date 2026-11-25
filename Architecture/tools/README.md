@@ -21,7 +21,7 @@ output is identical; if the output differs, the original is left unchanged.
 From the repository root:
 
 ```bash
-./Architecture/tools/reflow_markdown.sh Requirements/acrme_requirements_baseline_v4_0_2.md
+./Architecture/tools/reflow_markdown.sh Requirements/acrme_requirements_baseline_v4_0_3.md
 ```
 
 The script updates the specified file in place after the rendered-output check.
@@ -29,7 +29,7 @@ Review the result with:
 
 ```bash
 git diff --check
-git diff -- Requirements/acrme_requirements_baseline_v4_0_2.md
+git diff -- Requirements/acrme_requirements_baseline_v4_0_3.md
 ```
 
 Pass any GFM-compatible Markdown file as the sole argument. Files using syntax
